@@ -39,14 +39,27 @@ fn env_truthy(key: &str) -> bool {
     }
 }
 
-/// Apply storm-prevention env to a Command before spawn.
-pub fn apply_internal_env(cmd: &mut std::process::Command) {
+/// Disable scopey re-entry (and Claude Code hooks) without breaking OAuth.
+///
+/// Prefer this for `claude -p` children: setting `CLAUDE_CODE_SIMPLE=1` forces
+/// API-key-only auth and prints "Not logged in" with exit 0 when the user is
+/// only OAuth-authenticated — which is the common Claude Code desktop case.
+pub fn apply_hook_disable_env(cmd: &mut std::process::Command) {
     cmd.env(ENV_INTERNAL, "1");
     cmd.env(ENV_HOOKS_DISABLED, "1");
-    // Claude Code: reduce hook/plugin surface when children inherit env.
-    cmd.env("CLAUDE_CODE_SIMPLE", "1");
-    // Defensive: some wrappers honor this.
+    // Defensive: some Claude wrappers honor this without disabling OAuth.
     cmd.env("CLAUDE_CODE_DISABLE_HOOKS", "1");
+}
+
+/// Apply storm-prevention env to a Command before spawn.
+///
+/// Includes `CLAUDE_CODE_SIMPLE=1` for maximum surface reduction. Use
+/// [`apply_hook_disable_env`] for `claude -p` so OAuth still works.
+pub fn apply_internal_env(cmd: &mut std::process::Command) {
+    apply_hook_disable_env(cmd);
+    // Claude Code: reduce hook/plugin surface when children inherit env.
+    // NOTE: breaks OAuth — only use for non-Claude runners or true sandboxes.
+    cmd.env("CLAUDE_CODE_SIMPLE", "1");
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -409,6 +422,8 @@ mod tests {
     fn apply_internal_env_sets_keys() {
         let mut cmd = std::process::Command::new("true");
         apply_internal_env(&mut cmd);
+        let mut cmd2 = std::process::Command::new("true");
+        apply_hook_disable_env(&mut cmd2);
     }
 
     #[test]

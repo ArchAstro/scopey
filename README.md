@@ -167,17 +167,16 @@ Stop  →  scopey hook stop
 
 ### Session store path
 
-Same encoding Claude uses for project dirs (absolute cwd, `/` → `-`):
+Sessions are keyed by **`session_id` only** (not cwd). One Claude/Codex
+session stays one file even when the agent `cd`s into subdirectories.
 
 ```text
-~/.scopey/work/<escaped-cwd>/<session_id>.json
+~/.scopey/work/by-id/<session_id>.json
 ```
 
-Example:
-
-```text
-/Users/you/proj  →  ~/.scopey/work/-Users-you-proj/<session>.json
-```
+`SessionData.cwd` still tracks the latest working directory. On first open,
+legacy files at `work/<escaped-cwd>/<session_id>.json` are migrated into
+`by-id/`.
 
 ### Config (`~/.scopey/config.toml`)
 

@@ -325,15 +325,39 @@ pub struct SessionListEntry {
 }
 
 impl SessionStore {
-    pub fn session_path(cfg: &Config, cwd: &Path, session_id: &str) -> Result<PathBuf> {
+    /// Canonical session file path: keyed by **session_id only** (not cwd).
+    ///
+    /// Layout: `work_root/by-id/<session_id>.json`
+    ///
+    /// Older layouts used `work_root/<escaped-cwd>/<session_id>.json`, which
+    /// fragmented one Claude/Codex session across every `cd` into subdirs.
+    /// [`open_or_create_wait`] migrates legacy files when found.
+    pub fn session_path(cfg: &Config, _cwd: &Path, session_id: &str) -> Result<PathBuf> {
+        Ok(Self::session_path_by_id(cfg, session_id))
+    }
+
+    pub fn session_path_by_id(cfg: &Config, session_id: &str) -> PathBuf {
+        cfg.work_root
+            .join("by-id")
+            .join(format!("{}.json", sanitize_session_id(session_id)))
+    }
+
+    /// Legacy Claude-style path (cwd-encoded). Used only for migration lookup.
+    pub fn legacy_session_path(cfg: &Config, cwd: &Path, session_id: &str) -> Result<PathBuf> {
         let abs = canonicalize_best_effort(&abs_cwd(cwd)?);
         let esc = escape_project_path(&abs);
-        Ok(cfg.work_root.join(esc).join(format!("{session_id}.json")))
+        Ok(cfg
+            .work_root
+            .join(esc)
+            .join(format!("{}.json", sanitize_session_id(session_id))))
     }
 
     pub fn open(cfg: &Config, cwd: &Path, session_id: &str) -> Result<Self> {
-        let path = Self::session_path(cfg, cwd, session_id)?;
-        Self::open_path(path, session_id, cwd, JOB_LOCK_WAIT)
+        let path = Self::resolve_existing_path(cfg, cwd, session_id)
+            .unwrap_or_else(|| Self::session_path_by_id(cfg, session_id));
+        let mut s = Self::open_path(path, session_id, cwd, JOB_LOCK_WAIT)?;
+        s.touch_cwd(cwd)?;
+        Ok(s)
     }
 
     /// Open or create with default (job) lock wait.
@@ -363,15 +387,56 @@ impl SessionStore {
         harness: &str,
         lock_wait: Duration,
     ) -> Result<Self> {
-        let path = Self::session_path(cfg, cwd, session_id)?;
-        if path.exists() {
+        let canonical = Self::session_path_by_id(cfg, session_id);
+        let existing = Self::resolve_existing_path(cfg, cwd, session_id);
+
+        if let Some(old_path) = existing {
+            // Migrate legacy cwd-keyed file → by-id when needed.
+            if old_path != canonical && !canonical.exists() {
+                if let Some(parent) = canonical.parent() {
+                    fs::create_dir_all(parent)?;
+                }
+                // Prefer rename; fall back to copy if cross-device.
+                if fs::rename(&old_path, &canonical).is_err() {
+                    fs::copy(&old_path, &canonical).with_context(|| {
+                        format!(
+                            "migrate session {} → {}",
+                            old_path.display(),
+                            canonical.display()
+                        )
+                    })?;
+                    let _ = fs::remove_file(&old_path);
+                }
+                // Best-effort: move companion lock if present.
+                let old_lock = old_path.with_extension("json.lock");
+                let new_lock = canonical.with_extension("json.lock");
+                if old_lock.exists() {
+                    let _ = fs::rename(&old_lock, &new_lock);
+                }
+                crate::eventlog::info(
+                    session_id,
+                    "session.migrate",
+                    "migrated legacy cwd-keyed session to by-id",
+                    serde_json::json!({
+                        "from": old_path.display().to_string(),
+                        "to": canonical.display().to_string(),
+                    }),
+                );
+            }
+            let path = if canonical.exists() {
+                canonical
+            } else {
+                old_path
+            };
             let mut s = Self::open_path(path, session_id, cwd, lock_wait)?;
             if s.data.harness.is_empty() && !harness.is_empty() {
                 s.data.harness = harness.to_string();
             }
+            s.touch_cwd(cwd)?;
             return Ok(s);
         }
-        if let Some(parent) = path.parent() {
+
+        if let Some(parent) = canonical.parent() {
             fs::create_dir_all(parent)?;
         }
         let abs = canonicalize_best_effort(&abs_cwd(cwd)?);
@@ -393,7 +458,7 @@ impl SessionStore {
             summarize_pending: false,
             pending_judge: None,
         };
-        let lock_path = path.with_extension("json.lock");
+        let lock_path = canonical.with_extension("json.lock");
         let lock_file = OpenOptions::new()
             .create(true)
             .read(true)
@@ -404,12 +469,38 @@ impl SessionStore {
         lock_wait_exclusive(&lock_file, lock_wait)
             .with_context(|| format!("lock {}", lock_path.display()))?;
         let mut store = Self {
-            path,
+            path: canonical,
             data,
             lock_file,
         };
         store.persist()?;
         Ok(store)
+    }
+
+    /// Find an existing session file: by-id first, then legacy cwd path, then
+    /// any work_root/**/session_id.json (other legacy cwd fragments).
+    fn resolve_existing_path(cfg: &Config, cwd: &Path, session_id: &str) -> Option<PathBuf> {
+        let by_id = Self::session_path_by_id(cfg, session_id);
+        if by_id.exists() {
+            return Some(by_id);
+        }
+        if let Ok(legacy) = Self::legacy_session_path(cfg, cwd, session_id) {
+            if legacy.exists() {
+                return Some(legacy);
+            }
+        }
+        // Scan work_root for other cwd fragments of this session_id.
+        find_legacy_session_file(&cfg.work_root, session_id)
+    }
+
+    /// Keep SessionData.cwd current when the agent cds (does not re-key the file).
+    fn touch_cwd(&mut self, cwd: &Path) -> Result<()> {
+        let abs = canonicalize_best_effort(&abs_cwd(cwd)?);
+        let s = abs.to_string_lossy().to_string();
+        if self.data.cwd != s {
+            self.data.cwd = s;
+        }
+        Ok(())
     }
 
     fn open_path(
@@ -642,56 +733,109 @@ impl SessionStore {
         if !cfg.work_root.exists() {
             return Ok(out);
         }
-        let filter_esc = if let Some(c) = cwd {
+        let filter_cwd = if let Some(c) = cwd {
             let abs = canonicalize_best_effort(&abs_cwd(c)?);
-            Some(escape_project_path(&abs))
+            Some(abs.to_string_lossy().to_string())
         } else {
             None
         };
 
-        for entry in fs::read_dir(&cfg.work_root)? {
-            let entry = entry?;
-            if !entry.file_type()?.is_dir() {
+        let mut seen_ids = std::collections::HashSet::new();
+        for p in walk_session_json_files(&cfg.work_root) {
+            let meta = match fs::read_to_string(&p) {
+                Ok(t) => t,
+                Err(_) => continue,
+            };
+            let data: SessionData = match serde_json::from_str(&meta) {
+                Ok(d) => d,
+                Err(_) => continue,
+            };
+            if let Some(ref want) = filter_cwd {
+                // Match exact cwd or prefix (session may have last touched a subdir).
+                if data.cwd != *want && !data.cwd.starts_with(want) && !want.starts_with(&data.cwd) {
+                    continue;
+                }
+            }
+            // Prefer by-id path when duplicates exist after partial migration.
+            if !seen_ids.insert(data.session_id.clone()) {
                 continue;
             }
-            let name = entry.file_name().to_string_lossy().to_string();
-            if let Some(ref esc) = filter_esc {
-                if &name != esc {
-                    continue;
-                }
-            }
-            for f in fs::read_dir(entry.path())? {
-                let f = f?;
-                let p = f.path();
-                if p.extension().and_then(|e| e.to_str()) != Some("json") {
-                    continue;
-                }
-                if p.file_stem()
-                    .and_then(|s| s.to_str())
-                    .is_some_and(|s| s.ends_with(".json"))
-                {
-                    continue;
-                }
-                let meta = match fs::read_to_string(&p) {
-                    Ok(t) => t,
-                    Err(_) => continue,
-                };
-                let data: SessionData = match serde_json::from_str(&meta) {
-                    Ok(d) => d,
-                    Err(_) => continue,
-                };
-                out.push(SessionListEntry {
-                    session_id: data.session_id,
-                    path: p,
-                    updated_at: data.updated_at.to_rfc3339(),
-                    tool_call_count: data.tool_call_count,
-                });
-            }
+            out.push(SessionListEntry {
+                session_id: data.session_id,
+                path: p,
+                updated_at: data.updated_at.to_rfc3339(),
+                tool_call_count: data.tool_call_count,
+            });
         }
         out.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
         out.truncate(limit);
         Ok(out)
     }
+}
+
+/// Sanitize session id for a single path component.
+pub fn sanitize_session_id(session_id: &str) -> String {
+    let s: String = session_id
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    if s.is_empty() {
+        "unknown".into()
+    } else {
+        s
+    }
+}
+
+fn walk_session_json_files(root: &Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
+        let Ok(rd) = fs::read_dir(dir) else {
+            return;
+        };
+        for e in rd.flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                walk(&p, out);
+            } else if p.extension().and_then(|x| x.to_str()) == Some("json") {
+                // Skip lock companions and non-session junk.
+                if p.file_name()
+                    .and_then(|n| n.to_str())
+                    .is_some_and(|n| n.ends_with(".json.lock") || n.ends_with(".tmp"))
+                {
+                    continue;
+                }
+                out.push(p);
+            }
+        }
+    }
+    walk(root, &mut out);
+    // Prefer by-id paths first so list de-dup keeps the canonical file.
+    out.sort_by(|a, b| {
+        let a_id = a.to_string_lossy().contains("/by-id/");
+        let b_id = b.to_string_lossy().contains("/by-id/");
+        b_id.cmp(&a_id).then_with(|| a.cmp(b))
+    });
+    out
+}
+
+fn find_legacy_session_file(work_root: &Path, session_id: &str) -> Option<PathBuf> {
+    let want = format!("{}.json", sanitize_session_id(session_id));
+    for p in walk_session_json_files(work_root) {
+        if p.file_name().and_then(|n| n.to_str()) == Some(want.as_str()) {
+            // Skip already-canonical by-id (caller checked that first).
+            if p.to_string_lossy().contains("/by-id/") {
+                continue;
+            }
+            return Some(p);
+        }
+    }
+    None
 }
 
 impl Drop for SessionStore {
@@ -744,12 +888,69 @@ mod tests {
     }
 
     #[test]
-    fn session_path_uses_claude_escape() {
+    fn session_path_keyed_by_id_not_cwd() {
         let cfg = test_cfg(Path::new("/tmp/scopey-work"));
-        let p = SessionStore::session_path(&cfg, Path::new("/Users/me/proj"), "sid1").unwrap();
-        let s = p.to_string_lossy();
-        assert!(s.contains("-Users-me-proj"));
+        let p1 = SessionStore::session_path(&cfg, Path::new("/Users/me/proj"), "sid1").unwrap();
+        let p2 =
+            SessionStore::session_path(&cfg, Path::new("/Users/me/proj/subdir"), "sid1").unwrap();
+        assert_eq!(p1, p2);
+        let s = p1.to_string_lossy();
+        assert!(s.contains("by-id"));
         assert!(s.ends_with("sid1.json"));
+        assert!(!s.contains("-Users-me-proj"));
+    }
+
+    #[test]
+    fn open_same_session_across_cwd_shares_store() {
+        let dir = tempfile::tempdir().unwrap();
+        let cfg = test_cfg(dir.path());
+        let cwd1 = dir.path().join("proj");
+        let cwd2 = dir.path().join("proj").join("subdir");
+        fs::create_dir_all(&cwd2).unwrap();
+        {
+            let mut s = SessionStore::open_or_create(&cfg, &cwd1, "shared-sid", "claude").unwrap();
+            s.data.tool_call_count = 7;
+            s.persist().unwrap();
+        }
+        let s2 = SessionStore::open_or_create(&cfg, &cwd2, "shared-sid", "claude").unwrap();
+        assert_eq!(s2.data.tool_call_count, 7);
+        assert!(s2.path.to_string_lossy().contains("by-id"));
+    }
+
+    #[test]
+    fn migrates_legacy_cwd_keyed_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let cfg = test_cfg(dir.path());
+        let cwd = dir.path().join("proj");
+        fs::create_dir_all(&cwd).unwrap();
+        // Plant a legacy file.
+        let legacy = SessionStore::legacy_session_path(&cfg, &cwd, "mig-1").unwrap();
+        fs::create_dir_all(legacy.parent().unwrap()).unwrap();
+        let now = Utc::now();
+        let data = SessionData {
+            session_id: "mig-1".into(),
+            cwd: cwd.to_string_lossy().to_string(),
+            harness: "claude".into(),
+            created_at: now,
+            updated_at: now,
+            tool_call_count: 42,
+            last_judged_to_count: 0,
+            last_reminder_at_count: 0,
+            last_injection_at_count: 0,
+            transcript_path: None,
+            messages: vec![],
+            pending_judgement_id: None,
+            tool_events: vec![],
+            summarize_pending: false,
+            pending_judge: None,
+        };
+        fs::write(&legacy, serde_json::to_string_pretty(&data).unwrap()).unwrap();
+        assert!(legacy.exists());
+
+        let s = SessionStore::open_or_create(&cfg, &cwd, "mig-1", "claude").unwrap();
+        assert_eq!(s.data.tool_call_count, 42);
+        assert!(s.path.to_string_lossy().contains("by-id"));
+        assert!(!legacy.exists(), "legacy file should be moved");
     }
 
     #[test]

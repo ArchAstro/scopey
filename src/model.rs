@@ -198,38 +198,52 @@ pub fn complete(cfg: &Config, prompt: &str, session_harness: &str) -> Result<Str
 
 fn complete_claude(cfg: &Config, prompt: &str, model: &str) -> Result<String> {
     use crate::guard;
-    let mut cmd = Command::new("claude");
-    cmd.arg("-p")
-        .arg(prompt)
-        .arg("--model")
-        .arg(model)
-        .arg("--bare")
-        .arg("--output-format")
-        .arg("text")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    guard::apply_internal_env(&mut cmd);
-    let output = run_with_timeout(cmd, cfg.model_timeout_secs, "claude")?;
-    if output.status.success() {
-        return Ok(String::from_utf8_lossy(&output.stdout).trim().to_string());
+
+    // Prefer normal `claude -p` with OAuth-compatible env (no CLAUDE_CODE_SIMPLE).
+    // `--bare` is tried second for API-key sandboxes that want minimal surface.
+    let attempts: [(&str, bool); 2] = [("oauth", false), ("bare", true)];
+    let mut last_err = String::new();
+
+    for (label, bare) in attempts {
+        let mut cmd = Command::new("claude");
+        cmd.arg("-p").arg(prompt).arg("--model").arg(model);
+        if bare {
+            cmd.arg("--bare").arg("--output-format").arg("text");
+            // bare mode expects API key; SIMPLE is fine here
+            guard::apply_internal_env(&mut cmd);
+        } else {
+            cmd.arg("--output-format").arg("text");
+            // Do not set CLAUDE_CODE_SIMPLE — it forces API-key-only auth.
+            guard::apply_hook_disable_env(&mut cmd);
+        }
+        cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+
+        let output = match run_with_timeout(cmd, cfg.model_timeout_secs, "claude") {
+            Ok(o) => o,
+            Err(e) => {
+                last_err = format!("{label}: {e:#}");
+                continue;
+            }
+        };
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let combined = format!("{stdout}\n{stderr}").to_ascii_lowercase();
+
+        // Claude sometimes exits 0 with "Not logged in · Please run /login" on stdout.
+        let not_logged_in = combined.contains("not logged in") || combined.contains("please run /login");
+        if output.status.success() && !stdout.is_empty() && !not_logged_in {
+            return Ok(stdout);
+        }
+        last_err = if !stderr.is_empty() {
+            format!("{label}: status={} stderr={stderr}", output.status)
+        } else if !stdout.is_empty() {
+            format!("{label}: status={} stdout={stdout}", output.status)
+        } else {
+            format!("{label}: status={} (empty output)", output.status)
+        };
     }
 
-    let mut cmd2 = Command::new("claude");
-    cmd2.arg("-p")
-        .arg(prompt)
-        .arg("--model")
-        .arg(model)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    guard::apply_internal_env(&mut cmd2);
-    let output2 = run_with_timeout(cmd2, cfg.model_timeout_secs, "claude")?;
-    if !output2.status.success() {
-        bail!(
-            "claude -p --model {model} failed: {}",
-            String::from_utf8_lossy(&output2.stderr)
-        );
-    }
-    Ok(String::from_utf8_lossy(&output2.stdout).trim().to_string())
+    bail!("claude -p --model {model} failed: {last_err}")
 }
 
 fn complete_codex(cfg: &Config, prompt: &str, model: &str) -> Result<String> {

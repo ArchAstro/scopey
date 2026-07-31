@@ -40,8 +40,9 @@ HOW IT WORKS
   4. When a judgement is off_track, scopey also fires a desktop notification.
 
 SESSION FILES
-  Path layout mirrors Claude's project encoding:
-    ~/.scopey/work/<cwd-with-slashes-as-dashes>/<session_id>.json
+  Keyed by session_id (stable across cwd changes):
+    ~/.scopey/work/by-id/<session_id>.json
+  Legacy cwd-keyed files are migrated on open.
 
   Message types stored in the session: user_prompt, scope_requirements,
   trajectory_mark, judgement, injection, note.
