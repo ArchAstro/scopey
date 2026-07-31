@@ -289,7 +289,7 @@ fn pid_alive(pid: u32) -> bool {
         }
         // EPERM means process exists but we can't signal it
         let err = std::io::Error::last_os_error().raw_os_error();
-        return err == Some(libc::EPERM);
+        err == Some(libc::EPERM)
     }
     #[cfg(not(unix))]
     {
@@ -434,8 +434,10 @@ mod tests {
     #[test]
     fn single_flight_blocks_second_acquire() {
         Config::with_temp_scopey_home(|_| {
-            let mut cfg = Config::default();
-            cfg.min_job_interval_secs = 0;
+            let cfg = Config {
+                min_job_interval_secs: 0,
+                ..Config::default()
+            };
             let sid = "sess-single-flight";
             let g1 = SessionJobGuard::try_acquire(&cfg, sid, "summarize")
                 .unwrap()
@@ -455,8 +457,10 @@ mod tests {
     #[test]
     fn throttle_blocks_reacquire_when_interval_set() {
         Config::with_temp_scopey_home(|_| {
-            let mut cfg = Config::default();
-            cfg.min_job_interval_secs = 3600;
+            let cfg = Config {
+                min_job_interval_secs: 3600,
+                ..Config::default()
+            };
             let sid = "sess-throttle";
             let g1 = SessionJobGuard::try_acquire(&cfg, sid, "summarize")
                 .unwrap()

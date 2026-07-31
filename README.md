@@ -1,18 +1,36 @@
 # scopey
 
+[![CI](https://github.com/ArchAstro/scopey/actions/workflows/ci.yml/badge.svg)](https://github.com/ArchAstro/scopey/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 <p align="center">
   <img src="assets/scopey.jpg" alt="Scopey — the Scope Guy" width="320" />
 </p>
 
 <p align="center"><em>It looks like you're writing code.<br/>Would you like help staying on scope?</em></p>
 
-**Keep Claude Code and Codex sessions on the original scope.**
+**Keep Claude Code, Codex, Grok, Pi, and OpenCode sessions aligned with your
+current intent.**
 
 scopey is a lightweight Rust CLI that installs harness hooks, caches user prompts, summarizes them into scope requirements with a cheap model, periodically judges trajectory (writes/bash especially), injects course-corrections that lag by ~2N tool calls, reminds the model of scope every M tools, and desktop-notifies you when things go off-track.
 
+Scopey is pre-1.0 software. Config and session formats are designed to remain
+compatible, but may still evolve before the first stable release.
+
 ## Install
 
-Makefile targets match the `archastro/aster` style:
+Prerequisites: stable Rust and at least one supported coding-agent CLI for live
+scope extraction. Tests do not require an agent CLI.
+
+Install directly from GitHub:
+
+```bash
+cargo install --git https://github.com/ArchAstro/scopey.git
+scopey setup
+scopey doctor
+```
+
+Or clone the repository and use the Makefile:
 
 ```bash
 make                 # debug build
@@ -60,7 +78,7 @@ Summarize/judge use a **cheap/fast** model on the **same harness as the agent se
 
 | Config | Default | Meaning |
 |--------|---------|---------|
-| `model_runner` | `auto` | `auto` → session harness (`claude` or `codex`); or pin `claude` / `codex` |
+| `model_runner` | `auto` | Use the session harness when available, or pin `claude`, `codex`, `grok`, `pi`, or `opencode` |
 | `model` | `auto` | `auto` → product shipped fast tier |
 | `claude_fast_model` | `haiku` | Claude Code alias for current fast Haiku |
 | `codex_fast_model` | `gpt-5.6-terra` | Codex mini-like / lower-cost GPT-5.6 tier |
@@ -217,15 +235,17 @@ preserves only the latest request instead of replaying the full prompt history.
 
 ### Development checks
 
-Run `make install-pre-commit` once after installing
+Contributors should run `make install-pre-commit` once after installing
 [`pre-commit`](https://pre-commit.com/). The checked-in hook runs
 `cargo fmt --all -- --check` before each commit. CI enforces the same formatting
-check in its lint job.
+check, Clippy, rustdoc warnings, clean-runner tests, and package assembly. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for the complete workflow. CI also checks the
+locked dependency graph against the RustSec advisory database.
 
 ### Session store path
 
-Sessions are keyed by **`session_id` only** (not cwd). One Claude/Codex
-session stays one file even when the agent `cd`s into subdirectories.
+Sessions are keyed by **`session_id` only** (not cwd). One agent session stays
+one file even when the agent `cd`s into subdirectories.
 
 ```text
 ~/.scopey/work/by-id/<session_id>.json
@@ -241,7 +261,7 @@ legacy files at `work/<escaped-cwd>/<session_id>.json` are migrated into
 |-----|---------|---------|
 | `n_tool_calls` | 10 | Journal + start background judge every N tools |
 | `m_reminder` | 20 | Inject scope reminder every M tools |
-| `model_runner` | `auto` | Session harness, or pin `claude`/`codex` |
+| `model_runner` | `auto` | Session harness, or pin any supported runner |
 | `model` | `auto` | Shipped fast tier for that runner |
 | `claude_fast_model` | `haiku` | Claude fast alias |
 | `codex_fast_model` | `gpt-5.6-terra` | Codex fast/mini-like tier |
@@ -273,8 +293,8 @@ scopey notify --title scopey --body "test"
 
 ### Hook contract for harness authors
 
-- **stdin**: full event JSON from Claude/Codex (`session_id`, `cwd`, `prompt` / tools, `transcript_path`, …).
-- **stdout**: only Claude/Codex injection JSON when steering, else empty.
+- **stdin**: normalized harness event JSON (`session_id`, `cwd`, `prompt` / tools, `transcript_path`, …).
+- **stdout**: harness-compatible injection JSON when steering, else empty.
 - **stderr**: diagnostics.
 - Hooks must stay fast; model work is detached (`~/.scopey/logs/`).
 
@@ -315,6 +335,19 @@ scopey status --session-id demo1 --cwd . --raw | head
 
 Session files and logs under `~/.scopey/` contain **user prompts and trajectory excerpts**. Treat that directory like other agent transcripts. Do not commit it.
 
+Scopey invokes locally installed third-party agent CLIs, which may send prompts
+to their configured providers under those providers' terms. Review your harness
+configuration before using Scopey with sensitive material. See
+[SECURITY.md](SECURITY.md) for the complete security model and private reporting
+process.
+
 ## License
 
-MIT
+[MIT](LICENSE). See [CONTRIBUTING.md](CONTRIBUTING.md) and
+[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before participating.
+Maintainers should follow [RELEASING.md](RELEASING.md) before changing
+repository visibility or publishing a version.
+
+Scopey is an independent project and is not affiliated with or endorsed by the
+vendors of Claude Code, Codex, Grok, Pi, or OpenCode. Product names are used only
+to describe compatibility.
