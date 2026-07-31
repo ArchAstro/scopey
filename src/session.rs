@@ -537,12 +537,7 @@ impl SessionStore {
         Ok(())
     }
 
-    fn open_path(
-        path: PathBuf,
-        session_id: &str,
-        cwd: &Path,
-        lock_wait: Duration,
-    ) -> Result<Self> {
+    fn open_path(path: PathBuf, session_id: &str, cwd: &Path, lock_wait: Duration) -> Result<Self> {
         let lock_path = path.with_extension("json.lock");
         if let Some(parent) = lock_path.parent() {
             fs::create_dir_all(parent)?;
@@ -557,7 +552,8 @@ impl SessionStore {
         lock_wait_exclusive(&lock_file, lock_wait)
             .with_context(|| format!("lock {}", lock_path.display()))?;
 
-        let mut f = File::open(&path).with_context(|| format!("open session {}", path.display()))?;
+        let mut f =
+            File::open(&path).with_context(|| format!("open session {}", path.display()))?;
         let mut buf = String::new();
         f.read_to_string(&mut buf)?;
         let mut data: SessionData = serde_json::from_str(&buf)
@@ -684,8 +680,6 @@ impl SessionStore {
         });
     }
 
-
-
     pub fn mark_judgement_injected(&mut self, id: &str) {
         for m in self.data.messages.iter_mut() {
             if m.id.as_deref() == Some(id) {
@@ -786,7 +780,8 @@ impl SessionStore {
             };
             if let Some(ref want) = filter_cwd {
                 // Match exact cwd or prefix (session may have last touched a subdir).
-                if data.cwd != *want && !data.cwd.starts_with(want) && !want.starts_with(&data.cwd) {
+                if data.cwd != *want && !data.cwd.starts_with(want) && !want.starts_with(&data.cwd)
+                {
                     continue;
                 }
             }
@@ -996,8 +991,14 @@ mod tests {
         let sid = "roundtrip-1";
         {
             let mut s = SessionStore::open_or_create(&cfg, &cwd, sid, "claude").unwrap();
-            s.append(SessionMessage::user_prompt("do the thing", hash_prompt("do the thing")));
-            s.append(SessionMessage::scope_requirements("- stay on task", Some("h".into())));
+            s.append(SessionMessage::user_prompt(
+                "do the thing",
+                hash_prompt("do the thing"),
+            ));
+            s.append(SessionMessage::scope_requirements(
+                "- stay on task",
+                Some("h".into()),
+            ));
             s.data.tool_call_count = 5;
             s.set_transcript(Some(Path::new("/tmp/t.jsonl")));
             s.persist().unwrap();
@@ -1034,7 +1035,10 @@ mod tests {
         s.upsert_judgement(j);
         assert!(s.ready_judgement_for_injection().is_some());
         assert_eq!(
-            s.ready_judgement_for_injection().unwrap().summary.as_deref(),
+            s.ready_judgement_for_injection()
+                .unwrap()
+                .summary
+                .as_deref(),
             Some("drifted")
         );
         s.mark_judgement_injected(&jid);

@@ -68,9 +68,7 @@ pub fn resolve_runner(cfg: &Config, session_harness: &str) -> Result<Runner> {
     let explicit = cfg.model_runner.trim().to_ascii_lowercase();
     if explicit != "auto" && !explicit.is_empty() {
         return Runner::parse(&explicit).with_context(|| {
-            format!(
-                "unknown model_runner {explicit:?}; use auto|claude|codex|grok|pi|opencode"
-            )
+            format!("unknown model_runner {explicit:?}; use auto|claude|codex|grok|pi|opencode")
         });
     }
 
@@ -230,7 +228,8 @@ fn complete_claude(cfg: &Config, prompt: &str, model: &str) -> Result<String> {
         let combined = format!("{stdout}\n{stderr}").to_ascii_lowercase();
 
         // Claude sometimes exits 0 with "Not logged in · Please run /login" on stdout.
-        let not_logged_in = combined.contains("not logged in") || combined.contains("please run /login");
+        let not_logged_in =
+            combined.contains("not logged in") || combined.contains("please run /login");
         if output.status.success() && !stdout.is_empty() && !not_logged_in {
             return Ok(stdout);
         }

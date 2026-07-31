@@ -6,12 +6,145 @@ use crate::session::{
     hash_prompt, JudgementStatus, JudgementVerdict, SessionMessage, SessionStore,
 };
 use crate::tool_journal::{extract_tools_from_transcript, format_tools_for_judge};
-use std::path::PathBuf;
 use anyhow::{Context, Result};
 use serde_json::json;
 use std::fs;
 use std::path::Path;
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
+
+const SCOPE_CONTEXT_TURNS: usize = 4;
+
+fn build_scope_analysis_prompt(
+    prompts: &[String],
+    previous_scope: Option<&str>,
+    max_chars: usize,
+) -> String {
+    let latest = prompts.last().map(String::as_str).unwrap_or("");
+    let latest_budget = (max_chars / 2).max(1000);
+    let previous_budget = (max_chars / 4).max(500);
+    let context_budget = max_chars
+        .saturating_sub(latest_budget)
+        .saturating_sub(previous_budget)
+        .max(500);
+    let latest = clip(latest, latest_budget);
+    let previous = previous_scope
+        .map(|scope| clip(scope, previous_budget))
+        .unwrap_or_else(|| "(none — this is the first extraction)".into());
+    let earlier =
+        recent_prompt_context(&prompts[..prompts.len().saturating_sub(1)], context_budget);
+
+    format!(
+        r#"You are a scope analyst for a coding agent session.
+Produce the CURRENT ACTIVE SCOPE after interpreting the latest user prompt.
+
+Treat the latest prompt as an authoritative mutation of the previous active
+scope. Infer one or more of these operations:
+- ADD: add requirements while preserving all unaffected active requirements.
+- SUBTRACT: explicitly cancel, remove, or declare requirements out of scope.
+- MODIFY: alter or narrow named requirements while preserving unaffected ones.
+- REPLACE: explicitly supersede the scope, or clearly start an unrelated task.
+- QUERY: add an answer, explanation, assessment, logs, or status obligation.
+- ADMIN: add a commit, push, PR, or continue operation for the active work.
+- MACHINE_EVENT: record generated state/context without inventing a user goal.
+
+Scope lifecycle rules:
+- Apply every inferred operation; a prompt may combine operations (for example,
+  subtract one requirement and add another).
+- The latest user prompt is authoritative for those mutations. Explicit removals,
+  modifications, replacements, and contradictions override previous scope.
+- For ADD or MODIFY, preserve every unaffected active requirement. Do not treat
+  silence about an existing requirement as cancellation.
+- For SUBTRACT, remove the named requirement and anything that depends only on it.
+- For REPLACE, discard the old task instead of unioning unrelated topics.
+- For QUERY, add the read-only answering/reporting obligation. Never convert the
+  query itself into authorization to implement a change; preserve unaffected
+  existing scope unless the user also subtracts or replaces it.
+- For ADMIN, preserve the directly relevant unfinished task plus the requested administrative action; do not resurrect older tasks.
+- For MACHINE_EVENT, treat the event as state/context. Preserve only the explicit user request it resolves or updates.
+- Earlier prompts and previous scope are context, not automatically active requirements.
+- Output only requirements active NOW. Retire requirements only when the latest
+  mutation removes/replaces them or available context clearly establishes completion.
+- Do not invent implementation, commit, push, no-tools, or no-edit requirements unless the user explicitly requested them or they are inherent to a read-only status/assessment request.
+- Preserve explicit constraints and concrete semantics from the active request.
+
+Output rules:
+- First line exactly: <!-- scope-transition: OPERATIONS --> where OPERATIONS is
+  the inferred operation names separated by commas (for example ADD,SUBTRACT).
+- After that marker, output Markdown bullets only; no preamble or closing.
+- Capture active goals, constraints, out-of-scope boundaries, and done-when criteria.
+- Max ~25 concise bullets.
+
+PREVIOUS EXTRACTED SCOPE (possibly stale; use only if still active):
+---
+{previous}
+---
+
+RECENT EARLIER USER CONTEXT (reference resolution only):
+---
+{earlier}
+---
+
+LATEST USER PROMPT (authoritative):
+---
+{latest}
+---
+"#
+    )
+}
+
+fn recent_prompt_context(prompts: &[String], max_chars: usize) -> String {
+    if prompts.is_empty() {
+        return "(none)".into();
+    }
+    let selected: Vec<&String> = prompts
+        .iter()
+        .rev()
+        .take(SCOPE_CONTEXT_TURNS)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
+    let numbered = selected
+        .iter()
+        .enumerate()
+        .map(|(index, prompt)| format!("Turn {}: {}", index + 1, prompt.trim()))
+        .collect::<Vec<_>>()
+        .join("\n\n");
+    clip(&numbered, max_chars)
+}
+
+fn fallback_scope(latest_prompt: &str) -> String {
+    format!(
+        "- (fallback scope — model unavailable)\n- Respond only to the latest user request:\n{}",
+        clip(latest_prompt, 1500)
+    )
+}
+
+fn extract_scope_transition(output: &str) -> (String, String) {
+    let trimmed = output.trim();
+    let Some((first, rest)) = trimmed.split_once('\n') else {
+        return ("UNKNOWN".into(), trimmed.into());
+    };
+    let Some(operations) = first
+        .trim()
+        .strip_prefix("<!-- scope-transition:")
+        .and_then(|value| value.strip_suffix("-->"))
+    else {
+        return ("UNKNOWN".into(), trimmed.into());
+    };
+    let operations = operations.trim().to_ascii_uppercase();
+    let valid = operations.split(',').all(|operation| {
+        matches!(
+            operation.trim(),
+            "ADD" | "SUBTRACT" | "MODIFY" | "REPLACE" | "QUERY" | "ADMIN" | "MACHINE_EVENT"
+        )
+    });
+    if operations.is_empty() || !valid {
+        return ("UNKNOWN".into(), rest.trim().into());
+    }
+    (operations, rest.trim().into())
+}
 
 pub fn summarize_scope(
     cfg: &Config,
@@ -25,7 +158,7 @@ pub fn summarize_scope(
         "starting summarize",
         json!({ "cwd": cwd.display().to_string() }),
     );
-    let (prompts, harness) = {
+    let (prompts, previous_scope, harness) = {
         let mut store = SessionStore::open_or_create(cfg, cwd, session_id, "")?;
         if let Some(p) = extra_prompt {
             if !p.trim().is_empty() {
@@ -34,10 +167,11 @@ pub fn summarize_scope(
             }
         }
         let prompts = store.all_user_prompts();
+        let previous_scope = store.latest_scope_requirements();
         let harness = store.data.harness.clone();
         // Drop store before model.complete — exclusive flock must not span network I/O.
         drop(store);
-        (prompts, harness)
+        (prompts, previous_scope, harness)
     };
     if prompts.is_empty() {
         eventlog::warn(
@@ -49,50 +183,50 @@ pub fn summarize_scope(
         return Ok(());
     }
     let joined = prompts.join("\n\n---\n\n");
-    let clipped = clip(&joined, cfg.summarize_prompt_chars);
-
-    let sys = format!(
-        r#"You are a scope analyst for a coding agent session.
-Read the user prompt(s) below and extract a tight SCOPE REQUIREMENTS checklist.
-
-Rules:
-- Bullet list only (markdown).
-- Capture goals, constraints, out-of-scope boundaries, and done-when criteria.
-- Prefer actionable requirements the agent must not violate.
-- Max ~25 bullets. No preamble, no closing.
-
-USER PROMPT(S):
-{clipped}
-"#
+    let latest_prompt = prompts.last().expect("checked non-empty prompts");
+    let sys = build_scope_analysis_prompt(
+        &prompts,
+        previous_scope.as_deref(),
+        cfg.summarize_prompt_chars,
     );
 
-    let out = match model::complete(cfg, &sys, &harness) {
-        Ok(t) => t,
+    let (transition, out) = match model::complete(cfg, &sys, &harness) {
+        Ok(t) => extract_scope_transition(&t),
         Err(e) => {
-            // Fallback: first 1500 chars as crude scope so hooks still work offline.
+            // Fallback: latest request only, so offline mode cannot resurrect stale scope.
             eventlog::warn(
                 session_id,
                 "job.summarize.model",
-                format!("model failed; using truncated prompt fallback: {e:#}"),
+                format!("model failed; using latest-prompt fallback: {e:#}"),
                 json!({ "harness": harness }),
             );
-            format!(
-                "- (fallback scope — model unavailable)\n- Honor the user request:\n{}",
-                clip(&joined, 1500)
-            )
+            ("FALLBACK_LATEST".into(), fallback_scope(latest_prompt))
         }
     };
 
     let hash = hash_prompt(&joined);
+    let previous_scope_hash = previous_scope.as_deref().map(hash_prompt);
+    let scope_hash = hash_prompt(&out);
     let mut store = SessionStore::open_or_create(cfg, cwd, session_id, &harness)?;
     store.append(SessionMessage::scope_requirements(out.trim(), Some(hash)));
     store.clear_summarize_pending();
     store.persist()?;
     eventlog::info(
         session_id,
+        "job.summarize.transition",
+        format!("applied scope transition {transition}"),
+        json!({
+            "transition": transition,
+            "previous_scope_hash": previous_scope_hash,
+            "scope_hash": scope_hash,
+            "fallback": transition == "FALLBACK_LATEST",
+        }),
+    );
+    eventlog::info(
+        session_id,
         "job.summarize.done",
         "wrote scope_requirements",
-        json!({ "chars": out.len(), "prompt_count": prompts.len() }),
+        json!({ "chars": out.len(), "prompt_count": prompts.len(), "transition": transition }),
     );
     Ok(())
 }
@@ -138,16 +272,14 @@ pub fn judge_window(
             .latest_scope_requirements()
             .unwrap_or_else(|| "(no scope requirements recorded yet)".into());
 
-        let tp = transcript_path
-            .map(|p| p.to_path_buf())
-            .or_else(|| {
-                store
-                    .data
-                    .transcript_path
-                    .as_ref()
-                    .map(Path::new)
-                    .map(|p| p.to_path_buf())
-            });
+        let tp = transcript_path.map(|p| p.to_path_buf()).or_else(|| {
+            store
+                .data
+                .transcript_path
+                .as_ref()
+                .map(Path::new)
+                .map(|p| p.to_path_buf())
+        });
 
         let mut journal = store.tool_events_in_window(from_count, to_count);
         let mut evidence_source = "journal";
@@ -169,11 +301,7 @@ pub fn judge_window(
             }
         }
 
-        let last_user = store
-            .all_user_prompts()
-            .last()
-            .cloned()
-            .unwrap_or_default();
+        let last_user = store.all_user_prompts().last().cloned().unwrap_or_default();
         let harness = store.data.harness.clone();
         let store_cwd = store.data.cwd.clone();
         // Release exclusive flock before model I/O.
@@ -252,6 +380,9 @@ Structured tool journal for THIS window only ({tool_n} tools, source={evidence_s
 ---
 
 Judge whether the agent is still working within the scope requirements.
+Treat LATEST USER PROMPT as authoritative if it conflicts with or supersedes the extracted scope.
+If the latest prompt is a question, status request, or assessment, judge only whether the agent is answering/investigating that request; do not require implementation merely because an older scope did.
+Do not penalize the agent for retiring completed or superseded requirements.
 Focus especially on file writes/edits and shell commands that change system state.
 Read-only investigation (rg, sed, cat, git show/log, list files) is OnTrack when the scope is an implementation task that has not yet been started or is still being scoped.
 You MUST cite tool names and paths from the journal in details.
@@ -391,11 +522,7 @@ pub fn drain_pending_jobs(cfg: &Config, session_id: &str, cwd: &Path) -> Result<
     }
 
     let mut store = SessionStore::open_or_create(cfg, cwd, session_id, "")?;
-    let tp = store
-        .data
-        .transcript_path
-        .as_ref()
-        .map(PathBuf::from);
+    let tp = store.data.transcript_path.as_ref().map(PathBuf::from);
 
     if store.data.summarize_pending {
         store.persist()?;
@@ -761,6 +888,58 @@ mod tests {
     use super::*;
 
     #[test]
+    fn scope_prompt_makes_latest_intent_authoritative() {
+        let prompts = vec![
+            "old mascot task".to_string(),
+            "add analytics".to_string(),
+            "clean up analytics".to_string(),
+            "did the PR merge?".to_string(),
+            "when config is missing, what happens?".to_string(),
+            "show me sample extractions".to_string(),
+        ];
+        let prompt = build_scope_analysis_prompt(
+            &prompts,
+            Some("- Implement config bootstrapping\n- Update the mascot"),
+            10_000,
+        );
+        assert!(prompt.contains("LATEST USER PROMPT (authoritative)"));
+        assert!(prompt.contains("show me sample extractions"));
+        assert!(prompt.contains("authoritative mutation"));
+        assert!(prompt.contains("preserve every unaffected active requirement"));
+        assert!(prompt.contains("Never convert the\n  query itself into authorization"));
+        assert!(prompt.contains("ADD,SUBTRACT"));
+        assert!(prompt.contains("possibly stale"));
+        assert!(!prompt.contains("old mascot task"));
+        assert!(prompt.contains("add analytics"));
+    }
+
+    #[test]
+    fn fallback_uses_only_latest_request() {
+        let fallback = fallback_scope("when config is missing, what happens?");
+        assert!(fallback.contains("Respond only to the latest user request"));
+        assert!(fallback.contains("what happens?"));
+        assert!(!fallback.contains("Implement config bootstrapping"));
+    }
+
+    #[test]
+    fn scope_transition_is_removed_before_scope_is_stored() {
+        let (transition, scope) = extract_scope_transition(
+            "<!-- scope-transition: ADD,SUBTRACT -->\n- Keep tests\n- Remove deployment",
+        );
+        assert_eq!(transition, "ADD,SUBTRACT");
+        assert_eq!(scope, "- Keep tests\n- Remove deployment");
+        assert!(!scope.contains("scope-transition"));
+    }
+
+    #[test]
+    fn malformed_scope_transition_is_logged_as_unknown_without_losing_scope() {
+        let raw = "- Keep existing scope\n- Add tests";
+        let (transition, scope) = extract_scope_transition(raw);
+        assert_eq!(transition, "UNKNOWN");
+        assert_eq!(scope, raw);
+    }
+
+    #[test]
     fn extract_json_from_fenced_text() {
         let s = "Here you go:\n```json\n{\"verdict\":\"off_track\"}\n```\n";
         let slice = extract_json_object(s).unwrap();
@@ -788,7 +967,10 @@ mod tests {
             ("warn", JudgementVerdict::Warning),
             ("ok", JudgementVerdict::OnTrack),
             ("on-track", JudgementVerdict::OnTrack),
-            ("insufficient_evidence", JudgementVerdict::InsufficientEvidence),
+            (
+                "insufficient_evidence",
+                JudgementVerdict::InsufficientEvidence,
+            ),
             ("no_evidence", JudgementVerdict::InsufficientEvidence),
         ] {
             let raw = format!(r#"{{"verdict":"{input}","summary":"s","details":"d"}}"#);
@@ -805,7 +987,8 @@ mod tests {
 
     #[test]
     fn parse_judgement_wrapped_and_garbage() {
-        let wrapped = "Sure.\n{\"verdict\":\"warning\",\"summary\":\"maybe\",\"details\":\"x\"}\nThanks";
+        let wrapped =
+            "Sure.\n{\"verdict\":\"warning\",\"summary\":\"maybe\",\"details\":\"x\"}\nThanks";
         let (v, s, _) = parse_judgement_json(wrapped);
         assert_eq!(v, JudgementVerdict::Warning);
         assert_eq!(s, "maybe");

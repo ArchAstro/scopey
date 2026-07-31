@@ -61,12 +61,9 @@ pub fn notify_judgement(cfg: &Config, ctx: &NotifyContext<'_>) -> Result<()> {
             JudgementVerdict::InsufficientEvidence | JudgementVerdict::Unknown => "unknown",
         };
         let msg = format!("{}: {}", ctx.verdict_label(), ctx.summary);
-        if let Err(e) = herdr::report_agent_state(
-            state,
-            &msg,
-            &cfg.herdr_source,
-            &cfg.herdr_agent_label,
-        ) {
+        if let Err(e) =
+            herdr::report_agent_state(state, &msg, &cfg.herdr_source, &cfg.herdr_agent_label)
+        {
             eprintln!("scopey herdr: report-agent failed: {e:#}");
         }
     }
@@ -146,7 +143,10 @@ fn deliver_herdr(
             },
             None => "request",
         },
-        _ => herdr::herdr_sound_for(ctx.verdict_label(), explicit.or(cfg.notify_sound.as_deref())),
+        _ => herdr::herdr_sound_for(
+            ctx.verdict_label(),
+            explicit.or(cfg.notify_sound.as_deref()),
+        ),
     };
     let position = cfg.herdr_notify_position.as_deref();
     let shown = herdr::notification_show(title, body, sound, position)?;
@@ -239,9 +239,7 @@ fn notify_macos(title: &str, body: &str, sound: Option<&str>) -> Result<()> {
     let body_e = escape_applescript(body);
     let script = if let Some(s) = sound {
         let sound_e = escape_applescript(s);
-        format!(
-            r#"display notification "{body_e}" with title "{title_e}" sound name "{sound_e}""#
-        )
+        format!(r#"display notification "{body_e}" with title "{title_e}" sound name "{sound_e}""#)
     } else {
         format!(r#"display notification "{body_e}" with title "{title_e}""#)
     };

@@ -4,8 +4,8 @@ use crate::guard::{self, SessionJobGuard};
 use crate::session::{hash_prompt, SessionMessage, SessionStore, ToolEvent};
 use crate::tool_journal::{counts_toward_n, preview_tool_input};
 use crate::trajectory::{
-    build_correction_injection, build_reminder_injection, drain_pending_jobs, spawn_background_judge,
-    spawn_background_summarize, transcript_len,
+    build_correction_injection, build_reminder_injection, drain_pending_jobs,
+    spawn_background_judge, spawn_background_summarize, transcript_len,
 };
 use anyhow::{Context, Result};
 use chrono::Utc;
@@ -31,7 +31,12 @@ pub struct HookEvent {
     pub session_id: Option<String>,
     #[serde(default, alias = "workspaceRoot", alias = "workingDirectory")]
     pub cwd: Option<String>,
-    #[serde(default, alias = "transcriptPath", alias = "sessionFile", alias = "session_path")]
+    #[serde(
+        default,
+        alias = "transcriptPath",
+        alias = "sessionFile",
+        alias = "session_path"
+    )]
     pub transcript_path: Option<String>,
     #[serde(default, alias = "hookEventName", alias = "event")]
     pub hook_event_name: Option<String>,
@@ -70,8 +75,8 @@ fn read_event() -> Result<HookEvent> {
         anyhow::bail!("empty stdin; hook handlers expect harness JSON on stdin");
     }
     // Accept raw JSON object, or wrapper { "event": {...} } from some adapters.
-    let v: serde_json::Value =
-        serde_json::from_str(&buf).with_context(|| format!("parse hook JSON: {}", clip(&buf, 200)))?;
+    let v: serde_json::Value = serde_json::from_str(&buf)
+        .with_context(|| format!("parse hook JSON: {}", clip(&buf, 200)))?;
     let obj = if let Some(inner) = v.get("event").or_else(|| v.get("payload")) {
         inner.clone()
     } else {
@@ -177,7 +182,8 @@ pub(crate) fn harness_from_event(ev: &HookEvent) -> String {
         }
     }
     // Env markers from adapters / harness runners
-    if std::env::var_os("GROK_SESSION_ID").is_some() || std::env::var_os("GROK_HOOK_EVENT").is_some()
+    if std::env::var_os("GROK_SESSION_ID").is_some()
+        || std::env::var_os("GROK_HOOK_EVENT").is_some()
     {
         return "grok".into();
     }
@@ -472,10 +478,7 @@ pub fn post_tool(cfg: &Config) -> Result<()> {
     let mut journaled: Vec<(String, String, bool)> = Vec::new();
     if let Some(ref batch) = ev.tool_calls {
         for tc in batch {
-            let name = tc
-                .tool_name
-                .clone()
-                .unwrap_or_else(|| "unknown".into());
+            let name = tc.tool_name.clone().unwrap_or_else(|| "unknown".into());
             let noise = !counts_toward_n(&name);
             journaled.push((name, String::new(), noise));
         }
@@ -483,10 +486,7 @@ pub fn post_tool(cfg: &Config) -> Result<()> {
             journaled.push(("batch".into(), String::new(), false));
         }
     } else {
-        let name = ev
-            .tool_name
-            .clone()
-            .unwrap_or_else(|| "unknown".into());
+        let name = ev.tool_name.clone().unwrap_or_else(|| "unknown".into());
         let args = preview_tool_input(ev.tool_input.as_ref(), preview_chars);
         let noise = !counts_toward_n(&name);
         journaled.push((name, args, noise));
@@ -694,10 +694,7 @@ pub fn stop(cfg: &Config) -> Result<()> {
     let sid = session_id(&ev)?;
     let cwd = cwd(&ev);
     let harness = harness_from_event(&ev);
-    let hook_name = ev
-        .hook_event_name
-        .clone()
-        .unwrap_or_else(|| "Stop".into());
+    let hook_name = ev.hook_event_name.clone().unwrap_or_else(|| "Stop".into());
 
     let mut store = match SessionStore::open_or_create_hook(cfg, &cwd, &sid, &harness) {
         Ok(s) => s,

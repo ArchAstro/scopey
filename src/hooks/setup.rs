@@ -48,8 +48,7 @@ pub fn run_uninstall(
     if purge_data {
         let home = Config::scopey_home();
         if home.exists() {
-            fs::remove_dir_all(&home)
-                .with_context(|| format!("remove {}", home.display()))?;
+            fs::remove_dir_all(&home).with_context(|| format!("remove {}", home.display()))?;
             println!("data: removed {}", home.display());
         } else {
             println!("data: {} already absent", home.display());
@@ -84,7 +83,9 @@ pub(crate) fn is_scopey_hook_group(group: &Value) -> bool {
         .unwrap_or(false)
 }
 
-pub(crate) fn strip_scopey_from_hooks_object(hooks_obj: &mut serde_json::Map<String, Value>) -> usize {
+pub(crate) fn strip_scopey_from_hooks_object(
+    hooks_obj: &mut serde_json::Map<String, Value>,
+) -> usize {
     let mut removed = 0usize;
     let keys: Vec<String> = hooks_obj.keys().cloned().collect();
     for key in keys {
@@ -128,7 +129,10 @@ fn uninstall_claude_hooks() -> Result<()> {
     }
     let text = serde_json::to_string_pretty(&root)?;
     fs::write(&path, text + "\n")?;
-    println!("claude hooks: removed {n} scopey group(s) from {}", path.display());
+    println!(
+        "claude hooks: removed {n} scopey group(s) from {}",
+        path.display()
+    );
     Ok(())
 }
 
@@ -154,16 +158,14 @@ fn uninstall_codex_hooks() -> Result<()> {
     let n = strip_scopey_from_hooks_object(hooks);
     let text = serde_json::to_string_pretty(&root)?;
     fs::write(&path, text + "\n")?;
-    println!("codex hooks: removed {n} scopey group(s) from {}", path.display());
+    println!(
+        "codex hooks: removed {n} scopey group(s) from {}",
+        path.display()
+    );
     Ok(())
 }
 
-pub fn run_setup(
-    cfg: &Config,
-    set: HarnessSet,
-    force: bool,
-    write_config: bool,
-) -> Result<()> {
+pub fn run_setup(cfg: &Config, set: HarnessSet, force: bool, write_config: bool) -> Result<()> {
     if write_config {
         let p = Config::write_default_if_missing()?;
         println!("config: {}", p.display());
@@ -263,7 +265,10 @@ fn install_claude_hooks(bin: &PathBuf, force: bool) -> Result<()> {
     }
 
     // Strip legacy PostToolUse scopey hooks when force or when present (storm fix).
-    if let Some(arr) = hooks_obj.get_mut("PostToolUse").and_then(|v| v.as_array_mut()) {
+    if let Some(arr) = hooks_obj
+        .get_mut("PostToolUse")
+        .and_then(|v| v.as_array_mut())
+    {
         let before = arr.len();
         arr.retain(|group| {
             !group
@@ -359,7 +364,10 @@ fn install_grok_hooks(bin: &PathBuf, force: bool) -> Result<()> {
     fs::create_dir_all(&dir)?;
     let path = dir.join("scopey.json");
     if path.exists() && !force {
-        println!("grok hooks: {} already present (use --force to replace)", path.display());
+        println!(
+            "grok hooks: {} already present (use --force to replace)",
+            path.display()
+        );
         return Ok(());
     }
     let cmd = |sub: &str| scopey_hook_cmd(bin, sub);
@@ -688,9 +696,7 @@ pub fn run_doctor(cfg: &Config) -> Result<()> {
             let pinned = cfg.model_runner.trim().to_ascii_lowercase();
             if pinned == "claude" || pinned == "codex" {
                 if which::which(&pinned).is_err() {
-                    return Err(format!(
-                        "model_runner={pinned:?} but {pinned} not on PATH"
-                    ));
+                    return Err(format!("model_runner={pinned:?} but {pinned} not on PATH"));
                 }
             } else if which::which("claude").is_err() && which::which("codex").is_err() {
                 return Err("neither claude nor codex on PATH".into());

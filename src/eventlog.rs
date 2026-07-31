@@ -100,13 +100,7 @@ pub fn session_log_path(session_id: &str) -> PathBuf {
 }
 
 /// Append one structured log line for a session. Best-effort (never panics callers).
-pub fn write(
-    session_id: &str,
-    level: Level,
-    event: &str,
-    message: impl AsRef<str>,
-    fields: Value,
-) {
+pub fn write(session_id: &str, level: Level, event: &str, message: impl AsRef<str>, fields: Value) {
     let sid = session_id.trim();
     if sid.is_empty() {
         return;
@@ -293,10 +287,7 @@ fn emit_line(line: &str, q: &LogsQuery) {
     if !passes_filters(&v, q) {
         return;
     }
-    let ts = v
-        .get("ts")
-        .and_then(|x| x.as_str())
-        .unwrap_or("?");
+    let ts = v.get("ts").and_then(|x| x.as_str()).unwrap_or("?");
     // shorten ts for display
     let ts_short = if ts.len() >= 19 { &ts[..19] } else { ts };
     let level = v
@@ -307,10 +298,7 @@ fn emit_line(line: &str, q: &LogsQuery) {
     let event = v.get("event").and_then(|x| x.as_str()).unwrap_or("-");
     let msg = v.get("message").and_then(|x| x.as_str()).unwrap_or("");
     let pid = v.get("pid").and_then(|x| x.as_u64()).unwrap_or(0);
-    let internal = v
-        .get("internal")
-        .and_then(|x| x.as_bool())
-        .unwrap_or(false);
+    let internal = v.get("internal").and_then(|x| x.as_bool()).unwrap_or(false);
     let flag = if internal { " int" } else { "" };
     let fields = v.get("fields").cloned().unwrap_or(json!({}));
     let fields_s = if fields.as_object().map(|m| !m.is_empty()).unwrap_or(false) {
