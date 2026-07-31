@@ -114,14 +114,17 @@ fn default_socket_path() -> Option<PathBuf> {
 }
 
 /// Map scopey config sound / verdict to Herdr's sound enum: none|done|request.
+///
+/// Off-track / warning default to **request** (needs-attention). Unknown OS
+/// sound names (default, Glass, …) also map to request for attention alerts.
 pub fn herdr_sound_for(verdict: &str, configured: Option<&str>) -> &'static str {
-    // Explicit herdr sounds win when user set them.
     if let Some(s) = configured {
         match s.trim().to_ascii_lowercase().as_str() {
             "none" | "off" | "silent" | "" => return "none",
             "done" => return "done",
             "request" | "attention" | "blocked" => return "request",
-            // OS sound names → pick request for attention alerts
+            // OS sound names / "default" → attention ping for alerts
+            _ if matches!(verdict, "off_track" | "warning") => return "request",
             _ => {}
         }
     }
@@ -252,6 +255,8 @@ mod tests {
         assert_eq!(herdr_sound_for("off_track", Some("silent")), "none");
         assert_eq!(herdr_sound_for("off_track", Some("request")), "request");
         assert_eq!(herdr_sound_for("off_track", Some("Glass")), "request");
+        assert_eq!(herdr_sound_for("off_track", Some("default")), "request");
+        assert_eq!(herdr_sound_for("warning", Some("default")), "request");
         assert_eq!(herdr_sound_for("unknown", None), "none");
     }
 
