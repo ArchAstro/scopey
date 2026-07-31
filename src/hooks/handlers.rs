@@ -1,0 +1,669 @@
+use crate::config::Config;
+use crate::eventlog;
+use crate::guard::{self, SessionJobGuard};
+use crate::session::{hash_prompt, SessionMessage, SessionStore};
+use crate::trajectory::{
+    build_correction_injection, build_reminder_injection, spawn_background_judge,
+    spawn_background_summarize, transcript_len,
+};
+use anyhow::{Context, Result};
+use serde::Deserialize;
+use serde_json::json;
+use std::io::{self, Read};
+use std::path::{Path, PathBuf};
+
+/// Absolute first line of defense: headless/internal children never re-enter hooks.
+fn hooks_disabled() -> bool {
+    if guard::is_internal() {
+        // Do not log per-call when internal — would re-amplify during storms.
+        eprintln!("scopey hook: no-op (SCOPEY_INTERNAL / hooks disabled)");
+        return true;
+    }
+    false
+}
+
+#[derive(Debug, Deserialize)]
+pub struct HookEvent {
+    /// Claude/Codex snake_case; Grok camelCase (`sessionId`); env fallbacks applied later.
+    #[serde(default, alias = "sessionId")]
+    pub session_id: Option<String>,
+    #[serde(default, alias = "workspaceRoot", alias = "workingDirectory")]
+    pub cwd: Option<String>,
+    #[serde(default, alias = "transcriptPath", alias = "sessionFile", alias = "session_path")]
+    pub transcript_path: Option<String>,
+    #[serde(default, alias = "hookEventName", alias = "event")]
+    pub hook_event_name: Option<String>,
+    #[serde(default, alias = "userPrompt", alias = "text", alias = "message")]
+    pub prompt: Option<String>,
+    #[allow(dead_code)]
+    #[serde(default, alias = "toolName")]
+    pub tool_name: Option<String>,
+    #[allow(dead_code)]
+    #[serde(default, alias = "toolInput", alias = "args")]
+    pub tool_input: Option<serde_json::Value>,
+    #[serde(default, alias = "toolCalls")]
+    pub tool_calls: Option<Vec<ToolCall>>,
+    #[serde(default, alias = "reason")]
+    pub source: Option<String>,
+    #[serde(default)]
+    pub model: Option<String>,
+    /// Explicit harness tag from adapters (pi/opencode/grok).
+    #[serde(default)]
+    pub harness: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ToolCall {
+    #[allow(dead_code)]
+    #[serde(default, alias = "toolName", alias = "name")]
+    pub tool_name: Option<String>,
+}
+
+fn read_event() -> Result<HookEvent> {
+    let mut buf = String::new();
+    io::stdin()
+        .read_to_string(&mut buf)
+        .context("read hook stdin")?;
+    if buf.trim().is_empty() {
+        anyhow::bail!("empty stdin; hook handlers expect harness JSON on stdin");
+    }
+    // Accept raw JSON object, or wrapper { "event": {...} } from some adapters.
+    let v: serde_json::Value =
+        serde_json::from_str(&buf).with_context(|| format!("parse hook JSON: {}", clip(&buf, 200)))?;
+    let obj = if let Some(inner) = v.get("event").or_else(|| v.get("payload")) {
+        inner.clone()
+    } else {
+        v
+    };
+    let mut ev: HookEvent = serde_json::from_value(obj)
+        .with_context(|| format!("decode hook event: {}", clip(&buf, 200)))?;
+    normalize_event(&mut ev);
+    Ok(ev)
+}
+
+/// Normalize cross-harness quirks into Claude-like fields.
+fn normalize_event(ev: &mut HookEvent) {
+    if let Some(ref name) = ev.hook_event_name {
+        let n = name.to_ascii_lowercase().replace('-', "_");
+        ev.hook_event_name = Some(match n.as_str() {
+            "pre_tool_use" | "tool_execute_before" | "tool_call" => "PreToolUse".into(),
+            "post_tool_use" | "tool_execute_after" | "tool_result" | "tool_execution_end" => {
+                "PostToolUse".into()
+            }
+            "post_tool_batch" | "turn_end" => "PostToolBatch".into(),
+            "user_prompt_submit" | "before_agent_start" | "before_submit_prompt" => {
+                "UserPromptSubmit".into()
+            }
+            "session_start" | "session_created" => "SessionStart".into(),
+            "stop" | "agent_end" | "session_idle" | "end_turn" => "Stop".into(),
+            other => other.to_string(),
+        });
+    }
+}
+
+fn session_id(ev: &HookEvent) -> Result<String> {
+    if let Some(s) = ev.session_id.clone().filter(|s| !s.is_empty()) {
+        return Ok(s);
+    }
+    // Grok / env fallbacks
+    for key in [
+        "SCOPEY_SESSION_ID",
+        "GROK_SESSION_ID",
+        "CLAUDE_SESSION_ID",
+        "CODEX_SESSION_ID",
+        "OPENCODE_SESSION_ID",
+    ] {
+        if let Ok(s) = std::env::var(key) {
+            if !s.is_empty() {
+                return Ok(s);
+            }
+        }
+    }
+    anyhow::bail!("hook JSON missing session_id (and no session env var)")
+}
+
+fn cwd(ev: &HookEvent) -> PathBuf {
+    if let Some(ref c) = ev.cwd {
+        if !c.is_empty() {
+            return PathBuf::from(c);
+        }
+    }
+    if let Ok(c) = std::env::var("GROK_WORKSPACE_ROOT") {
+        if !c.is_empty() {
+            return PathBuf::from(c);
+        }
+    }
+    if let Ok(c) = std::env::var("CLAUDE_PROJECT_DIR") {
+        if !c.is_empty() {
+            return PathBuf::from(c);
+        }
+    }
+    std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+}
+
+pub(crate) fn harness_from_event(ev: &HookEvent) -> String {
+    if let Some(ref h) = ev.harness {
+        let hl = h.to_ascii_lowercase();
+        if matches!(
+            hl.as_str(),
+            "claude" | "codex" | "grok" | "pi" | "opencode" | "open-code"
+        ) {
+            return if hl == "open-code" {
+                "opencode".into()
+            } else {
+                hl
+            };
+        }
+    }
+    // Prefer explicit signals from the harness payload / paths.
+    if let Some(ref tp) = ev.transcript_path {
+        let lower = tp.to_ascii_lowercase();
+        if lower.contains("codex") || lower.contains("/.codex/") {
+            return "codex".into();
+        }
+        if lower.contains("claude") || lower.contains("/.claude/") {
+            return "claude".into();
+        }
+        if lower.contains("/.grok/") || lower.contains("grok") {
+            return "grok".into();
+        }
+        if lower.contains("/.pi/") || lower.contains("/pi/") {
+            return "pi".into();
+        }
+        if lower.contains("opencode") {
+            return "opencode".into();
+        }
+    }
+    // Env markers from adapters / harness runners
+    if std::env::var_os("GROK_SESSION_ID").is_some() || std::env::var_os("GROK_HOOK_EVENT").is_some()
+    {
+        return "grok".into();
+    }
+    if std::env::var("SCOPEY_HARNESS")
+        .map(|v| v.to_ascii_lowercase())
+        .ok()
+        .as_deref()
+        == Some("pi")
+    {
+        return "pi".into();
+    }
+    if std::env::var("SCOPEY_HARNESS")
+        .map(|v| v.to_ascii_lowercase())
+        .ok()
+        .as_deref()
+        == Some("opencode")
+    {
+        return "opencode".into();
+    }
+    // Model slug heuristics
+    if let Some(ref m) = ev.model {
+        let ml = m.to_ascii_lowercase();
+        if ml.contains("gpt") || ml.contains("codex") || ml.contains("o3") || ml.contains("o4") {
+            return "codex".into();
+        }
+        if ml.contains("claude")
+            || ml.contains("haiku")
+            || ml.contains("sonnet")
+            || ml.contains("opus")
+            || ml.contains("fable")
+        {
+            return "claude".into();
+        }
+        if ml.contains("grok") {
+            return "grok".into();
+        }
+    }
+    "unknown".into()
+}
+
+fn emit_additional_context(hook_event_name: &str, context: &str) {
+    let out = json!({
+        "hookSpecificOutput": {
+            "hookEventName": hook_event_name,
+            "additionalContext": context,
+        }
+    });
+    println!("{}", out);
+}
+
+fn clip(s: &str, n: usize) -> String {
+    s.chars().take(n).collect()
+}
+
+pub fn user_prompt(cfg: &Config) -> Result<()> {
+    if hooks_disabled() {
+        return Ok(());
+    }
+    let ev = read_event()?;
+    let sid = session_id(&ev)?;
+    let cwd = cwd(&ev);
+    let prompt = ev.prompt.clone().unwrap_or_default();
+    if prompt.trim().is_empty() {
+        eventlog::debug(&sid, "hook.user_prompt", "empty prompt; no-op", json!({}));
+        return Ok(());
+    }
+    // Never store recursive headless prompts as user scope.
+    if guard::looks_like_scopey_internal_prompt(&prompt) {
+        eventlog::warn(
+            &sid,
+            "hook.user_prompt",
+            "ignored internal scopey/model prompt",
+            json!({ "chars": prompt.len() }),
+        );
+        return Ok(());
+    }
+
+    let harness = harness_from_event(&ev);
+    let mut store = SessionStore::open_or_create(cfg, &cwd, &sid, &harness)?;
+    if let Some(ref tp) = ev.transcript_path {
+        store.set_transcript(Some(Path::new(tp)));
+    }
+    store.append(SessionMessage::user_prompt(&prompt, hash_prompt(&prompt)));
+    store.persist()?;
+    eventlog::info(
+        &sid,
+        "hook.user_prompt",
+        "cached user prompt",
+        json!({
+            "harness": harness,
+            "chars": prompt.len(),
+            "cwd": cwd.display().to_string(),
+        }),
+    );
+
+    // Single-flight + throttle: parent refuses if session already has a live worker.
+    if !SessionJobGuard::can_spawn(cfg, &sid)? {
+        eventlog::info(
+            &sid,
+            "hook.user_prompt",
+            "skip summarize (session busy/throttled)",
+            json!({}),
+        );
+        return Ok(());
+    }
+    if let Err(e) = spawn_background_summarize(cfg, &sid, &cwd) {
+        eventlog::error(
+            &sid,
+            "hook.user_prompt",
+            format!("failed to spawn summarize: {e:#}"),
+            json!({}),
+        );
+    }
+
+    // Silent stdout — do not inject on every prompt by default.
+    Ok(())
+}
+
+pub fn session_start(cfg: &Config) -> Result<()> {
+    if hooks_disabled() {
+        return Ok(());
+    }
+    let ev = read_event()?;
+    let sid = session_id(&ev)?;
+    let cwd = cwd(&ev);
+    let harness = harness_from_event(&ev);
+    let mut store = SessionStore::open_or_create(cfg, &cwd, &sid, &harness)?;
+    if let Some(ref tp) = ev.transcript_path {
+        store.set_transcript(Some(Path::new(tp)));
+    }
+    let note = format!(
+        "session_start source={}",
+        ev.source.clone().unwrap_or_else(|| "unknown".into())
+    );
+    store.append(SessionMessage {
+        type_: crate::session::MessageType::Note,
+        ts: chrono::Utc::now(),
+        content: Some(note),
+        tool_count: None,
+        transcript_offset: None,
+        from_count: None,
+        to_count: None,
+        verdict: None,
+        status: None,
+        summary: None,
+        details: None,
+        kind: Some("session_start".into()),
+        prompt_hash: None,
+        id: Some(uuid::Uuid::new_v4().to_string()),
+    });
+    store.persist()?;
+    eventlog::info(
+        &sid,
+        "hook.session_start",
+        "session ensured",
+        json!({
+            "harness": harness,
+            "source": ev.source.clone().unwrap_or_default(),
+        }),
+    );
+    Ok(())
+}
+
+pub fn post_tool(cfg: &Config) -> Result<()> {
+    if hooks_disabled() {
+        return Ok(());
+    }
+    let ev = read_event()?;
+    let sid = session_id(&ev)?;
+    let cwd = cwd(&ev);
+    let harness = harness_from_event(&ev);
+    let hook_name = ev
+        .hook_event_name
+        .clone()
+        .unwrap_or_else(|| "PostToolUse".into());
+
+    // Prefer batch accounting: if this is PostToolUse and PostToolBatch is also
+    // installed historically, we only count batch events when present; for
+    // PostToolUse alone, count 1. Detect batch via tool_calls array.
+    let is_batch = ev.tool_calls.is_some() || hook_name == "PostToolBatch";
+    let delta: u64 = if let Some(ref batch) = ev.tool_calls {
+        batch.len().max(1) as u64
+    } else if is_batch {
+        1
+    } else {
+        // Per-tool PostToolUse: still count, but only spawn on N boundaries below.
+        1
+    };
+    let _ = is_batch;
+
+    let mut store = SessionStore::open_or_create(cfg, &cwd, &sid, &harness)?;
+    if let Some(ref tp) = ev.transcript_path {
+        store.set_transcript(Some(Path::new(tp)));
+    }
+
+    let prev = store.data.tool_call_count;
+    store.data.tool_call_count = prev.saturating_add(delta);
+    let count = store.data.tool_call_count;
+
+    let n = cfg.n_tool_calls.max(1);
+    let m = cfg.m_reminder.max(1);
+
+    let mut injected = false;
+
+    // 1) Apply ready off-track/warning judgement (lags previous window ≈ 2N)
+    if let Some(j) = store.ready_judgement_for_injection().cloned() {
+        let scope = store
+            .latest_scope_requirements()
+            .unwrap_or_else(|| "(scope requirements not ready yet)".into());
+        let summary = j.summary.clone().unwrap_or_default();
+        let details = j.details.clone().unwrap_or_default();
+        let verdict = j
+            .verdict
+            .clone()
+            .unwrap_or(crate::session::JudgementVerdict::Unknown);
+        let text = build_correction_injection(&scope, &summary, &details, &verdict);
+        if let Some(id) = j.id.as_deref() {
+            store.mark_judgement_injected(id);
+        }
+        store.append(SessionMessage::injection("correction", &text, count));
+        store.data.last_injection_at_count = count;
+        emit_additional_context(&hook_name, &text);
+        injected = true;
+        eventlog::info(
+            &sid,
+            "hook.post_tool.inject",
+            "injected course correction",
+            json!({
+                "tool_count": count,
+                "verdict": format!("{:?}", verdict),
+            }),
+        );
+    }
+
+    // 2) Periodic scope reminder
+    if !injected && count > 0 && count % m == 0 && store.data.last_reminder_at_count != count {
+        if let Some(scope) = store.latest_scope_requirements() {
+            let text = build_reminder_injection(&scope);
+            store.append(SessionMessage::injection("reminder", &text, count));
+            store.data.last_reminder_at_count = count;
+            store.data.last_injection_at_count = count;
+            emit_additional_context(&hook_name, &text);
+            injected = true;
+            eventlog::info(
+                &sid,
+                "hook.post_tool.inject",
+                "injected scope reminder",
+                json!({ "tool_count": count, "scope_chars": scope.len() }),
+            );
+        }
+    }
+
+    // 3) Every N tools: journal mark + at most one background judge
+    if count > 0 && count % n == 0 {
+        let from = count.saturating_sub(n);
+        let to = count;
+        let off = transcript_len(
+            store
+                .data
+                .transcript_path
+                .as_ref()
+                .map(Path::new),
+        );
+        store.append(SessionMessage::trajectory_mark(count, off));
+        let tp = store
+            .data
+            .transcript_path
+            .as_ref()
+            .map(PathBuf::from);
+        store.persist()?;
+
+        if !SessionJobGuard::can_spawn(cfg, &sid)? {
+            eventlog::info(
+                &sid,
+                "hook.post_tool.judge",
+                "skip judge (session busy/throttled)",
+                json!({ "from": from, "to": to, "tool_count": count }),
+            );
+        } else if let Err(e) =
+            spawn_background_judge(cfg, &sid, &cwd, from, to, tp.as_deref())
+        {
+            eventlog::error(
+                &sid,
+                "hook.post_tool.judge",
+                format!("failed to spawn judge: {e:#}"),
+                json!({ "from": from, "to": to }),
+            );
+        } else {
+            eventlog::info(
+                &sid,
+                "hook.post_tool.judge",
+                "scheduled background judge",
+                json!({ "from": from, "to": to, "tool_count": count, "delta": delta }),
+            );
+        }
+    } else {
+        store.persist()?;
+        eventlog::debug(
+            &sid,
+            "hook.post_tool",
+            "tool count advanced",
+            json!({
+                "tool_count": count,
+                "delta": delta,
+                "hook_event": hook_name,
+                "harness": harness,
+            }),
+        );
+    }
+
+    let _ = injected;
+    Ok(())
+}
+
+pub fn stop(cfg: &Config) -> Result<()> {
+    if hooks_disabled() {
+        return Ok(());
+    }
+    let ev = read_event()?;
+    let sid = session_id(&ev)?;
+    let cwd = cwd(&ev);
+    let harness = harness_from_event(&ev);
+    let hook_name = ev
+        .hook_event_name
+        .clone()
+        .unwrap_or_else(|| "Stop".into());
+
+    let mut store = SessionStore::open_or_create(cfg, &cwd, &sid, &harness)?;
+    if let Some(ref tp) = ev.transcript_path {
+        store.set_transcript(Some(Path::new(tp)));
+    }
+
+    if let Some(j) = store.ready_judgement_for_injection().cloned() {
+        let scope = store
+            .latest_scope_requirements()
+            .unwrap_or_else(|| "(scope requirements not ready yet)".into());
+        let summary = j.summary.clone().unwrap_or_default();
+        let details = j.details.clone().unwrap_or_default();
+        let verdict = j
+            .verdict
+            .clone()
+            .unwrap_or(crate::session::JudgementVerdict::Unknown);
+        let text = build_correction_injection(&scope, &summary, &details, &verdict);
+        if let Some(id) = j.id.as_deref() {
+            store.mark_judgement_injected(id);
+        }
+        let count = store.data.tool_call_count;
+        store.append(SessionMessage::injection("correction_stop", &text, count));
+        store.persist()?;
+        emit_additional_context(&hook_name, &text);
+        eventlog::info(
+            &sid,
+            "hook.stop",
+            "injected pending correction",
+            json!({ "tool_count": count }),
+        );
+    } else {
+        store.persist()?;
+        eventlog::debug(&sid, "hook.stop", "no pending correction", json!({}));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn harness_from_transcript_path() {
+        let claude = HookEvent {
+            session_id: Some("s".into()),
+            cwd: None,
+            transcript_path: Some("/Users/x/.claude/projects/foo/s.jsonl".into()),
+            hook_event_name: None,
+            prompt: None,
+            tool_name: None,
+            tool_input: None,
+            tool_calls: None,
+            source: None,
+            model: None,
+            harness: None,
+        };
+        assert_eq!(harness_from_event(&claude), "claude");
+
+        let codex = HookEvent {
+            session_id: Some("s".into()),
+            cwd: None,
+            transcript_path: Some("/Users/x/.codex/sessions/rollout.jsonl".into()),
+            hook_event_name: None,
+            prompt: None,
+            tool_name: None,
+            tool_input: None,
+            tool_calls: None,
+            source: None,
+            model: None,
+            harness: None,
+        };
+        assert_eq!(harness_from_event(&codex), "codex");
+    }
+
+    #[test]
+    fn harness_from_model_slug() {
+        let ev = HookEvent {
+            session_id: None,
+            cwd: None,
+            transcript_path: None,
+            hook_event_name: None,
+            prompt: None,
+            tool_name: None,
+            tool_input: None,
+            tool_calls: None,
+            source: None,
+            model: Some("gpt-5.6-sol".into()),
+            harness: None,
+        };
+        assert_eq!(harness_from_event(&ev), "codex");
+
+        let ev2 = HookEvent {
+            model: Some("claude-fable-5".into()),
+            harness: None,
+            ..ev
+        };
+        assert_eq!(harness_from_event(&ev2), "claude");
+
+        let ev3 = HookEvent {
+            model: Some("grok-3-mini".into()),
+            harness: None,
+            session_id: None,
+            cwd: None,
+            transcript_path: None,
+            hook_event_name: None,
+            prompt: None,
+            tool_name: None,
+            tool_input: None,
+            tool_calls: None,
+            source: None,
+        };
+        assert_eq!(harness_from_event(&ev3), "grok");
+    }
+
+    #[test]
+    fn harness_explicit_tag() {
+        let ev = HookEvent {
+            session_id: None,
+            cwd: None,
+            transcript_path: None,
+            hook_event_name: None,
+            prompt: None,
+            tool_name: None,
+            tool_input: None,
+            tool_calls: None,
+            source: None,
+            model: None,
+            harness: Some("pi".into()),
+        };
+        assert_eq!(harness_from_event(&ev), "pi");
+        let ev2 = HookEvent {
+            harness: Some("opencode".into()),
+            ..ev
+        };
+        assert_eq!(harness_from_event(&ev2), "opencode");
+    }
+
+    #[test]
+    fn camel_case_session_id_deserializes() {
+        let raw = r#"{"sessionId":"abc","hookEventName":"user_prompt_submit","prompt":"hi"}"#;
+        let mut ev: HookEvent = serde_json::from_str(raw).unwrap();
+        normalize_event(&mut ev);
+        assert_eq!(ev.session_id.as_deref(), Some("abc"));
+        assert_eq!(ev.hook_event_name.as_deref(), Some("UserPromptSubmit"));
+        assert_eq!(ev.prompt.as_deref(), Some("hi"));
+    }
+
+    #[test]
+    fn harness_unknown_without_signals() {
+        let ev = HookEvent {
+            session_id: None,
+            cwd: None,
+            transcript_path: None,
+            hook_event_name: None,
+            prompt: None,
+            tool_name: None,
+            tool_input: None,
+            tool_calls: None,
+            source: None,
+            model: None,
+            harness: None,
+        };
+        assert_eq!(harness_from_event(&ev), "unknown");
+    }
+}

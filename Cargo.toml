@@ -1,0 +1,38 @@
+[package]
+name = "scopey"
+version = "0.1.0"
+edition = "2021"
+description = "Keep Claude Code and Codex sessions on scope: observe, summarize requirements, judge drift, inject course-corrections, and notify when off-track."
+license = "MIT"
+readme = "README.md"
+keywords = ["claude", "codex", "hooks", "agent", "scope"]
+categories = ["command-line-utilities", "development-tools"]
+
+[[bin]]
+name = "scopey"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4", features = ["derive", "env", "wrap_help", "string"] }
+dirs = "6"
+fs2 = "0.4"
+libc = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tempfile = "3"
+thiserror = "2"
+toml = "0.8"
+uuid = { version = "1", features = ["v4"] }
+which = "7"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+
+[dev-dependencies]
+tempfile = "3"
+serde_json = "1"
