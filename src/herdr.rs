@@ -7,7 +7,7 @@
 //!   HERDR_PANE_ID=w1:p2
 //!
 //! Notification CLI (v0.7+):
-//!   herdr notification show <title> [--body TEXT]
+//!   `herdr notification show <title> [--body TEXT]`
 //!     [--position top-left|top-right|bottom-left|bottom-right]
 //!     [--sound none|done|request]
 //!
@@ -15,7 +15,7 @@
 //!   off | herdr | terminal | system
 //!
 //! State reporting (affects sidebar rollups / waits / Herdr-native alerts):
-//!   herdr pane report-agent <pane_id> --source scopey --agent scopey
+//!   `herdr pane report-agent <pane_id> --source scopey --agent scopey`
 //!     --state idle|working|blocked|unknown [--message TEXT]
 
 use anyhow::{bail, Context, Result};

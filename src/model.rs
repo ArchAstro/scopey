@@ -65,6 +65,14 @@ pub struct ModelChoice {
 /// 3. `default_harness` if that binary exists
 /// 4. First available among claude, codex, grok, pi, opencode
 pub fn resolve_runner(cfg: &Config, session_harness: &str) -> Result<Runner> {
+    resolve_runner_with(cfg, session_harness, which_any)
+}
+
+fn resolve_runner_with(
+    cfg: &Config,
+    session_harness: &str,
+    is_available: impl Fn(&[&str]) -> bool,
+) -> Result<Runner> {
     let explicit = cfg.model_runner.trim().to_ascii_lowercase();
     if explicit != "auto" && !explicit.is_empty() {
         return Runner::parse(&explicit).with_context(|| {
@@ -73,13 +81,13 @@ pub fn resolve_runner(cfg: &Config, session_harness: &str) -> Result<Runner> {
     }
 
     if let Some(r) = Runner::parse(session_harness) {
-        if which_any(r.binary_names()) {
+        if is_available(r.binary_names()) {
             return Ok(r);
         }
     }
 
     if let Some(r) = Runner::parse(&cfg.default_harness) {
-        if which_any(r.binary_names()) {
+        if is_available(r.binary_names()) {
             return Ok(r);
         }
     }
@@ -91,7 +99,7 @@ pub fn resolve_runner(cfg: &Config, session_harness: &str) -> Result<Runner> {
         Runner::Pi,
         Runner::OpenCode,
     ] {
-        if which_any(r.binary_names()) {
+        if is_available(r.binary_names()) {
             return Ok(r);
         }
     }
@@ -541,32 +549,40 @@ mod tests {
 
     #[test]
     fn resolve_model_auto_claude() {
-        let mut cfg = Config::default();
-        cfg.model = "auto".into();
-        cfg.claude_fast_model = "haiku".into();
+        let cfg = Config {
+            model: "auto".into(),
+            claude_fast_model: "haiku".into(),
+            ..Config::default()
+        };
         assert_eq!(resolve_model(&cfg, Runner::Claude), "haiku");
     }
 
     #[test]
     fn resolve_model_auto_codex() {
-        let mut cfg = Config::default();
-        cfg.model = "auto".into();
-        cfg.codex_fast_model = "gpt-5.6-terra".into();
+        let cfg = Config {
+            model: "auto".into(),
+            codex_fast_model: "gpt-5.6-terra".into(),
+            ..Config::default()
+        };
         assert_eq!(resolve_model(&cfg, Runner::Codex), "gpt-5.6-terra");
     }
 
     #[test]
     fn resolve_model_auto_grok() {
-        let mut cfg = Config::default();
-        cfg.model = "auto".into();
-        cfg.grok_fast_model = "grok-3-mini".into();
+        let cfg = Config {
+            model: "auto".into(),
+            grok_fast_model: "grok-3-mini".into(),
+            ..Config::default()
+        };
         assert_eq!(resolve_model(&cfg, Runner::Grok), "grok-3-mini");
     }
 
     #[test]
     fn resolve_model_explicit_wins() {
-        let mut cfg = Config::default();
-        cfg.model = "claude-haiku-4-5".into();
+        let cfg = Config {
+            model: "claude-haiku-4-5".into(),
+            ..Config::default()
+        };
         assert_eq!(resolve_model(&cfg, Runner::Claude), "claude-haiku-4-5");
         assert_eq!(resolve_model(&cfg, Runner::Codex), "claude-haiku-4-5");
     }
@@ -587,8 +603,10 @@ mod tests {
 
     #[test]
     fn resolve_runner_explicit_pin() {
-        let mut cfg = Config::default();
-        cfg.model_runner = "claude".into();
+        let mut cfg = Config {
+            model_runner: "claude".into(),
+            ..Config::default()
+        };
         assert_eq!(resolve_runner(&cfg, "codex").unwrap(), Runner::Claude);
         cfg.model_runner = "grok".into();
         assert_eq!(resolve_runner(&cfg, "claude").unwrap(), Runner::Grok);
@@ -596,22 +614,28 @@ mod tests {
 
     #[test]
     fn resolve_runner_auto_uses_session_when_binary_present() {
-        let mut cfg = Config::default();
-        cfg.model_runner = "auto".into();
-        let r = resolve_runner(&cfg, "claude");
-        assert!(
-            r.is_ok()
-                || resolve_runner(&cfg, "codex").is_ok()
-                || resolve_runner(&cfg, "grok").is_ok()
-                || resolve_runner(&cfg, "").is_ok()
-        );
+        let cfg = Config {
+            model_runner: "auto".into(),
+            ..Config::default()
+        };
+        let runner = resolve_runner_with(&cfg, "codex", |names| names.contains(&"codex"));
+        assert_eq!(runner.unwrap(), Runner::Codex);
+    }
+
+    #[test]
+    fn resolve_runner_auto_reports_when_no_binary_is_present() {
+        let cfg = Config::default();
+        let error = resolve_runner_with(&cfg, "claude", |_| false).unwrap_err();
+        assert!(error.to_string().contains("no model runner on PATH"));
     }
 
     #[test]
     fn resolve_choice_reason_nonempty() {
-        let mut cfg = Config::default();
-        cfg.model_runner = "claude".into();
-        cfg.model = "haiku".into();
+        let cfg = Config {
+            model_runner: "claude".into(),
+            model: "haiku".into(),
+            ..Config::default()
+        };
         let c = resolve_choice(&cfg, "claude").unwrap();
         assert_eq!(c.runner, Runner::Claude);
         assert_eq!(c.model, "haiku");

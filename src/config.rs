@@ -10,7 +10,8 @@ pub struct Config {
     pub n_tool_calls: u64,
     /// Every M tool calls: inject a scope-requirements reminder (if no stronger injection).
     pub m_reminder: u64,
-    /// Which CLI runs summarize/judge: `"auto"` | `"claude"` | `"codex"`.
+    /// Which CLI runs summarize/judge: `"auto"`, `"claude"`, `"codex"`,
+    /// `"grok"`, `"pi"`, or `"opencode"`.
     ///
     /// `auto` uses the session's harness (same product the agent is running in).
     pub model_runner: String,
@@ -27,7 +28,7 @@ pub struct Config {
     /// OpenCode `run` model when `model = "auto"` (empty = OpenCode default).
     pub opencode_fast_model: String,
     /// Optional full command template. Placeholders: {model} {prompt_file} {runner}
-    /// If empty, built-in templates for claude/codex are used.
+    /// If empty, the selected runner's built-in invocation is used.
     pub model_command: Option<String>,
     /// Desktop notify when a judgement is off_track.
     pub notify_on_off_track: bool,
@@ -188,9 +189,10 @@ impl Config {
             c.loaded_from = path.clone();
             c
         } else {
-            let mut c = Config::default();
-            c.loaded_from = path.clone();
-            c
+            Config {
+                loaded_from: path.clone(),
+                ..Config::default()
+            }
         };
 
         // Project overlay: <cwd>/.scopey/config.toml
@@ -248,7 +250,7 @@ impl Config {
             "loaded_from = {}\n\
              n_tool_calls = {}          # journal + background judge every N tools\n\
              m_reminder = {}            # inject scope reminder every M tools\n\
-             model_runner = {:?}     # auto → use session harness (claude|codex)\n\
+             model_runner = {:?}     # auto → use any supported session harness\n\
              model = {:?}            # auto → runner's shipped fast default\n\
              claude_fast_model = {:?}\n\
              codex_fast_model = {:?}\n\
@@ -287,7 +289,7 @@ impl Config {
              Throttled summarize/judge jobs are deferred and drained when free.\n\
              \n\
              Model selection: same product as the agent session when model_runner=auto.\n\
-             Fast defaults track what Claude Code / Codex ship (haiku, gpt-5.6-terra).\n",
+             Fast defaults are runner-specific; empty Pi/OpenCode values use provider defaults.\n",
             self.loaded_from.display(),
             self.n_tool_calls,
             self.m_reminder,
@@ -331,86 +333,6 @@ fn default_work_root() -> PathBuf {
     Config::scopey_home().join("work")
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn default_values_sane() {
-        let c = Config::default();
-        assert!(c.n_tool_calls >= 1);
-        assert!(c.m_reminder >= c.n_tool_calls);
-        assert_eq!(c.model_runner, "auto");
-        assert_eq!(c.model, "auto");
-        assert_eq!(c.claude_fast_model, "haiku");
-        assert!(!c.codex_fast_model.is_empty());
-        assert_eq!(c.notify_backend, "auto");
-    }
-
-    #[test]
-    fn parse_toml_defaults() {
-        let t = default_config_toml();
-        let c: Config = toml::from_str(&t).expect("default toml parses");
-        assert!(c.n_tool_calls > 0);
-        assert!(c.min_job_interval_secs > 0 || c.min_job_interval_secs == 0);
-    }
-
-    #[test]
-    fn load_missing_file_uses_defaults() {
-        let dir = tempfile::tempdir().unwrap();
-        let missing = dir.path().join("nope.toml");
-        let c = Config::load(Some(&missing)).unwrap();
-        assert_eq!(c.loaded_from, missing);
-        assert_eq!(c.model_runner, "auto");
-    }
-
-    #[test]
-    fn load_partial_toml() {
-        let dir = tempfile::tempdir().unwrap();
-        let p = dir.path().join("c.toml");
-        fs::write(
-            &p,
-            r#"
-n_tool_calls = 42
-model_runner = "claude"
-model = "haiku"
-"#,
-        )
-        .unwrap();
-        let c = Config::load(Some(&p)).unwrap();
-        assert_eq!(c.n_tool_calls, 42);
-        assert_eq!(c.model_runner, "claude");
-        assert_eq!(c.model, "haiku");
-        // defaults filled
-        assert!(!c.claude_fast_model.is_empty());
-    }
-
-    #[test]
-    fn zero_n_tool_calls_normalized() {
-        let dir = tempfile::tempdir().unwrap();
-        let p = dir.path().join("c.toml");
-        fs::write(&p, "n_tool_calls = 0\nm_reminder = 0\n").unwrap();
-        let c = Config::load(Some(&p)).unwrap();
-        assert_eq!(c.n_tool_calls, 10);
-        assert!(c.m_reminder > 0);
-    }
-
-    #[test]
-    fn display_human_mentions_keys() {
-        let d = Config::default().display_human();
-        assert!(d.contains("n_tool_calls"));
-        assert!(d.contains("model_runner"));
-        assert!(d.contains("min_job_interval"));
-    }
-
-    #[test]
-    fn scopey_home_respects_env() {
-        Config::with_temp_scopey_home(|dir| {
-            assert_eq!(Config::scopey_home(), dir);
-        });
-    }
-}
-
 pub fn default_config_toml() -> String {
     format!(
         r#"# scopey configuration
@@ -428,6 +350,9 @@ m_reminder = 30
 #   auto    → use the session harness (same product the agent is running in)
 #   claude  → always `claude -p --model …`
 #   codex   → always `codex exec -m …`
+#   grok    → always `grok -p --model …`
+#   pi      → always `pi --print …`
+#   opencode → always `opencode run …`
 model_runner = "auto"
 
 # Model id/alias, or "auto" to use the runner's shipped fast default:
@@ -498,4 +423,83 @@ ascii_scopey_on_correction = true
 "#,
         work = default_work_root().display()
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_values_sane() {
+        let c = Config::default();
+        assert!(c.n_tool_calls >= 1);
+        assert!(c.m_reminder >= c.n_tool_calls);
+        assert_eq!(c.model_runner, "auto");
+        assert_eq!(c.model, "auto");
+        assert_eq!(c.claude_fast_model, "haiku");
+        assert!(!c.codex_fast_model.is_empty());
+        assert_eq!(c.notify_backend, "auto");
+    }
+
+    #[test]
+    fn parse_toml_defaults() {
+        let t = default_config_toml();
+        let c: Config = toml::from_str(&t).expect("default toml parses");
+        assert!(c.n_tool_calls > 0);
+        assert_eq!(c.min_job_interval_secs, 60);
+    }
+
+    #[test]
+    fn load_missing_file_uses_defaults() {
+        let dir = tempfile::tempdir().unwrap();
+        let missing = dir.path().join("nope.toml");
+        let c = Config::load(Some(&missing)).unwrap();
+        assert_eq!(c.loaded_from, missing);
+        assert_eq!(c.model_runner, "auto");
+    }
+
+    #[test]
+    fn load_partial_toml() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("c.toml");
+        fs::write(
+            &p,
+            r#"
+n_tool_calls = 42
+model_runner = "claude"
+model = "haiku"
+"#,
+        )
+        .unwrap();
+        let c = Config::load(Some(&p)).unwrap();
+        assert_eq!(c.n_tool_calls, 42);
+        assert_eq!(c.model_runner, "claude");
+        assert_eq!(c.model, "haiku");
+        assert!(!c.claude_fast_model.is_empty());
+    }
+
+    #[test]
+    fn zero_n_tool_calls_normalized() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("c.toml");
+        fs::write(&p, "n_tool_calls = 0\nm_reminder = 0\n").unwrap();
+        let c = Config::load(Some(&p)).unwrap();
+        assert_eq!(c.n_tool_calls, 10);
+        assert!(c.m_reminder > 0);
+    }
+
+    #[test]
+    fn display_human_mentions_keys() {
+        let d = Config::default().display_human();
+        assert!(d.contains("n_tool_calls"));
+        assert!(d.contains("model_runner"));
+        assert!(d.contains("min_job_interval"));
+    }
+
+    #[test]
+    fn scopey_home_respects_env() {
+        Config::with_temp_scopey_home(|dir| {
+            assert_eq!(Config::scopey_home(), dir);
+        });
+    }
 }
