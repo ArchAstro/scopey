@@ -354,7 +354,7 @@ pub fn list_session_ids(limit: usize) -> Result<Vec<String>> {
             .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
         entries.push((modified, stem));
     }
-    entries.sort_by(|a, b| b.0.cmp(&a.0));
+    entries.sort_by_key(|entry| std::cmp::Reverse(entry.0));
     entries.truncate(limit);
     Ok(entries.into_iter().map(|(_, id)| id).collect())
 }
