@@ -1,6 +1,7 @@
 use crate::config::Config;
 use crate::session::{
-    JudgementStatus, JudgementVerdict, MessageType, SessionData, SessionMessageWire, SessionStore,
+    normalize_judgement_verdict, JudgementStatus, JudgementVerdict, MessageType, SessionData,
+    SessionMessageWire, SessionStore,
 };
 use anyhow::{bail, Context, Result};
 use chrono::{DateTime, Days, Local, NaiveDate, TimeZone, Utc};
@@ -20,6 +21,7 @@ pub struct InsightArgs {
     pub harness: Option<String>,
     pub verdict: Option<String>,
     pub off_scope: bool,
+    pub include_empty: bool,
     pub limit: usize,
     pub details: bool,
     pub json: bool,
@@ -33,6 +35,7 @@ struct InsightQuery {
     harness: Option<String>,
     verdict: Option<JudgementVerdict>,
     off_scope: bool,
+    include_empty: bool,
     limit: usize,
 }
 
@@ -51,9 +54,13 @@ pub struct InsightCounts {
 #[derive(Debug, Default, Serialize)]
 pub struct InsightTotals {
     sessions: usize,
+    sessions_evaluated: usize,
     sessions_off_track: usize,
     sessions_warning: usize,
     sessions_unevaluated: usize,
+    contaminated_scope_sessions: usize,
+    evaluation_coverage_pct: f64,
+    judge_failure_rate_pct: f64,
     #[serde(flatten)]
     counts: InsightCounts,
 }
@@ -88,8 +95,17 @@ pub struct SessionInsight {
     severity: String,
     counts: InsightCounts,
     scope: String,
+    scope_quality: ScopeQuality,
     latest_signal: Option<InsightSignal>,
     signals: Vec<InsightSignal>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ScopeQuality {
+    Ok,
+    Missing,
+    Contaminated,
 }
 
 #[derive(Debug, Serialize)]
@@ -98,6 +114,7 @@ pub struct InsightReport {
     filters: Vec<String>,
     totals: InsightTotals,
     sessions: Vec<SessionInsight>,
+    excluded_empty_sessions: usize,
     skipped_files: usize,
 }
 
@@ -123,6 +140,7 @@ pub fn run(cfg: &Config, args: InsightArgs) -> Result<()> {
         harness: args.harness.as_ref().map(|s| s.to_ascii_lowercase()),
         verdict,
         off_scope: args.off_scope,
+        include_empty: args.include_empty || args.session.is_some(),
         limit: args.limit,
     };
 
@@ -266,6 +284,7 @@ fn analyze_sessions(
     skipped_files: usize,
 ) -> InsightReport {
     let mut analyzed = Vec::new();
+    let mut excluded_empty_sessions = 0;
     for data in sessions {
         if query
             .harness
@@ -275,6 +294,10 @@ fn analyze_sessions(
             continue;
         }
         if !session_overlaps(&data, query.since, query.until) {
+            continue;
+        }
+        if data.tool_call_count == 0 && !query.include_empty {
+            excluded_empty_sessions += 1;
             continue;
         }
 
@@ -287,39 +310,35 @@ fn analyze_sessions(
             .collect();
         judgement_messages.sort_by_key(|m| m.ts);
 
+        let signals: Vec<InsightSignal> = judgement_messages
+            .iter()
+            .map(|m| signal_from_message(m))
+            .collect();
         if let Some(ref verdict) = query.verdict {
-            if !judgement_messages
-                .iter()
-                .any(|m| m.verdict.as_ref() == Some(verdict))
-            {
+            if !signals.iter().any(|signal| &signal.verdict == verdict) {
                 continue;
             }
         } else if query.off_scope
-            && !judgement_messages.iter().any(|m| {
+            && !signals.iter().any(|signal| {
                 matches!(
-                    m.verdict,
-                    Some(JudgementVerdict::Warning) | Some(JudgementVerdict::OffTrack)
+                    signal.verdict,
+                    JudgementVerdict::Warning | JudgementVerdict::OffTrack
                 )
             })
         {
             continue;
         }
 
-        let signals: Vec<InsightSignal> = judgement_messages
-            .iter()
-            .map(|m| signal_from_message(m))
-            .collect();
         let counts = count_signals(&signals);
         let severity = session_severity(&counts).to_string();
-        let scope = data
+        let raw_scope = data
             .messages
             .iter()
             .filter(|m| m.type_ == MessageType::ScopeRequirements)
             .filter(|m| query.until.is_none_or(|end| m.ts <= end))
             .max_by_key(|m| m.ts)
-            .and_then(|m| m.content.as_deref())
-            .map(|s| clip_one_line(s, 240))
-            .unwrap_or_else(|| "(no scope requirements recorded)".into());
+            .and_then(|m| m.content.as_deref());
+        let (scope, scope_quality) = clean_scope(raw_scope);
         let latest_signal = signals.last().cloned();
         analyzed.push(SessionInsight {
             session_id: data.session_id,
@@ -331,6 +350,7 @@ fn analyze_sessions(
             severity,
             counts,
             scope,
+            scope_quality,
             latest_signal,
             signals,
         });
@@ -348,20 +368,48 @@ fn analyze_sessions(
         filters,
         totals,
         sessions: analyzed,
+        excluded_empty_sessions,
         skipped_files,
     }
 }
 
 fn signal_from_message(message: &SessionMessageWire) -> InsightSignal {
+    let summary = message.summary.clone().unwrap_or_default();
+    let details = message.details.clone().unwrap_or_default();
+    let verdict = normalize_judgement_verdict(
+        message.verdict.clone().unwrap_or(JudgementVerdict::Unknown),
+        &summary,
+        &details,
+    );
     InsightSignal {
         timestamp: message.ts.to_rfc3339(),
-        verdict: message.verdict.clone().unwrap_or(JudgementVerdict::Unknown),
+        verdict,
         status: message.status.clone(),
         from_count: message.from_count,
         to_count: message.to_count,
-        summary: message.summary.clone().unwrap_or_default(),
-        details: message.details.clone().unwrap_or_default(),
+        summary,
+        details,
     }
+}
+
+fn clean_scope(scope: Option<&str>) -> (String, ScopeQuality) {
+    let Some(scope) = scope.map(str::trim).filter(|scope| !scope.is_empty()) else {
+        return (
+            "(no scope requirements recorded)".into(),
+            ScopeQuality::Missing,
+        );
+    };
+    let lower = scope.to_ascii_lowercase();
+    let looks_like_judge_json = (lower.starts_with('{') || lower.starts_with("```json"))
+        && lower.contains("\"verdict\"")
+        && lower.contains("\"summary\"");
+    if looks_like_judge_json {
+        return (
+            "(invalid scope: judge output was captured instead of scope requirements)".into(),
+            ScopeQuality::Contaminated,
+        );
+    }
+    (clip_one_line(scope, 240), ScopeQuality::Ok)
 }
 
 fn count_signals(signals: &[InsightSignal]) -> InsightCounts {
@@ -389,6 +437,9 @@ fn total_counts(sessions: &[SessionInsight]) -> InsightTotals {
         ..InsightTotals::default()
     };
     for session in sessions {
+        if session.counts.evaluated > 0 {
+            totals.sessions_evaluated += 1;
+        }
         if session.counts.off_track > 0 {
             totals.sessions_off_track += 1;
         } else if session.counts.warning > 0 {
@@ -396,6 +447,9 @@ fn total_counts(sessions: &[SessionInsight]) -> InsightTotals {
         }
         if session.counts.judgements == 0 {
             totals.sessions_unevaluated += 1;
+        }
+        if session.scope_quality == ScopeQuality::Contaminated {
+            totals.contaminated_scope_sessions += 1;
         }
         totals.counts.judgements += session.counts.judgements;
         totals.counts.evaluated += session.counts.evaluated;
@@ -409,6 +463,8 @@ fn total_counts(sessions: &[SessionInsight]) -> InsightTotals {
         totals.counts.warning + totals.counts.off_track,
         totals.counts.evaluated,
     );
+    totals.evaluation_coverage_pct = percentage(totals.sessions_evaluated, totals.sessions);
+    totals.judge_failure_rate_pct = percentage(totals.counts.unknown, totals.counts.judgements);
     totals
 }
 
@@ -492,6 +548,9 @@ fn describe_filters(
     if args.off_scope {
         out.push("verdict=warning|off-track".into());
     }
+    if args.include_empty {
+        out.push("include-empty=true".into());
+    }
     out
 }
 
@@ -501,15 +560,27 @@ fn print_human(report: &InsightReport, details: bool, work_root: &std::path::Pat
         if !report.filters.is_empty() {
             println!("filters: {}", report.filters.join(", "));
         }
+        if report.excluded_empty_sessions > 0 {
+            println!(
+                "{} zero-tool session store(s) excluded; use --include-empty to inspect them.",
+                report.excluded_empty_sessions
+            );
+        }
         return;
     }
     println!("Scopey insights");
     if !report.filters.is_empty() {
         println!("filters: {}", report.filters.join(", "));
     }
+    let session_label = if report.excluded_empty_sessions > 0 {
+        "active sessions"
+    } else {
+        "sessions"
+    };
     println!(
-        "{} sessions · {} judged windows · {} off-track · {} warning · {} on-track",
+        "{} {} · {} judged windows · {} off-track · {} warning · {} on-track",
         report.totals.sessions,
+        session_label,
         report.totals.judgements,
         report.totals.off_track,
         report.totals.warning,
@@ -522,6 +593,27 @@ fn print_human(report: &InsightReport, details: bool, work_root: &std::path::Pat
         report.totals.sessions_warning,
         report.totals.sessions_unevaluated
     );
+    println!(
+        "evaluation coverage: {}/{} sessions ({:.1}%) · judge failures: {}/{} attempts ({:.1}%)",
+        report.totals.sessions_evaluated,
+        report.totals.sessions,
+        report.totals.evaluation_coverage_pct,
+        report.totals.unknown,
+        report.totals.judgements,
+        report.totals.judge_failure_rate_pct
+    );
+    if report.excluded_empty_sessions > 0 {
+        println!(
+            "data hygiene: {} zero-tool session store(s) excluded (use --include-empty to inspect)",
+            report.excluded_empty_sessions
+        );
+    }
+    if report.totals.contaminated_scope_sessions > 0 {
+        println!(
+            "data hygiene: {} active session(s) have contaminated scope records",
+            report.totals.contaminated_scope_sessions
+        );
+    }
     if report.totals.insufficient_evidence > 0 || report.totals.unknown > 0 {
         println!(
             "coverage gaps: {} insufficient-evidence · {} unknown",
@@ -548,6 +640,9 @@ fn print_human(report: &InsightReport, details: bool, work_root: &std::path::Pat
             session.counts.attention_rate_pct
         );
         println!("  scope: {}", session.scope);
+        if session.scope_quality == ScopeQuality::Contaminated {
+            println!("  data quality: scope record contains judge output");
+        }
         if details {
             if session.signals.is_empty() {
                 println!("  signals: none");
@@ -701,6 +796,7 @@ mod tests {
             harness: None,
             verdict: None,
             off_scope: false,
+            include_empty: false,
             limit: 20,
         }
     }
@@ -773,5 +869,59 @@ mod tests {
         assert!(resolve_session_selector(&mut sessions, Some("abc")).is_err());
         resolve_session_selector(&mut sessions, Some("abc-1")).unwrap();
         assert_eq!(sessions.len(), 1);
+    }
+
+    #[test]
+    fn excludes_empty_sessions_by_default_but_can_include_them() {
+        let mut ghost = session("ghost", &[]);
+        ghost.tool_call_count = 0;
+        let active = session("active", &[JudgementVerdict::OnTrack]);
+
+        let report = analyze_sessions(vec![ghost.clone(), active.clone()], &query(), vec![], 0);
+        assert_eq!(report.totals.sessions, 1);
+        assert_eq!(report.excluded_empty_sessions, 1);
+        assert_eq!(report.sessions[0].session_id, "active");
+
+        let mut include = query();
+        include.include_empty = true;
+        let report = analyze_sessions(vec![ghost, active], &include, vec![], 0);
+        assert_eq!(report.totals.sessions, 2);
+        assert_eq!(report.excluded_empty_sessions, 0);
+    }
+
+    #[test]
+    fn missing_evidence_is_not_counted_as_scope_drift() {
+        let mut data = session("missing", &[]);
+        data.messages.push(
+            SessionMessage::judgement(
+                0,
+                10,
+                JudgementVerdict::OffTrack,
+                JudgementStatus::Injected,
+                "Cannot audit agent scope without transcript data",
+                "The transcript file is missing or empty; no actions to evaluate.",
+            )
+            .into(),
+        );
+        let report = analyze_sessions(vec![data], &query(), vec![], 0);
+        assert_eq!(report.totals.off_track, 0);
+        assert_eq!(report.totals.insufficient_evidence, 1);
+        assert_eq!(report.totals.attention_rate_pct, 0.0);
+    }
+
+    #[test]
+    fn flags_judge_json_captured_as_scope() {
+        let mut data = session("contaminated", &[JudgementVerdict::OnTrack]);
+        data.messages.push(
+            SessionMessage::scope_requirements(
+                r#"```json {"verdict":"warning","summary":"not scope"} ```"#,
+                None,
+            )
+            .into(),
+        );
+        let report = analyze_sessions(vec![data], &query(), vec![], 0);
+        assert_eq!(report.totals.contaminated_scope_sessions, 1);
+        assert_eq!(report.sessions[0].scope_quality, ScopeQuality::Contaminated);
+        assert!(report.sessions[0].scope.starts_with("(invalid scope:"));
     }
 }

@@ -237,6 +237,9 @@ enum Commands {
         /// Shortcut for warning or off-track verdicts
         #[arg(long, conflicts_with = "verdict")]
         off_scope: bool,
+        /// Include zero-tool session stores (hidden by default as inactive/ghost records)
+        #[arg(long)]
+        include_empty: bool,
         /// Maximum sessions to print
         #[arg(long, default_value_t = 20)]
         limit: usize,
@@ -468,7 +471,8 @@ const INSIGHTS_ABOUT: &str = r#"Analyze judgement history across stored sessions
 
 The summary highlights sessions with off-track or warning windows, reports the
 share of evaluated windows that needed attention, and includes the judge's
-summary plus scope context. Date-only values use the machine's local timezone.
+summary plus scope context. Zero-tool stores are excluded by default; use
+--include-empty to audit raw history. Date-only values use the local timezone.
 
 Verdicts: on-track, warning, off-track, insufficient-evidence, unknown.
 
@@ -478,6 +482,7 @@ Examples:
   scopey insights --session 019fb598 --details
   scopey insights --date 2026-07-30 --harness codex
   scopey insights --cwd . --verdict warning --json
+  scopey insights --include-empty
 "#;
 
 const PATH_ABOUT: &str = r#"Path helpers matching Claude's project-directory encoding.
@@ -744,6 +749,7 @@ fn run() -> Result<()> {
             harness,
             verdict,
             off_scope,
+            include_empty,
             limit,
             details,
             json,
@@ -758,6 +764,7 @@ fn run() -> Result<()> {
                 harness,
                 verdict,
                 off_scope,
+                include_empty,
                 limit,
                 details,
                 json,

@@ -232,6 +232,24 @@ fn insights_reports_and_filters_off_scope_sessions() {
         serde_json::to_string_pretty(&data).unwrap(),
     )
     .unwrap();
+    let ghost = serde_json::json!({
+        "session_id": "ghost-empty",
+        "cwd": "/tmp/project",
+        "harness": "claude",
+        "created_at": now,
+        "updated_at": now,
+        "tool_call_count": 0,
+        "messages": [{
+            "type": "scope_requirements",
+            "ts": now,
+            "content": "```json {\"verdict\":\"warning\",\"summary\":\"captured judge output\"} ```"
+        }]
+    });
+    fs::write(
+        work.join("ghost-empty.json"),
+        serde_json::to_string_pretty(&ghost).unwrap(),
+    )
+    .unwrap();
 
     let day = chrono::Local::now().format("%Y-%m-%d").to_string();
     let human = Command::new(scopey_bin())
@@ -256,6 +274,8 @@ fn insights_reports_and_filters_off_scope_sessions() {
     assert!(stdout.contains("insights-drift"));
     assert!(stdout.contains("edited an unrelated file"));
     assert!(stdout.contains("50.0%"));
+    assert!(stdout.contains("evaluation coverage: 1/1 sessions"));
+    assert!(stdout.contains("1 zero-tool session store(s) excluded"));
 
     let json = Command::new(scopey_bin())
         .args([
@@ -273,7 +293,29 @@ fn insights_reports_and_filters_off_scope_sessions() {
     let report: serde_json::Value = serde_json::from_slice(&json.stdout).unwrap();
     assert_eq!(report["totals"]["sessions"], 1);
     assert_eq!(report["totals"]["off_track"], 1);
+    assert_eq!(report["excluded_empty_sessions"], 0);
     assert_eq!(report["sessions"][0]["session_id"], "insights-drift");
+
+    let ghost_json = Command::new(scopey_bin())
+        .args([
+            "--config",
+            config.to_str().unwrap(),
+            "insights",
+            "--session",
+            "ghost-",
+            "--json",
+        ])
+        .env("SCOPEY_HOME", home.path())
+        .output()
+        .unwrap();
+    assert!(ghost_json.status.success());
+    let ghost_report: serde_json::Value = serde_json::from_slice(&ghost_json.stdout).unwrap();
+    assert_eq!(ghost_report["totals"]["sessions"], 1);
+    assert_eq!(ghost_report["excluded_empty_sessions"], 0);
+    assert_eq!(
+        ghost_report["sessions"][0]["scope_quality"],
+        "contaminated"
+    );
 }
 
 fn walkdir_json(root: &std::path::Path) -> Vec<PathBuf> {

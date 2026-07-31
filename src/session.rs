@@ -36,6 +36,40 @@ pub enum JudgementVerdict {
     Unknown,
 }
 
+/// Missing evidence is not scope drift, even if a model returned warning/off_track.
+///
+/// This keeps both new judgements and historical analytics from treating an
+/// unavailable transcript or empty tool window as an agent failure.
+pub fn normalize_judgement_verdict(
+    verdict: JudgementVerdict,
+    summary: &str,
+    details: &str,
+) -> JudgementVerdict {
+    if !matches!(
+        verdict,
+        JudgementVerdict::Warning | JudgementVerdict::OffTrack
+    ) {
+        return verdict;
+    }
+    let evidence = format!("{summary}\n{details}").to_ascii_lowercase();
+    let missing_evidence = evidence.contains("cannot audit")
+        || evidence.contains("no actions to evaluate")
+        || evidence.contains("no tool actions")
+        || evidence.contains("no actionable tool")
+        || evidence.contains("no visible tool")
+        || evidence.contains("not enough evidence")
+        || evidence.contains("insufficient evidence")
+        || (evidence.contains("transcript")
+            && (evidence.contains("missing")
+                || evidence.contains("inaccessible")
+                || evidence.contains("empty")));
+    if missing_evidence {
+        JudgementVerdict::InsufficientEvidence
+    } else {
+        verdict
+    }
+}
+
 /// One meaningful (or noise) tool observation for structured judging.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ToolEvent {

@@ -481,6 +481,7 @@ pub(crate) fn parse_judgement_json(raw: &str) -> (JudgementVerdict, String, Stri
             .and_then(|x| x.as_str())
             .unwrap_or("")
             .to_string();
+        let verdict = crate::session::normalize_judgement_verdict(verdict, &summary, &details);
         return (verdict, summary, details);
     }
     (
@@ -812,6 +813,17 @@ mod tests {
         let (v2, s2, _) = parse_judgement_json("not json at all");
         assert_eq!(v2, JudgementVerdict::Unknown);
         assert!(s2.contains("unparseable"));
+    }
+
+    #[test]
+    fn parse_judgement_normalizes_missing_evidence() {
+        let raw = r#"{
+          "verdict": "off_track",
+          "summary": "Cannot audit agent scope without transcript data",
+          "details": "The transcript file is missing or empty; no actions to evaluate."
+        }"#;
+        let (verdict, _, _) = parse_judgement_json(raw);
+        assert_eq!(verdict, JudgementVerdict::InsufficientEvidence);
     }
 
     #[test]
