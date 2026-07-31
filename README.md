@@ -86,14 +86,25 @@ scopey insights --session 019fb598 --details # exact id or unique prefix
 scopey insights --date 2026-07-30 --harness codex
 scopey insights --cwd . --verdict warning
 scopey insights --since 2026-07-01T09:00:00-07:00 --json
+scopey insights --include-empty                 # audit raw zero-tool stores
 ```
 
 Date-only filters use the machine's local timezone. `--date` selects one
 calendar day; `--since` and `--until` accept either `YYYY-MM-DD` or RFC3339.
 Verdict filters select sessions containing that signal while retaining all
 their evaluated windows, so the reported attention rate still has useful
-context. `--json` exposes the same totals, per-session counts, scope, summaries,
-details, tool windows, and timestamps for scripts.
+context.
+
+Zero-tool stores are excluded from default reports because they contain no
+agent trajectory to assess; the report states how many it excluded. Exact
+`--session` lookups include an empty match automatically, and `--include-empty`
+restores the raw cross-session view. Reports also show session evaluation
+coverage, judge failure rate, and contaminated scope records. Historical or
+new warning/off-track results that explicitly say the transcript or tool
+evidence is missing are counted as `insufficient-evidence`, not agent drift.
+
+`--json` exposes the same totals, data-quality counts, per-session scope
+quality, summaries, details, tool windows, and timestamps for scripts.
 
 ## Session logs
 
