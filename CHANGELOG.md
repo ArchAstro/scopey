@@ -12,7 +12,7 @@ and the project intends to follow [Semantic Versioning](https://semver.org/).
 ### Added
 
 - Prebuilt macOS and Linux binaries for Intel and Apple/ARM systems, published
-  by the GitHub release workflow.
+  by a manually dispatchable or tag-triggered GitHub release workflow.
 - Installation through the public `ArchAstro/tools` Homebrew tap.
 - Cross-session insights with session, date, harness, cwd, and verdict filters.
 - Structured scope-transition logging and authoritative scope mutations.
