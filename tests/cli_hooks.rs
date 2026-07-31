@@ -180,6 +180,102 @@ fn post_tool_batch_counts_and_logs() {
     assert!(text.contains("hook.post_tool") || text.contains("tool count") || text.contains("post_tool"));
 }
 
+#[test]
+fn insights_reports_and_filters_off_scope_sessions() {
+    let home = tempfile::tempdir().unwrap();
+    let work = home.path().join("work/by-id");
+    fs::create_dir_all(&work).unwrap();
+    let config = home.path().join("config.toml");
+    fs::write(
+        &config,
+        format!("work_root = '{}'\n", home.path().join("work").display()),
+    )
+    .unwrap();
+    let now = chrono::Utc::now().to_rfc3339();
+    let data = serde_json::json!({
+        "session_id": "insights-drift",
+        "cwd": "/tmp/project",
+        "harness": "codex",
+        "created_at": now,
+        "updated_at": now,
+        "tool_call_count": 20,
+        "messages": [
+            {
+                "type": "scope_requirements",
+                "ts": now,
+                "content": "- only edit the requested file"
+            },
+            {
+                "type": "judgement",
+                "ts": now,
+                "from_count": 0,
+                "to_count": 10,
+                "verdict": "on_track",
+                "status": "ready",
+                "summary": "focused",
+                "details": "read-only inspection"
+            },
+            {
+                "type": "judgement",
+                "ts": now,
+                "from_count": 10,
+                "to_count": 20,
+                "verdict": "off_track",
+                "status": "injected",
+                "summary": "edited an unrelated file",
+                "details": "the write exceeded the requested scope"
+            }
+        ]
+    });
+    fs::write(
+        work.join("insights-drift.json"),
+        serde_json::to_string_pretty(&data).unwrap(),
+    )
+    .unwrap();
+
+    let day = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let human = Command::new(scopey_bin())
+        .args([
+            "--config",
+            config.to_str().unwrap(),
+            "insights",
+            "--off-scope",
+            "--date",
+        ])
+        .arg(day)
+        .env("SCOPEY_HOME", home.path())
+        .output()
+        .unwrap();
+    assert!(
+        human.status.success(),
+        "stderr={}",
+        String::from_utf8_lossy(&human.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&human.stdout);
+    assert!(stdout.contains("OFF TRACK"));
+    assert!(stdout.contains("insights-drift"));
+    assert!(stdout.contains("edited an unrelated file"));
+    assert!(stdout.contains("50.0%"));
+
+    let json = Command::new(scopey_bin())
+        .args([
+            "--config",
+            config.to_str().unwrap(),
+            "insights",
+            "--session",
+            "insights-",
+            "--json",
+        ])
+        .env("SCOPEY_HOME", home.path())
+        .output()
+        .unwrap();
+    assert!(json.status.success());
+    let report: serde_json::Value = serde_json::from_slice(&json.stdout).unwrap();
+    assert_eq!(report["totals"]["sessions"], 1);
+    assert_eq!(report["totals"]["off_track"], 1);
+    assert_eq!(report["sessions"][0]["session_id"], "insights-drift");
+}
+
 fn walkdir_json(root: &std::path::Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
     let Ok(rd) = fs::read_dir(root) else {

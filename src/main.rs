@@ -8,6 +8,7 @@ mod eventlog;
 mod guard;
 mod herdr;
 mod hooks;
+mod insights;
 mod model;
 mod notify;
 mod pathutil;
@@ -207,6 +208,44 @@ enum Commands {
         /// Limit
         #[arg(long, default_value_t = 50)]
         limit: usize,
+    },
+
+    /// Analyze scope drift across stored sessions
+    #[command(alias = "analytics", long_about = INSIGHTS_ABOUT)]
+    Insights {
+        /// Exact session id or unique id prefix
+        #[arg(long = "session", alias = "session-id")]
+        session: Option<String>,
+        /// One local calendar day (YYYY-MM-DD)
+        #[arg(long, conflicts_with_all = ["since", "until"])]
+        date: Option<String>,
+        /// Start time, inclusive (YYYY-MM-DD or RFC3339)
+        #[arg(long)]
+        since: Option<String>,
+        /// End time, inclusive for dates (YYYY-MM-DD or RFC3339)
+        #[arg(long)]
+        until: Option<String>,
+        /// Only sessions for this cwd
+        #[arg(long)]
+        cwd: Option<PathBuf>,
+        /// Only sessions from this harness (codex, claude, ...)
+        #[arg(long)]
+        harness: Option<String>,
+        /// Only sessions containing this verdict
+        #[arg(long, value_name = "VERDICT")]
+        verdict: Option<String>,
+        /// Shortcut for warning or off-track verdicts
+        #[arg(long, conflicts_with = "verdict")]
+        off_scope: bool,
+        /// Maximum sessions to print
+        #[arg(long, default_value_t = 20)]
+        limit: usize,
+        /// Include every matching judgement and its details
+        #[arg(long)]
+        details: bool,
+        /// Print machine-readable JSON
+        #[arg(long)]
+        json: bool,
     },
 
     /// Encode/decode Claude-style project path segments
@@ -423,6 +462,22 @@ const SESSIONS_ABOUT: &str = r#"List recent session files under the work root.
 Example:
   scopey sessions
   scopey sessions --cwd . --limit 20
+"#;
+
+const INSIGHTS_ABOUT: &str = r#"Analyze judgement history across stored sessions.
+
+The summary highlights sessions with off-track or warning windows, reports the
+share of evaluated windows that needed attention, and includes the judge's
+summary plus scope context. Date-only values use the machine's local timezone.
+
+Verdicts: on-track, warning, off-track, insufficient-evidence, unknown.
+
+Examples:
+  scopey insights
+  scopey insights --off-scope --since 2026-07-01
+  scopey insights --session 019fb598 --details
+  scopey insights --date 2026-07-30 --harness codex
+  scopey insights --cwd . --verdict warning --json
 "#;
 
 const PATH_ABOUT: &str = r#"Path helpers matching Claude's project-directory encoding.
@@ -680,6 +735,34 @@ fn run() -> Result<()> {
             raw,
         } => cmd_status(&cfg, session_id, cwd, raw),
         Commands::Sessions { cwd, limit } => cmd_sessions(&cfg, cwd, limit),
+        Commands::Insights {
+            session,
+            date,
+            since,
+            until,
+            cwd,
+            harness,
+            verdict,
+            off_scope,
+            limit,
+            details,
+            json,
+        } => insights::run(
+            &cfg,
+            insights::InsightArgs {
+                session,
+                date,
+                since,
+                until,
+                cwd,
+                harness,
+                verdict,
+                off_scope,
+                limit,
+                details,
+                json,
+            },
+        ),
         Commands::Path { action } => match action {
             PathCmd::Escape { cwd } => {
                 let abs = pathutil::abs_cwd(&cwd)?;
