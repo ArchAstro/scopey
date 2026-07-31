@@ -25,15 +25,16 @@
    `CHANGELOG.md`, then run `make release-check` and
    `cargo publish --dry-run --locked` before merging them.
 2. In GitHub Actions, run the `Release` workflow from `main` and choose a
-   `patch`, `minor`, or `major` bump. The workflow updates `Cargo.toml`,
-   `Cargo.lock`, and the changelog, then commits the bump to `main` before it
-   builds all four native archives and creates the tag, checksums, and GitHub
-   release. Pushing an already-prepared matching `vX.Y.Z` tag remains supported
-   as an alternative trigger.
-3. The release workflow uses `ARCHASTRO_RELEASE_GITHUB_TOKEN` to push the bump
-   commit to this repository and to regenerate and push `Formula/scopey.rb` in
-   `ArchAstro/homebrew-tools`. The token owner must be allowed to bypass both
-   repositories' pull-request rules.
+   `patch`, `minor`, or `major` bump. The workflow opens a release bump pull
+   request with updated `Cargo.toml`, `Cargo.lock`, and changelog, then enables
+   auto-merge. Once that pull request merges, the workflow builds all four
+   native archives, creates the tag, checksums, and GitHub release. Pushing an
+   already-prepared matching `vX.Y.Z` tag remains supported as an alternative
+   trigger.
+3. The release workflow uses its configured release credential for the bump
+   pull request and to regenerate and push `Formula/scopey.rb` in
+   `ArchAstro/homebrew-tools`. No branch-protection bypass is required for
+   Scopey.
 4. Verify a clean install with `brew install ArchAstro/tools/scopey`, followed
    by `scopey --version`, `scopey setup`, and `scopey doctor`.
 5. If publishing to crates.io, run `cargo publish --locked` from the tagged
