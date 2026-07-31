@@ -1,6 +1,6 @@
-//! scopey — keep agent sessions on the original scope.
+//! scopey — keep coding-agent sessions aligned with the current user scope.
 //!
-//! Hooks call into this CLI at Claude Code / Codex lifecycle events. See
+//! Supported harnesses call into this CLI at agent lifecycle events. See
 //! `scopey --help` and each subcommand's `--help` for model-oriented usage.
 
 mod config;
@@ -23,14 +23,14 @@ use std::path::PathBuf;
 use crate::config::Config;
 use crate::session::SessionStore;
 
-const LONG_ABOUT: &str = r#"scopey observes Claude Code and Codex sessions and keeps them on the
-original user-defined scope.
+const LONG_ABOUT: &str = r#"scopey observes supported coding-agent sessions and keeps them aligned
+with the user's current active scope.
 
 HOW IT WORKS
-  1. `scopey setup` installs lifecycle hooks into Claude and/or Codex.
+  1. `scopey setup` installs lifecycle hooks or extensions into supported harnesses.
   2. On each user prompt, hooks call `scopey hook user-prompt` which:
        - caches the prompt under ~/.scopey/work/<escaped-cwd>/<session>.json
-       - runs a cheap model (claude -p / codex exec) to extract scope requirements
+       - runs a cheap model through the selected harness to extract scope requirements
   3. Every N tool calls (config: n_tool_calls), hooks call `scopey hook post-tool` which:
        - journals a trajectory pointer
        - if a prior background judgement was off-track, emits injection JSON
@@ -68,7 +68,7 @@ FOR MODELS DRIVING SCOPEY
 #[command(
     name = "scopey",
     version,
-    about = "Keep Claude/Codex sessions on scope: observe, judge, inject, notify.",
+    about = "Keep coding-agent sessions on scope: observe, judge, inject, notify.",
     long_about = LONG_ABOUT,
     propagate_version = true,
     styles = clap::builder::Styles::styled()
@@ -436,7 +436,7 @@ const CONFIG_ABOUT: &str = r#"Show the effective config (user + optional project
 Keys that matter for lifecycle:
   n_tool_calls       every N tool events → journal + start background judge
   m_reminder         every M tool events → inject scope-requirements reminder
-  model_runner         auto|claude|codex  (auto = session harness)
+  model_runner         auto|claude|codex|grok|pi|opencode
   model                auto|<slug>        (auto = shipped fast tier)
   claude_fast_model    default "haiku"
   codex_fast_model     default "gpt-5.6-terra"
@@ -642,16 +642,17 @@ Examples:
 const MODELS_ABOUT: &str = r#"Explain and verify lightweight model selection for summarize/judge.
 
 Resolution rules (config defaults in parentheses):
-  model_runner = auto|claude|codex   (auto)
+  model_runner = auto|claude|codex|grok|pi|opencode   (auto)
   model        = auto|<slug>         (auto)
 
-When model_runner=auto, the session harness wins:
-  Claude Code session → claude CLI
-  Codex session       → codex CLI
+When model_runner=auto, the session harness wins when its CLI is available.
 
 When model=auto, use the product's shipped fast tier:
-  Claude → claude_fast_model (default "haiku" alias)
-  Codex  → codex_fast_model  (default "gpt-5.6-terra" mini-like tier)
+  Claude   → claude_fast_model
+  Codex    → codex_fast_model
+  Grok     → grok_fast_model
+  Pi       → pi_fast_model, or its configured provider default
+  OpenCode → opencode_fast_model, or its configured provider default
 
 Examples:
   scopey models

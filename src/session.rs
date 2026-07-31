@@ -364,8 +364,8 @@ impl SessionStore {
     /// Layout: `work_root/by-id/<session_id>.json`
     ///
     /// Older layouts used `work_root/<escaped-cwd>/<session_id>.json`, which
-    /// fragmented one Claude/Codex session across every `cd` into subdirs.
-    /// [`open_or_create_wait`] migrates legacy files when found.
+    /// fragmented one agent session across every `cd` into subdirectories.
+    /// [`Self::open_or_create_wait`] migrates legacy files when found.
     pub fn session_path(cfg: &Config, _cwd: &Path, session_id: &str) -> Result<PathBuf> {
         Ok(Self::session_path_by_id(cfg, session_id))
     }
@@ -904,9 +904,10 @@ mod tests {
     use super::*;
 
     fn test_cfg(work: &Path) -> Config {
-        let mut c = Config::default();
-        c.work_root = work.to_path_buf();
-        c
+        Config {
+            work_root: work.to_path_buf(),
+            ..Config::default()
+        }
     }
 
     #[test]
