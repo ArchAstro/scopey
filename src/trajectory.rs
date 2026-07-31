@@ -13,6 +13,103 @@ use std::fs;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
+const SCOPE_CONTEXT_TURNS: usize = 4;
+
+fn build_scope_analysis_prompt(
+    prompts: &[String],
+    previous_scope: Option<&str>,
+    max_chars: usize,
+) -> String {
+    let latest = prompts.last().map(String::as_str).unwrap_or("");
+    let latest_budget = (max_chars / 2).max(1000);
+    let previous_budget = (max_chars / 4).max(500);
+    let context_budget = max_chars
+        .saturating_sub(latest_budget)
+        .saturating_sub(previous_budget)
+        .max(500);
+    let latest = clip(latest, latest_budget);
+    let previous = previous_scope
+        .map(|scope| clip(scope, previous_budget))
+        .unwrap_or_else(|| "(none — this is the first extraction)".into());
+    let earlier = recent_prompt_context(
+        &prompts[..prompts.len().saturating_sub(1)],
+        context_budget,
+    );
+
+    format!(
+        r#"You are a scope analyst for a coding agent session.
+Produce the CURRENT ACTIVE SCOPE after interpreting the latest user prompt.
+
+First classify the latest prompt internally (do not print the classification):
+- CONTINUE/REFINE: extends or narrows unfinished work.
+- REPLACE: starts a new topic or supersedes prior work.
+- QUESTION/STATUS: asks for an answer, explanation, assessment, logs, or status.
+- ADMIN: asks to commit, push, open/update a PR, or continue already-requested work.
+- MACHINE_EVENT: a task notification or generated event, not a new user-authored goal.
+
+Scope lifecycle rules:
+- The latest user prompt is authoritative. On conflict, it overrides prior scope.
+- Output only requirements active NOW. Retire completed, superseded, and unrelated prior requirements.
+- For CONTINUE/REFINE, keep only prior requirements needed for the continuation.
+- For REPLACE, discard the old task instead of unioning both topics.
+- For QUESTION/STATUS, scope the work to answering or reporting. Never convert a question into authorization to implement a change.
+- For ADMIN, preserve the directly relevant unfinished task plus the requested administrative action; do not resurrect older tasks.
+- For MACHINE_EVENT, treat the event as state/context. Preserve only the explicit user request it resolves or updates.
+- Earlier prompts and previous scope are context, not automatically active requirements.
+- Do not invent implementation, commit, push, no-tools, or no-edit requirements unless the user explicitly requested them or they are inherent to a read-only status/assessment request.
+- Preserve explicit constraints and concrete semantics from the active request.
+
+Output rules:
+- Markdown bullet list only; no intent label, preamble, or closing.
+- Capture active goals, constraints, out-of-scope boundaries, and done-when criteria.
+- Max ~25 concise bullets.
+
+PREVIOUS EXTRACTED SCOPE (possibly stale; use only if still active):
+---
+{previous}
+---
+
+RECENT EARLIER USER CONTEXT (reference resolution only):
+---
+{earlier}
+---
+
+LATEST USER PROMPT (authoritative):
+---
+{latest}
+---
+"#
+    )
+}
+
+fn recent_prompt_context(prompts: &[String], max_chars: usize) -> String {
+    if prompts.is_empty() {
+        return "(none)".into();
+    }
+    let selected: Vec<&String> = prompts
+        .iter()
+        .rev()
+        .take(SCOPE_CONTEXT_TURNS)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
+    let numbered = selected
+        .iter()
+        .enumerate()
+        .map(|(index, prompt)| format!("Turn {}: {}", index + 1, prompt.trim()))
+        .collect::<Vec<_>>()
+        .join("\n\n");
+    clip(&numbered, max_chars)
+}
+
+fn fallback_scope(latest_prompt: &str) -> String {
+    format!(
+        "- (fallback scope — model unavailable)\n- Respond only to the latest user request:\n{}",
+        clip(latest_prompt, 1500)
+    )
+}
+
 pub fn summarize_scope(
     cfg: &Config,
     session_id: &str,
@@ -25,7 +122,7 @@ pub fn summarize_scope(
         "starting summarize",
         json!({ "cwd": cwd.display().to_string() }),
     );
-    let (prompts, harness) = {
+    let (prompts, previous_scope, harness) = {
         let mut store = SessionStore::open_or_create(cfg, cwd, session_id, "")?;
         if let Some(p) = extra_prompt {
             if !p.trim().is_empty() {
@@ -34,10 +131,11 @@ pub fn summarize_scope(
             }
         }
         let prompts = store.all_user_prompts();
+        let previous_scope = store.latest_scope_requirements();
         let harness = store.data.harness.clone();
         // Drop store before model.complete — exclusive flock must not span network I/O.
         drop(store);
-        (prompts, harness)
+        (prompts, previous_scope, harness)
     };
     if prompts.is_empty() {
         eventlog::warn(
@@ -49,37 +147,24 @@ pub fn summarize_scope(
         return Ok(());
     }
     let joined = prompts.join("\n\n---\n\n");
-    let clipped = clip(&joined, cfg.summarize_prompt_chars);
-
-    let sys = format!(
-        r#"You are a scope analyst for a coding agent session.
-Read the user prompt(s) below and extract a tight SCOPE REQUIREMENTS checklist.
-
-Rules:
-- Bullet list only (markdown).
-- Capture goals, constraints, out-of-scope boundaries, and done-when criteria.
-- Prefer actionable requirements the agent must not violate.
-- Max ~25 bullets. No preamble, no closing.
-
-USER PROMPT(S):
-{clipped}
-"#
+    let latest_prompt = prompts.last().expect("checked non-empty prompts");
+    let sys = build_scope_analysis_prompt(
+        &prompts,
+        previous_scope.as_deref(),
+        cfg.summarize_prompt_chars,
     );
 
     let out = match model::complete(cfg, &sys, &harness) {
         Ok(t) => t,
         Err(e) => {
-            // Fallback: first 1500 chars as crude scope so hooks still work offline.
+            // Fallback: latest request only, so offline mode cannot resurrect stale scope.
             eventlog::warn(
                 session_id,
                 "job.summarize.model",
-                format!("model failed; using truncated prompt fallback: {e:#}"),
+                format!("model failed; using latest-prompt fallback: {e:#}"),
                 json!({ "harness": harness }),
             );
-            format!(
-                "- (fallback scope — model unavailable)\n- Honor the user request:\n{}",
-                clip(&joined, 1500)
-            )
+            fallback_scope(latest_prompt)
         }
     };
 
@@ -252,6 +337,9 @@ Structured tool journal for THIS window only ({tool_n} tools, source={evidence_s
 ---
 
 Judge whether the agent is still working within the scope requirements.
+Treat LATEST USER PROMPT as authoritative if it conflicts with or supersedes the extracted scope.
+If the latest prompt is a question, status request, or assessment, judge only whether the agent is answering/investigating that request; do not require implementation merely because an older scope did.
+Do not penalize the agent for retiring completed or superseded requirements.
 Focus especially on file writes/edits and shell commands that change system state.
 Read-only investigation (rg, sed, cat, git show/log, list files) is OnTrack when the scope is an implementation task that has not yet been started or is still being scoped.
 You MUST cite tool names and paths from the journal in details.
@@ -759,6 +847,38 @@ as authoritative."#
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn scope_prompt_makes_latest_intent_authoritative() {
+        let prompts = vec![
+            "old mascot task".to_string(),
+            "add analytics".to_string(),
+            "clean up analytics".to_string(),
+            "did the PR merge?".to_string(),
+            "when config is missing, what happens?".to_string(),
+            "show me sample extractions".to_string(),
+        ];
+        let prompt = build_scope_analysis_prompt(
+            &prompts,
+            Some("- Implement config bootstrapping\n- Update the mascot"),
+            10_000,
+        );
+        assert!(prompt.contains("LATEST USER PROMPT (authoritative)"));
+        assert!(prompt.contains("show me sample extractions"));
+        assert!(prompt.contains("Never convert a question into authorization"));
+        assert!(prompt.contains("Retire completed, superseded, and unrelated"));
+        assert!(prompt.contains("possibly stale"));
+        assert!(!prompt.contains("old mascot task"));
+        assert!(prompt.contains("add analytics"));
+    }
+
+    #[test]
+    fn fallback_uses_only_latest_request() {
+        let fallback = fallback_scope("when config is missing, what happens?");
+        assert!(fallback.contains("Respond only to the latest user request"));
+        assert!(fallback.contains("what happens?"));
+        assert!(!fallback.contains("Implement config bootstrapping"));
+    }
 
     #[test]
     fn extract_json_from_fenced_text() {

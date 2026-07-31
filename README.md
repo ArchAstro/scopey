@@ -204,6 +204,15 @@ Stop  →  scopey hook stop
                      · inject any pending correction
 ```
 
+Scope extraction is intentionally **current-state**, not an ever-growing union
+of the conversation. The latest prompt is authoritative. Short continuations
+retain only relevant unfinished requirements; new topics replace old scope;
+questions and status requests remain read-only requests rather than becoming
+implementation authorization. Completed and superseded requirements are
+retired. Machine-generated task notifications are treated as context, not new
+user goals. If the summarizer model is unavailable, the fallback preserves only
+the latest request instead of replaying the full prompt history.
+
 ### Session store path
 
 Sessions are keyed by **`session_id` only** (not cwd). One Claude/Codex

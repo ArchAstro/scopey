@@ -559,8 +559,11 @@ Example:
     --transcript-path ~/.claude/projects/.../sid.jsonl
 "#;
 
-const SUMMARIZE_ABOUT: &str = r#"Build/replace scope_requirements from all user_prompt messages in the session.
+const SUMMARIZE_ABOUT: &str = r#"Build/replace the current active scope after the latest user prompt.
 
+The latest prompt is authoritative. The summarizer classifies it as a
+continuation, replacement, question/status request, administrative follow-up,
+or machine event, then retires completed, superseded, and unrelated scope.
 Uses model_runner + model from config. Intended for background use after prompts.
 
 Example:
