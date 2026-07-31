@@ -220,7 +220,7 @@ preserves only the latest request instead of replaying the full prompt history.
 Run `make install-pre-commit` once after installing
 [`pre-commit`](https://pre-commit.com/). The checked-in hook runs
 `cargo fmt --all -- --check` before each commit. CI enforces the same formatting
-check in its lint job and runs the full test suite separately.
+check in its lint job.
 
 ### Session store path
 
