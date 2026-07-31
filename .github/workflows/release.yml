@@ -12,6 +12,8 @@ on:
           - patch
           - minor
           - major
+  pull_request:
+    types: [closed]
   push:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
@@ -24,8 +26,72 @@ permissions:
   contents: read
 
 jobs:
+  bump:
+    name: Prepare release bump PR
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.ARCHASTRO_RELEASE_GITHUB_TOKEN }}
+      - name: Apply selected version bump
+        id: version
+        env:
+          RELEASE_BUMP: ${{ inputs.bump }}
+        shell: bash
+        run: |
+          version="$(scripts/prepare-release.sh "$RELEASE_BUMP")"
+          tag="v${version}"
+          branch="release/${tag}"
+          if git ls-remote --exit-code origin "refs/tags/${tag}" >/dev/null 2>&1; then
+            echo "tag ${tag} already exists" >&2
+            exit 1
+          fi
+          if git ls-remote --exit-code origin "refs/heads/${branch}" >/dev/null 2>&1; then
+            echo "release branch ${branch} already exists" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+      - name: Validate bumped checkout
+        run: |
+          cargo check --locked
+          git diff --check
+      - name: Open and auto-merge release PR
+        env:
+          GH_TOKEN: ${{ secrets.ARCHASTRO_RELEASE_GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_BRANCH: ${{ steps.version.outputs.branch }}
+        shell: bash
+        run: |
+          git switch -c "$RELEASE_BRANCH"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.toml Cargo.lock CHANGELOG.md
+          git commit -m "Release v${RELEASE_VERSION}"
+          git push --set-upstream origin "$RELEASE_BRANCH"
+
+          pr_url="$(gh pr create \
+            --base main \
+            --head "$RELEASE_BRANCH" \
+            --title "Release v${RELEASE_VERSION}" \
+            --body "Automated release bump for v${RELEASE_VERSION}. Merge this PR to build and publish the release.")"
+          gh pr merge "$pr_url" --auto --rebase
+
   prepare:
-    name: Validate release
+    name: Validate merged release
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.merged == true &&
+       github.event.pull_request.base.ref == 'main' &&
+       startsWith(github.event.pull_request.head.ref, 'release/v'))
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -37,40 +103,17 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          token: ${{ github.token }}
-      - name: Apply selected version bump
-        if: github.event_name == 'workflow_dispatch'
-        env:
-          RELEASE_BUMP: ${{ inputs.bump }}
-        shell: bash
-        run: |
-          version="$(scripts/prepare-release.sh "$RELEASE_BUMP")"
-          tag="v${version}"
-          if git rev-parse --verify --quiet "refs/tags/${tag}" >/dev/null; then
-            echo "tag ${tag} already exists" >&2
-            exit 1
-          fi
-
-          cargo check --locked
-          git diff --check
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Cargo.toml Cargo.lock CHANGELOG.md
-          git commit -m "Release ${tag}"
-          git push origin HEAD:main
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
       - name: Validate version, changelog, and tag
         id: release
         shell: bash
         run: |
-          version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -1)"
+          version="$(sed -n 's/^version = "\([^"\]*\)"/\1/p' Cargo.toml | head -1)"
           tag="v${version}"
+          commit="$(git rev-parse HEAD)"
 
           if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF_NAME}" != "$tag" ]]; then
             echo "tag ${GITHUB_REF_NAME} does not match Cargo.toml version ${version}" >&2
-            exit 1
-          fi
-          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && "${GITHUB_REF}" != "refs/heads/main" ]]; then
-            echo "manual releases must run from main" >&2
             exit 1
           fi
           if ! grep -Fq "## [${version}]" CHANGELOG.md; then
@@ -79,8 +122,8 @@ jobs:
           fi
           if git rev-parse --verify --quiet "refs/tags/${tag}" >/dev/null; then
             tag_commit="$(git rev-list -n 1 "$tag")"
-            if [[ "$tag_commit" != "${GITHUB_SHA}" ]]; then
-              echo "tag ${tag} already points to ${tag_commit}, not ${GITHUB_SHA}" >&2
+            if [[ "$tag_commit" != "$commit" ]]; then
+              echo "tag ${tag} already points to ${tag_commit}, not ${commit}" >&2
               exit 1
             fi
           fi
@@ -88,7 +131,7 @@ jobs:
           {
             echo "tag=$tag"
             echo "version=$version"
-            echo "commit=$(git rev-parse HEAD)"
+            echo "commit=$commit"
           } >> "$GITHUB_OUTPUT"
 
   build:
@@ -117,7 +160,7 @@ jobs:
       - name: Verify tag matches Cargo version
         shell: bash
         run: |
-          version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -1)"
+          version="$(sed -n 's/^version = "\([^"\]*\)"/\1/p' Cargo.toml | head -1)"
           test "$version" = "${{ needs.prepare.outputs.version }}"
       - name: Build archive
         shell: bash
@@ -157,7 +200,7 @@ jobs:
           RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
           RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
         run: |
-          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]] &&
+          if [[ "${GITHUB_EVENT_NAME}" != "push" ]] &&
              ! gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
             gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
               -f ref="refs/tags/${RELEASE_TAG}" \

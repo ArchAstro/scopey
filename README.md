@@ -7,7 +7,7 @@
   <img src="assets/scopey.jpg" alt="Scopey — the Scope Guy" width="320" />
 </p>
 
-<p align="center"><em>It looks like you're writing code.<br/>Would you like help staying on scope?</em></p>
+<p align="center"><em>It looks like you're writing code.<br/>Would you like help staying in scope?</em></p>
 
 **Keep Claude Code, Codex, Grok, Pi, and OpenCode sessions aligned with your
 current intent.**
