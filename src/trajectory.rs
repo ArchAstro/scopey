@@ -682,27 +682,27 @@ fn clip(s: &str, max: usize) -> String {
 }
 
 /// Canonical ASCII Scopey gag used in course-corrections when enabled.
-/// Matches the mascot: monocular body, thick Clippy brows, googly eyes on the
-/// lens rim, crosshair glass, knurled rings, bent wire arm.
+/// Side-on monocular matching assets/scopey.jpg: tapered body left, big circular
+/// lens right with reticle, googly eyes + thick brows on the rim, bent wire arm.
 pub const ASCII_SCOPEY_SCOPED: &str = r#"
-                              _________________
-                             <  You got scoped!  >
-                              -----------------
-                                     /
-                                    /
-              __                  __
-             /  \                /  \     thick brows
-            | oo |              | oo |    googly eyes
-             \__/____.----._____\__/
-        .===|####|   /++++\   |####|===.
-       /    |####|  |  +   |  |####|    \
-      | ()  |####|  | + +  |  |####|  () |  knurls + reticle
-       \    |####|   \++++/   |####|    /
-        `===|####|____`---'____|####|==='
-             \__/              \__/
-               \___            /
-                   \____.-----'   bent wire arm
-                        Scopey
+                                    _________________
+                                   <  You got scoped!  >
+                                    -----------------
+                                           /
+                                          /
+                        .-~~-.  .-~~-.
+                       /  __  \/  __  \     thick Clippy brows
+                      |  (••) || (••)  |    googly eyes on the rim
+                       \  \/  /\  \/  /
+        .--------.______`----'`----'______.------------.
+       /  knurl  |        .----------.        |  knurl  \
+      |   (())   |       /   \  |  /   \       |  (())   |
+      |          |      |  --- + ---  |      |          |  big glass + reticle
+      |   body   |       \   /  |  \   /       |   face  |
+       \_________|        `----------'        |_________/
+            \__                               /
+               \__         wire arm         /
+                  `----._______________.---'
 "#;
 
 pub fn build_correction_injection(
@@ -734,13 +734,13 @@ out-of-scope changes when safe. State a one-line re-plan before the next edit."#
             r#"
 
 MANDATORY ACK (do this before any other tool call):
-Render a monospaced ASCII version of Scopey (the cheesy optical-scope mascot with
-googly eyes and thick eyebrows) saying exactly: "You got scoped!"
-You may use the template below or a similar ASCII Scopey of your own; the line
-"You got scoped!" must appear. Put the ASCII art in a fenced code block so it
-renders monospaced. Then continue the re-plan.
+Print the ASCII Scopey below in a fenced code block (monospaced), including the
+exact line "You got scoped!". It should read like assets/scopey.jpg: side-on
+chrome monocular, big circular lens with crosshair reticle, two googly eyes and
+thick black eyebrows on the top rim, knurled rings, bent wire arm. Prefer the
+template as-is (or a tighter monospaced redraw that still looks like him). Then
+continue the re-plan.
 
-Example template:
 ```
 "#,
         );
