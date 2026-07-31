@@ -1,4 +1,5 @@
-.PHONY: all build build-release install uninstall test test-all clean fmt lint check \
+.PHONY: all build build-release install uninstall test test-all clean fmt fmt-check lint check \
+	install-pre-commit \
 	setup setup-hooks doctor verify-models release-check help
 
 # Default target
@@ -38,7 +39,15 @@ clean:
 
 # Format
 fmt:
-	cargo fmt
+	cargo fmt --all
+
+# Verify formatting without changing files
+fmt-check:
+	cargo fmt --all -- --check
+
+# Install the repository's checked-in pre-commit hooks
+install-pre-commit:
+	pre-commit install
 
 # Lint
 lint:
@@ -77,7 +86,10 @@ help:
 	@echo "  make test             cargo test"
 	@echo "  make test-all         all targets + features"
 	@echo "  make check            cargo check"
-	@echo "  make fmt / make lint  format / clippy -D warnings"
+	@echo "  make fmt              format all Rust targets"
+	@echo "  make fmt-check        verify formatting without changes"
+	@echo "  make lint             clippy -D warnings"
+	@echo "  make install-pre-commit  install checked-in git hooks"
 	@echo "  make clean            cargo clean + rm -rf .scopey/"
 	@echo "  make setup            release build + install hooks"
 	@echo "  make setup-hooks      scopey setup --force"

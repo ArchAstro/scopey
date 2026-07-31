@@ -177,7 +177,11 @@ fn post_tool_batch_counts_and_logs() {
     let log_path = home.path().join("logs").join(format!("{sid}.jsonl"));
     assert!(log_path.exists());
     let text = fs::read_to_string(log_path).unwrap();
-    assert!(text.contains("hook.post_tool") || text.contains("tool count") || text.contains("post_tool"));
+    assert!(
+        text.contains("hook.post_tool")
+            || text.contains("tool count")
+            || text.contains("post_tool")
+    );
 }
 
 #[test]
@@ -312,10 +316,7 @@ fn insights_reports_and_filters_off_scope_sessions() {
     let ghost_report: serde_json::Value = serde_json::from_slice(&ghost_json.stdout).unwrap();
     assert_eq!(ghost_report["totals"]["sessions"], 1);
     assert_eq!(ghost_report["excluded_empty_sessions"], 0);
-    assert_eq!(
-        ghost_report["sessions"][0]["scope_quality"],
-        "contaminated"
-    );
+    assert_eq!(ghost_report["sessions"][0]["scope_quality"], "contaminated");
 }
 
 fn walkdir_json(root: &std::path::Path) -> Vec<PathBuf> {

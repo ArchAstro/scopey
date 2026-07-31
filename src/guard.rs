@@ -84,7 +84,13 @@ impl SessionJobGuard {
     fn lock_path(_cfg: &Config, session_id: &str) -> PathBuf {
         let safe: String = session_id
             .chars()
-            .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+            .map(|c| {
+                if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                    c
+                } else {
+                    '_'
+                }
+            })
             .collect();
         Config::scopey_home()
             .join("locks")
@@ -220,7 +226,6 @@ impl SessionJobGuard {
         }
         Ok(true)
     }
-
 }
 
 impl Drop for SessionJobGuard {
@@ -458,7 +463,10 @@ mod tests {
                 .expect("first");
             drop(g1);
             let g2 = SessionJobGuard::try_acquire(&cfg, sid, "judge").unwrap();
-            assert!(g2.is_none(), "throttle should refuse immediately after release");
+            assert!(
+                g2.is_none(),
+                "throttle should refuse immediately after release"
+            );
             assert!(!SessionJobGuard::can_spawn(&cfg, sid).unwrap());
         });
     }

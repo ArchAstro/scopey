@@ -45,14 +45,9 @@ impl HerdrContext {
             .map(PathBuf::from)
             .filter(|p| !p.as_os_str().is_empty())
             .or_else(default_socket_path);
-        let pane_id = env::var("HERDR_PANE_ID")
-            .ok()
-            .filter(|s| !s.is_empty());
+        let pane_id = env::var("HERDR_PANE_ID").ok().filter(|s| !s.is_empty());
         let binary = which::which("herdr").ok();
-        let server_running = socket_path
-            .as_ref()
-            .map(|p| p.exists())
-            .unwrap_or(false)
+        let server_running = socket_path.as_ref().map(|p| p.exists()).unwrap_or(false)
             || binary
                 .as_ref()
                 .map(|b| {
@@ -158,9 +153,7 @@ pub fn notification_show(
         cmd.arg("--position").arg(pos);
     }
     cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
-    let output = cmd
-        .output()
-        .context("spawn herdr notification show")?;
+    let output = cmd.output().context("spawn herdr notification show")?;
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
     if !output.status.success() {

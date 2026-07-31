@@ -205,13 +205,22 @@ Stop  →  scopey hook stop
 ```
 
 Scope extraction is intentionally **current-state**, not an ever-growing union
-of the conversation. The latest prompt is authoritative. Short continuations
-retain only relevant unfinished requirements; new topics replace old scope;
-questions and status requests remain read-only requests rather than becoming
-implementation authorization. Completed and superseded requirements are
-retired. Machine-generated task notifications are treated as context, not new
-user goals. If the summarizer model is unavailable, the fallback preserves only
-the latest request instead of replaying the full prompt history.
+of the conversation. Each new prompt is an authoritative mutation that may add,
+subtract, modify, or replace requirements. Additions and modifications preserve
+unaffected active requirements; explicit removals, contradictions, and
+replacements win. Questions add a read-only obligation without becoming new
+implementation authorization. Machine-generated task notifications are treated
+as context, not new user goals. Each transition is written to the structured
+session log as `job.summarize.transition`, including the operation and
+before/after scope hashes. If the summarizer model is unavailable, the fallback
+preserves only the latest request instead of replaying the full prompt history.
+
+### Development checks
+
+Run `make install-pre-commit` once after installing
+[`pre-commit`](https://pre-commit.com/). The checked-in hook runs
+`cargo fmt --all -- --check` before each commit. CI enforces the same formatting
+check in its lint job and runs the full test suite separately.
 
 ### Session store path
 

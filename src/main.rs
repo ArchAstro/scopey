@@ -561,9 +561,9 @@ Example:
 
 const SUMMARIZE_ABOUT: &str = r#"Build/replace the current active scope after the latest user prompt.
 
-The latest prompt is authoritative. The summarizer classifies it as a
-continuation, replacement, question/status request, administrative follow-up,
-or machine event, then retires completed, superseded, and unrelated scope.
+The latest prompt is an authoritative mutation that can add, subtract, modify,
+or replace scope. Unaffected requirements survive additions/modifications;
+questions remain read-only. Each transition is recorded in the session log.
 Uses model_runner + model from config. Intended for background use after prompts.
 
 Example:
@@ -887,18 +887,13 @@ fn cmd_herdr(cfg: &Config, probe: bool) -> Result<()> {
     println!("  {}", h.summary_line());
     println!("  notify_backend = {:?}", cfg.notify_backend);
     println!("  herdr_report_state = {}", cfg.herdr_report_state);
-    println!(
-        "  herdr_notify_sound = {:?}",
-        cfg.herdr_notify_sound
-    );
+    println!("  herdr_notify_sound = {:?}", cfg.herdr_notify_sound);
     println!(
         "  notify_fallback_os_if_herdr_disabled = {}",
         cfg.notify_fallback_os_if_herdr_disabled
     );
     println!();
-    println!(
-        "Herdr toast delivery is configured in ~/.config/herdr/config.toml under [ui.toast]."
-    );
+    println!("Herdr toast delivery is configured in ~/.config/herdr/config.toml under [ui.toast].");
     println!("  delivery = \"herdr\" | \"terminal\" | \"system\" | \"off\"");
     println!();
 
