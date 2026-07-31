@@ -86,20 +86,27 @@ scopey logs --session <id> --raw
 scopey logs --session <id> --path
 ```
 
-## Process-storm guards (critical)
+## Process-storm + hang guards (critical)
 
 Headless `claude -p` / `codex exec` used for summarize/judge must **never** re-enter scopey hooks. That recursion was causing machine-killing process storms.
+
+Hooks must also never block the agent turn. Session store exclusive flocks are held only for short read/write bursts — **not** across model network calls. Hook opens wait at most **~1.5s** for the lock; if busy they skip and exit 0 with empty stdout (never hang Codex’s 15s timeout).
 
 Deterministic guards in the CLI (not left to the model):
 
 | Guard | Behavior |
 |---|---|
 | `SCOPEY_INTERNAL=1` | Set on every child scopey/model process; **all hooks no-op** |
-| Per-session lock | `~/.scopey/locks/<session>.job.lock` — **one** live summarize/judge per session |
+| Per-session job lock | `~/.scopey/locks/<session>.job.lock` — **one** live summarize/judge per session |
+| Session store flock | Held only while reading/writing JSON; released before `model.complete` |
+| Hook lock wait | Max ~1.5s; then skip (exit 0, empty stdout) so the harness never hangs |
+| Tool journal | Judge reads structured tool events, not raw JSONL tails |
+| Deferred jobs | Throttled summarize/judge are queued and drained when free |
 | `min_job_interval_secs` | Default 60s between jobs for a session |
 | `max_global_jobs` | Default 2 concurrent bg workers machine-wide |
 | Claude hooks | **PostToolBatch only** (not PostToolUse) to avoid double count/spawn |
 | Internal prompt filter | UserPromptSubmit ignores scopey analyst/judge text |
+| Hook exit | Hooks always exit 0; errors go to stderr / logs only |
 
 ```bash
 scopey purge              # SIGTERM leaked bg jobs / recursive claude storms
@@ -160,17 +167,16 @@ Stop  →  scopey hook stop
 
 ### Session store path
 
-Same encoding Claude uses for project dirs (absolute cwd, `/` → `-`):
+Sessions are keyed by **`session_id` only** (not cwd). One Claude/Codex
+session stays one file even when the agent `cd`s into subdirectories.
 
 ```text
-~/.scopey/work/<escaped-cwd>/<session_id>.json
+~/.scopey/work/by-id/<session_id>.json
 ```
 
-Example:
-
-```text
-/Users/you/proj  →  ~/.scopey/work/-Users-you-proj/<session>.json
-```
+`SessionData.cwd` still tracks the latest working directory. On first open,
+legacy files at `work/<escaped-cwd>/<session_id>.json` are migrated into
+`by-id/`.
 
 ### Config (`~/.scopey/config.toml`)
 

@@ -79,6 +79,11 @@ pub struct Config {
     pub min_job_interval_secs: u64,
     /// Max concurrent background jobs globally (0 = unlimited; default 2).
     pub max_global_jobs: u64,
+    /// Max chars of each tool's args stored in the journal / sent to the judge.
+    pub tool_args_preview_chars: usize,
+    /// Max tools lag after a judgement window before Ready injects are discarded as stale.
+    /// Default: 2 * n_tool_calls (course-correction lag budget).
+    pub judgement_max_lag_tools: u64,
 
     /// Filled at load time — not serialized as user config preference.
     #[serde(skip)]
@@ -119,6 +124,8 @@ impl Default for Config {
             default_harness: "claude".into(),
             min_job_interval_secs: 60,
             max_global_jobs: 2,
+            tool_args_preview_chars: 400,
+            judgement_max_lag_tools: 0, // 0 → 2 * n_tool_calls at load
             loaded_from: PathBuf::new(),
         }
     }
@@ -199,6 +206,12 @@ impl Config {
         if cfg.m_reminder == 0 {
             cfg.m_reminder = cfg.n_tool_calls * 2;
         }
+        if cfg.tool_args_preview_chars == 0 {
+            cfg.tool_args_preview_chars = 400;
+        }
+        if cfg.judgement_max_lag_tools == 0 {
+            cfg.judgement_max_lag_tools = cfg.n_tool_calls.saturating_mul(2).max(30);
+        }
         Ok(cfg)
     }
 
@@ -260,9 +273,13 @@ impl Config {
              default_harness = {:?}\n\
              min_job_interval_secs = {}   # throttle bg jobs per session\n\
              max_global_jobs = {}         # cap concurrent scopey bg workers\n\
+             tool_args_preview_chars = {} # journal / judge arg clip\n\
+             judgement_max_lag_tools = {} # stale inject discard after this lag\n\
              \n\
              Course-correction lag ≈ 2 * n_tool_calls tool events:\n\
                window k judged in background → injection applied at window k+1 boundary.\n\
+             Judge reads structured tool journal (not raw JSONL tails).\n\
+             Throttled summarize/judge jobs are deferred and drained when free.\n\
              \n\
              Model selection: same product as the agent session when model_runner=auto.\n\
              Fast defaults track what Claude Code / Codex ship (haiku, gpt-5.6-terra).\n",
@@ -298,6 +315,8 @@ impl Config {
             self.default_harness,
             self.min_job_interval_secs,
             self.max_global_jobs,
+            self.tool_args_preview_chars,
+            self.judgement_max_lag_tools,
         )
     }
 }
@@ -460,6 +479,12 @@ default_harness = "claude"
 min_job_interval_secs = 60
 # Soft cap on concurrent scopey bg jobs machine-wide (0 = off)
 max_global_jobs = 2
+
+# Structured tool journal (judge uses this, not raw JSONL tails)
+tool_args_preview_chars = 400
+# Discard Ready warning/off_track injects once session advanced this many tools past window end.
+# 0 = auto (2 * n_tool_calls)
+judgement_max_lag_tools = 0
 "#,
         work = default_work_root().display()
     )
