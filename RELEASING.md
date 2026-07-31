@@ -31,9 +31,10 @@
    creates the tag, checksums, and GitHub release. No repository secret is
    required. Pushing a matching `vX.Y.Z` tag remains supported as an
    alternative trigger.
-6. Run `scripts/update-scopey-formula.sh` in `ArchAstro/homebrew-tools` with
-   the version and four checksums from the release, then open and merge the tap
-   pull request.
+6. The release workflow uses `ARCHASTRO_RELEASE_GITHUB_TOKEN` to run
+   `scripts/update-scopey-formula.sh` and push the generated formula directly
+   to `ArchAstro/homebrew-tools/main`. The token owner must be allowed to bypass
+   the tap's pull-request rule, matching the ArchAstro CLI release setup.
 7. Verify a clean install with `brew install ArchAstro/tools/scopey`, followed
    by `scopey --version`, `scopey setup`, and `scopey doctor`.
 8. If publishing to crates.io, run `cargo publish --locked` from the tagged
