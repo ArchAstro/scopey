@@ -21,23 +21,22 @@
 
 ## Publishing a version
 
-1. Move relevant entries from `Unreleased` in `CHANGELOG.md` into a dated
-   version section.
-2. Update the version in `Cargo.toml` and run `cargo update -w` if needed.
-3. Run `make release-check` and `cargo publish --dry-run --locked`.
-4. Merge the release pull request.
-5. In GitHub Actions, run the `Release` workflow from `main`. It verifies that
-   `Cargo.toml` and this changelog agree, builds all four native archives, then
-   creates the tag, checksums, and GitHub release. No repository secret is
-   required. Pushing a matching `vX.Y.Z` tag remains supported as an
-   alternative trigger.
-6. The release workflow uses `ARCHASTRO_RELEASE_GITHUB_TOKEN` to run
-   `scripts/update-scopey-formula.sh` and push the generated formula directly
-   to `ArchAstro/homebrew-tools/main`. The token owner must be allowed to bypass
-   the tap's pull-request rule, matching the ArchAstro CLI release setup.
-7. Verify a clean install with `brew install ArchAstro/tools/scopey`, followed
+1. Make sure the merged changes are described under `Unreleased` in
+   `CHANGELOG.md`, then run `make release-check` and
+   `cargo publish --dry-run --locked` before merging them.
+2. In GitHub Actions, run the `Release` workflow from `main` and choose a
+   `patch`, `minor`, or `major` bump. The workflow updates `Cargo.toml`,
+   `Cargo.lock`, and the changelog, then commits the bump to `main` before it
+   builds all four native archives and creates the tag, checksums, and GitHub
+   release. Pushing an already-prepared matching `vX.Y.Z` tag remains supported
+   as an alternative trigger.
+3. The release workflow uses `ARCHASTRO_RELEASE_GITHUB_TOKEN` to push the bump
+   commit to this repository and to regenerate and push `Formula/scopey.rb` in
+   `ArchAstro/homebrew-tools`. The token owner must be allowed to bypass both
+   repositories' pull-request rules.
+4. Verify a clean install with `brew install ArchAstro/tools/scopey`, followed
    by `scopey --version`, `scopey setup`, and `scopey doctor`.
-8. If publishing to crates.io, run `cargo publish --locked` from the tagged
+5. If publishing to crates.io, run `cargo publish --locked` from the tagged
    commit and verify the docs.rs build.
 
 Release archives contain the `scopey` binary at their root and use these names:

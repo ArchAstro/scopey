@@ -7,6 +7,13 @@ and the project intends to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Hook and extension installers now invoke `scopey` through `PATH` instead of
+  embedding the setup process's absolute executable path.
+- Manually dispatched releases now accept a patch, minor, or major bump and
+  persist the selected version before building and publishing it.
+
 ## [0.1.0] - 2026-07-31
 
 ### Added

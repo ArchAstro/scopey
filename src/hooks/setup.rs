@@ -2,7 +2,6 @@ use crate::config::{default_config_toml, Config};
 use anyhow::{Context, Result};
 use serde_json::{json, Value};
 use std::fs;
-use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// Which harnesses to touch during setup/uninstall.
@@ -173,29 +172,28 @@ pub fn run_setup(cfg: &Config, set: HarnessSet, force: bool, write_config: bool)
     fs::create_dir_all(&cfg.work_root)?;
     fs::create_dir_all(Config::scopey_home().join("logs"))?;
 
-    let bin = resolve_scopey_bin()?;
-    println!("binary: {}", bin.display());
+    println!("binary: scopey (resolved through PATH by each harness)");
 
     if set.claude {
-        install_claude_hooks(&bin, force)?;
+        install_claude_hooks(force)?;
     }
     if set.codex {
-        install_codex_hooks(&bin, force)?;
+        install_codex_hooks(force)?;
     }
     if set.grok {
-        install_grok_hooks(&bin, force)?;
+        install_grok_hooks(force)?;
     }
     if set.pi {
-        install_pi_extension(&bin, force)?;
+        install_pi_extension(force)?;
     }
     if set.opencode {
-        install_opencode_plugin(&bin, force)?;
+        install_opencode_plugin(force)?;
     }
 
     println!(
         "\nscopey setup complete.\n\
          Next:\n\
-         1. Ensure `scopey` is on PATH (or hooks use absolute path above).\n\
+         1. Ensure `scopey` is on PATH.\n\
          2. Run `scopey doctor`.\n\
          3. Codex: open `/hooks` and trust scopey commands.\n\
          4. Grok: global hooks in ~/.grok/hooks/ are trusted; project hooks need /hooks-trust.\n\
@@ -206,24 +204,11 @@ pub fn run_setup(cfg: &Config, set: HarnessSet, force: bool, write_config: bool)
     Ok(())
 }
 
-fn resolve_scopey_bin() -> Result<PathBuf> {
-    if let Ok(exe) = std::env::current_exe() {
-        if exe.exists() {
-            return Ok(exe);
-        }
-    }
-    if let Ok(p) = which::which("scopey") {
-        return Ok(p);
-    }
-    Ok(PathBuf::from("scopey"))
+fn scopey_hook_cmd(sub: &str) -> String {
+    format!("scopey hook {sub}")
 }
 
-fn scopey_hook_cmd(bin: &Path, sub: &str) -> String {
-    // Quote path for shell form settings.
-    format!("\"{}\" hook {sub}", bin.display())
-}
-
-fn install_claude_hooks(bin: &Path, force: bool) -> Result<()> {
+fn install_claude_hooks(force: bool) -> Result<()> {
     let path = dirs::home_dir()
         .context("home dir")?
         .join(".claude")
@@ -260,7 +245,7 @@ fn install_claude_hooks(bin: &Path, force: bool) -> Result<()> {
     ];
 
     for (event, sub) in entries {
-        let cmd = scopey_hook_cmd(bin, sub);
+        let cmd = scopey_hook_cmd(sub);
         ensure_claude_event(hooks_obj, event, &cmd, force)?;
     }
 
@@ -355,7 +340,7 @@ fn ensure_claude_event(
     Ok(())
 }
 
-fn install_grok_hooks(bin: &Path, force: bool) -> Result<()> {
+fn install_grok_hooks(force: bool) -> Result<()> {
     // Grok discovers ~/.grok/hooks/*.json (always trusted for global).
     let dir = dirs::home_dir()
         .context("home dir")?
@@ -370,7 +355,7 @@ fn install_grok_hooks(bin: &Path, force: bool) -> Result<()> {
         );
         return Ok(());
     }
-    let cmd = |sub: &str| scopey_hook_cmd(bin, sub);
+    let cmd = scopey_hook_cmd;
     let root = json!({
         "description": "scopey lifecycle hooks for Grok Build",
         "hooks": {
@@ -426,7 +411,7 @@ fn uninstall_grok_hooks() -> Result<()> {
     Ok(())
 }
 
-fn install_pi_extension(bin: &Path, force: bool) -> Result<()> {
+fn install_pi_extension(force: bool) -> Result<()> {
     let dir = dirs::home_dir()
         .context("home dir")?
         .join(".pi")
@@ -441,17 +426,7 @@ fn install_pi_extension(bin: &Path, force: bool) -> Result<()> {
         );
         return Ok(());
     }
-    let mut body = include_str!("../../templates/pi_scopey_extension.ts").to_string();
-    // Bake absolute bin path as default when available.
-    if bin.is_absolute() {
-        body = body.replace(
-            "return process.env.SCOPEY_BIN || \"scopey\";",
-            &format!(
-                "return process.env.SCOPEY_BIN || {};",
-                serde_json::to_string(&bin.display().to_string()).unwrap()
-            ),
-        );
-    }
+    let body = include_str!("../../templates/pi_scopey_extension.ts");
     fs::write(&path, body)?;
     println!("pi extension: {}", path.display());
     println!("  restart Pi or run /reload to load the extension");
@@ -474,7 +449,7 @@ fn uninstall_pi_extension() -> Result<()> {
     Ok(())
 }
 
-fn install_opencode_plugin(bin: &Path, force: bool) -> Result<()> {
+fn install_opencode_plugin(force: bool) -> Result<()> {
     let dir = dirs::home_dir()
         .context("home dir")?
         .join(".config")
@@ -489,16 +464,7 @@ fn install_opencode_plugin(bin: &Path, force: bool) -> Result<()> {
         );
         return Ok(());
     }
-    let mut body = include_str!("../../templates/opencode_scopey_plugin.mjs").to_string();
-    if bin.is_absolute() {
-        body = body.replace(
-            "return process.env.SCOPEY_BIN || \"scopey\";",
-            &format!(
-                "return process.env.SCOPEY_BIN || {};",
-                serde_json::to_string(&bin.display().to_string()).unwrap()
-            ),
-        );
-    }
+    let body = include_str!("../../templates/opencode_scopey_plugin.mjs");
     fs::write(&path, body)?;
     println!("opencode plugin: {}", path.display());
     println!("  restart OpenCode to load plugins from ~/.config/opencode/plugins/");
@@ -521,7 +487,7 @@ fn uninstall_opencode_plugin() -> Result<()> {
     Ok(())
 }
 
-fn install_codex_hooks(bin: &Path, force: bool) -> Result<()> {
+fn install_codex_hooks(force: bool) -> Result<()> {
     let path = dirs::home_dir()
         .context("home dir")?
         .join(".codex")
@@ -559,7 +525,7 @@ fn install_codex_hooks(bin: &Path, force: bool) -> Result<()> {
     ];
 
     for (event, sub) in entries {
-        let cmd = scopey_hook_cmd(bin, sub);
+        let cmd = scopey_hook_cmd(sub);
         ensure_codex_event(hooks_obj, event, &cmd, force)?;
     }
 
@@ -856,6 +822,11 @@ fn _touch_default_toml() {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn hook_commands_resolve_scopey_through_path() {
+        assert_eq!(scopey_hook_cmd("post-tool"), "scopey hook post-tool");
+    }
 
     #[test]
     fn detects_scopey_hook_groups() {
