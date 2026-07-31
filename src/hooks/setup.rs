@@ -209,6 +209,14 @@ pub fn run_setup(cfg: &Config, set: HarnessSet, force: bool, write_config: bool)
 fn resolve_scopey_bin() -> Result<PathBuf> {
     if let Ok(exe) = std::env::current_exe() {
         if exe.exists() {
+            // Homebrew resolves the executable symlink into its versioned Cellar
+            // directory. Hooks should instead use the stable opt symlink so they
+            // keep working after `brew upgrade` removes the old Cellar version.
+            if let Some(stable) = stable_homebrew_scopey_bin(&exe) {
+                if stable.exists() {
+                    return Ok(stable);
+                }
+            }
             return Ok(exe);
         }
     }
@@ -216,6 +224,21 @@ fn resolve_scopey_bin() -> Result<PathBuf> {
         return Ok(p);
     }
     Ok(PathBuf::from("scopey"))
+}
+
+fn stable_homebrew_scopey_bin(exe: &Path) -> Option<PathBuf> {
+    if exe.file_name()? != "scopey" || exe.parent()?.file_name()? != "bin" {
+        return None;
+    }
+
+    let version_dir = exe.parent()?.parent()?;
+    let formula_dir = version_dir.parent()?;
+    let cellar_dir = formula_dir.parent()?;
+    if formula_dir.file_name()? != "scopey" || cellar_dir.file_name()? != "Cellar" {
+        return None;
+    }
+
+    Some(cellar_dir.parent()?.join("opt/scopey/bin/scopey"))
 }
 
 fn scopey_hook_cmd(bin: &Path, sub: &str) -> String {
@@ -892,5 +915,42 @@ mod tests {
         let batch = hooks.get("PostToolBatch").unwrap().as_array().unwrap();
         assert_eq!(batch.len(), 1);
         assert!(!hooks.contains_key("UserPromptSubmit"));
+    }
+
+    #[test]
+    fn normalizes_homebrew_cellar_paths_to_stable_opt_paths() {
+        let cases = [
+            (
+                "/opt/homebrew/Cellar/scopey/0.1.0/bin/scopey",
+                "/opt/homebrew/opt/scopey/bin/scopey",
+            ),
+            (
+                "/usr/local/Cellar/scopey/0.2.0/bin/scopey",
+                "/usr/local/opt/scopey/bin/scopey",
+            ),
+            (
+                "/home/linuxbrew/.linuxbrew/Cellar/scopey/1.0.0/bin/scopey",
+                "/home/linuxbrew/.linuxbrew/opt/scopey/bin/scopey",
+            ),
+        ];
+
+        for (cellar, stable) in cases {
+            assert_eq!(
+                stable_homebrew_scopey_bin(Path::new(cellar)),
+                Some(PathBuf::from(stable))
+            );
+        }
+    }
+
+    #[test]
+    fn leaves_non_homebrew_paths_unchanged() {
+        assert_eq!(
+            stable_homebrew_scopey_bin(Path::new("/usr/bin/scopey")),
+            None
+        );
+        assert_eq!(
+            stable_homebrew_scopey_bin(Path::new("/opt/homebrew/Cellar/other/0.1/bin/scopey")),
+            None
+        );
     }
 }
