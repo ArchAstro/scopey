@@ -7,6 +7,8 @@ and the project intends to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-07-31
+
 ### Changed
 
 - Hook and extension installers now invoke `scopey` through `PATH` instead of
