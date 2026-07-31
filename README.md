@@ -21,7 +21,7 @@ make install         # cargo install --path . --force
 make setup           # release build + hooks + config
 make doctor
 make verify-models   # probe claude/codex fast defaults
-make test            # unit + CLI integration (58 tests)
+make test            # unit + CLI integration tests
 make lint
 make release-check
 ```
@@ -72,6 +72,28 @@ Codex invoke: `codex exec --ephemeral -m <fast> --output-last-message …`
 scopey models              # print resolution table
 scopey models --verify     # live one-word probes
 ```
+
+## Session insights
+
+`scopey insights` turns stored judgement history into a cross-session drift
+report. Off-track sessions sort first, and each result includes its scope,
+evaluated tool windows, attention rate, and the judge's explanation.
+
+```bash
+scopey insights                              # recent overview
+scopey insights --off-scope --since 2026-07-01
+scopey insights --session 019fb598 --details # exact id or unique prefix
+scopey insights --date 2026-07-30 --harness codex
+scopey insights --cwd . --verdict warning
+scopey insights --since 2026-07-01T09:00:00-07:00 --json
+```
+
+Date-only filters use the machine's local timezone. `--date` selects one
+calendar day; `--since` and `--until` accept either `YYYY-MM-DD` or RFC3339.
+Verdict filters select sessions containing that signal while retaining all
+their evaluated windows, so the reported attention rate still has useful
+context. `--json` exposes the same totals, per-session counts, scope, summaries,
+details, tool windows, and timestamps for scripts.
 
 ## Session logs
 
@@ -208,6 +230,7 @@ scopey config
 scopey config --init
 scopey status --session-id <id>
 scopey sessions
+scopey insights --off-scope --since 2026-07-01
 scopey path escape --cwd .
 scopey path session-file --cwd . --session-id <id>
 scopey hook user-prompt     # stdin: harness JSON
