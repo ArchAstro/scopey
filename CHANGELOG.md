@@ -20,11 +20,6 @@ and the project intends to follow [Semantic Versioning](https://semver.org/).
 - Harness integrations for Claude Code, Codex, Grok, Pi, and OpenCode.
 - Local formatting hooks and public CI checks.
 
-### Fixed
-
-- Installed hooks now use Homebrew's stable `opt` path so they continue to
-  work after `brew upgrade` removes an older Cellar version.
-
 ### Security
 
 - Documented the sensitivity of stored prompts, transcripts, hook
