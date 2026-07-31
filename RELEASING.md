@@ -26,8 +26,11 @@
 2. Update the version in `Cargo.toml` and run `cargo update -w` if needed.
 3. Run `make release-check` and `cargo publish --dry-run --locked`.
 4. Merge the release pull request.
-5. Create and push a signed `vX.Y.Z` tag. The `Release` workflow builds four
-   native archives, publishes their checksums, and creates the GitHub release.
+5. In GitHub Actions, run the `Release` workflow from `main`. It verifies that
+   `Cargo.toml` and this changelog agree, builds all four native archives, then
+   creates the tag, checksums, and GitHub release. No repository secret is
+   required. Pushing a matching `vX.Y.Z` tag remains supported as an
+   alternative trigger.
 6. Run `scripts/update-scopey-formula.sh` in `ArchAstro/homebrew-tools` with
    the version and four checksums from the release, then open and merge the tap
    pull request.
