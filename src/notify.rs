@@ -128,13 +128,26 @@ fn deliver_herdr(
     sound_override: Option<&str>,
     ctx: &NotifyContext<'_>,
 ) -> Result<()> {
-    let sound = herdr::herdr_sound_for(
-        ctx.verdict_label(),
-        cfg.herdr_notify_sound
-            .as_deref()
-            .or(sound_override)
-            .or(cfg.notify_sound.as_deref()),
-    );
+    // Off-track / warning always use Herdr `request` (needs-attention) unless the
+    // caller explicitly chose none/done/request via herdr_notify_sound or --sound.
+    let explicit = cfg
+        .herdr_notify_sound
+        .as_deref()
+        .or(sound_override)
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    let sound = match ctx.verdict {
+        JudgementVerdict::OffTrack | JudgementVerdict::Warning => match explicit {
+            Some(s) => match s.to_ascii_lowercase().as_str() {
+                "none" | "off" | "silent" => "none",
+                "done" => "done",
+                // request, attention, blocked, default, Glass, … → attention ping
+                _ => "request",
+            },
+            None => "request",
+        },
+        _ => herdr::herdr_sound_for(ctx.verdict_label(), explicit.or(cfg.notify_sound.as_deref())),
+    };
     let position = cfg.herdr_notify_position.as_deref();
     let shown = herdr::notification_show(title, body, sound, position)?;
     if !shown && cfg.notify_fallback_os_if_herdr_disabled {
@@ -157,10 +170,10 @@ fn deliver_herdr(
 /// Fire a notification using the same backend rules as off-track alerts.
 ///
 /// When `notify_backend` is `auto`/`herdr` and Herdr is available (inside a
-/// pane or server up), calls `herdr notification show`. Otherwise uses OS
-/// desktop notify (osascript on macOS).
+/// pane or server up), calls `herdr notification show` with sound **request**.
+/// Otherwise uses OS desktop notify (osascript on macOS).
 pub fn notify(cfg: &Config, title: &str, body: &str, sound: Option<&str>) -> Result<()> {
-    // Treat CLI notifies like attention alerts for sound mapping (request).
+    // CLI notifies are attention alerts → Herdr sound "request" by default.
     let verdict = JudgementVerdict::OffTrack;
     let ctx = NotifyContext {
         verdict: &verdict,
@@ -172,6 +185,7 @@ pub fn notify(cfg: &Config, title: &str, body: &str, sound: Option<&str>) -> Res
         to_count: 0,
         harness: "cli",
     };
+    let sound = sound.or(Some("request"));
     deliver(cfg, title, body, sound, &ctx)
 }
 
