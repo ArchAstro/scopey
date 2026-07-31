@@ -2,9 +2,12 @@
 name = "scopey"
 version = "0.1.0"
 edition = "2021"
-description = "Keep Claude Code and Codex sessions on scope: observe, summarize requirements, judge drift, inject course-corrections, and notify when off-track."
+description = "Keep coding-agent sessions on scope with requirement summaries, trajectory judging, course corrections, and drift insights."
 license = "MIT"
 readme = "README.md"
+repository = "https://github.com/ArchAstro/scopey"
+homepage = "https://github.com/ArchAstro/scopey"
+documentation = "https://docs.rs/scopey"
 keywords = ["claude", "codex", "hooks", "agent", "scope"]
 categories = ["command-line-utilities", "development-tools"]
 

@@ -330,13 +330,15 @@ mod tests {
 
     #[test]
     fn title_template_selection_uses_config() {
-        let mut cfg = Config::default();
-        cfg.notify_title_off_track = "OFF {verdict}".into();
-        cfg.notify_title_warning = "WARN {summary}".into();
-        cfg.notify_body = "body {session_id}".into();
-        cfg.notify_backend = "command".into();
-        cfg.notify_command = Some("true".into()); // no-op shell
-        cfg.herdr_report_state = false;
+        let cfg = Config {
+            notify_title_off_track: "OFF {verdict}".into(),
+            notify_title_warning: "WARN {summary}".into(),
+            notify_body: "body {session_id}".into(),
+            notify_backend: "command".into(),
+            notify_command: Some("true".into()),
+            herdr_report_state: false,
+            ..Config::default()
+        };
 
         let v = JudgementVerdict::OffTrack;
         let c = ctx(&v);
@@ -349,10 +351,12 @@ mod tests {
 
     #[test]
     fn notify_cli_uses_config_backend_not_raw_os() {
-        let mut cfg = Config::default();
-        cfg.notify_backend = "command".into();
-        cfg.notify_command = Some("true".into());
-        cfg.herdr_report_state = false;
+        let cfg = Config {
+            notify_backend: "command".into(),
+            notify_command: Some("true".into()),
+            herdr_report_state: false,
+            ..Config::default()
+        };
         // Would fail if this still always went to osascript-only path without config.
         notify(&cfg, "t", "b", None).unwrap();
     }

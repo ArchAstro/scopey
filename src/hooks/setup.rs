@@ -2,7 +2,7 @@ use crate::config::{default_config_toml, Config};
 use anyhow::{Context, Result};
 use serde_json::{json, Value};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// Which harnesses to touch during setup/uninstall.
@@ -218,12 +218,12 @@ fn resolve_scopey_bin() -> Result<PathBuf> {
     Ok(PathBuf::from("scopey"))
 }
 
-fn scopey_hook_cmd(bin: &PathBuf, sub: &str) -> String {
+fn scopey_hook_cmd(bin: &Path, sub: &str) -> String {
     // Quote path for shell form settings.
     format!("\"{}\" hook {sub}", bin.display())
 }
 
-fn install_claude_hooks(bin: &PathBuf, force: bool) -> Result<()> {
+fn install_claude_hooks(bin: &Path, force: bool) -> Result<()> {
     let path = dirs::home_dir()
         .context("home dir")?
         .join(".claude")
@@ -355,7 +355,7 @@ fn ensure_claude_event(
     Ok(())
 }
 
-fn install_grok_hooks(bin: &PathBuf, force: bool) -> Result<()> {
+fn install_grok_hooks(bin: &Path, force: bool) -> Result<()> {
     // Grok discovers ~/.grok/hooks/*.json (always trusted for global).
     let dir = dirs::home_dir()
         .context("home dir")?
@@ -426,7 +426,7 @@ fn uninstall_grok_hooks() -> Result<()> {
     Ok(())
 }
 
-fn install_pi_extension(bin: &PathBuf, force: bool) -> Result<()> {
+fn install_pi_extension(bin: &Path, force: bool) -> Result<()> {
     let dir = dirs::home_dir()
         .context("home dir")?
         .join(".pi")
@@ -474,7 +474,7 @@ fn uninstall_pi_extension() -> Result<()> {
     Ok(())
 }
 
-fn install_opencode_plugin(bin: &PathBuf, force: bool) -> Result<()> {
+fn install_opencode_plugin(bin: &Path, force: bool) -> Result<()> {
     let dir = dirs::home_dir()
         .context("home dir")?
         .join(".config")
@@ -521,7 +521,7 @@ fn uninstall_opencode_plugin() -> Result<()> {
     Ok(())
 }
 
-fn install_codex_hooks(bin: &PathBuf, force: bool) -> Result<()> {
+fn install_codex_hooks(bin: &Path, force: bool) -> Result<()> {
     let path = dirs::home_dir()
         .context("home dir")?
         .join(".codex")
@@ -674,11 +674,12 @@ pub fn run_doctor(cfg: &Config) -> Result<()> {
         "model_runner",
         || {
             use crate::model::{resolve_choice, shipped_fast_defaults, Runner};
+            const RUNNERS: [&str; 5] = ["claude", "codex", "grok", "pi", "opencode"];
             let mut lines = Vec::new();
             for (product, slug, note) in shipped_fast_defaults() {
                 lines.push(format!("shipped {product} fast={slug} ({note})"));
             }
-            for harness in ["claude", "codex", "unknown"] {
+            for harness in ["claude", "codex", "grok", "pi", "opencode", "unknown"] {
                 match resolve_choice(cfg, harness) {
                     Ok(c) => {
                         let bin_ok = which::which(c.runner.as_str()).is_ok();
@@ -692,16 +693,24 @@ pub fn run_doctor(cfg: &Config) -> Result<()> {
                     Err(e) => lines.push(format!("harness={harness} → {e}")),
                 }
             }
-            // Critical only if neither binary exists for auto, or pinned runner missing.
+            // Critical only if no supported binary exists for auto, or a pinned runner is missing.
             let pinned = cfg.model_runner.trim().to_ascii_lowercase();
-            if pinned == "claude" || pinned == "codex" {
-                if which::which(&pinned).is_err() {
-                    return Err(format!("model_runner={pinned:?} but {pinned} not on PATH"));
+            if pinned != "auto" && !pinned.is_empty() {
+                let runner = Runner::parse(&pinned).ok_or_else(|| {
+                    format!("unknown model_runner {pinned:?}; expected auto or a supported runner")
+                })?;
+                if which::which(runner.as_str()).is_err() {
+                    return Err(format!(
+                        "model_runner={pinned:?} but {} not on PATH",
+                        runner.as_str()
+                    ));
                 }
-            } else if which::which("claude").is_err() && which::which("codex").is_err() {
-                return Err("neither claude nor codex on PATH".into());
+            } else if RUNNERS.iter().all(|runner| which::which(runner).is_err()) {
+                return Err(format!(
+                    "no supported model runner on PATH (need {})",
+                    RUNNERS.join("|")
+                ));
             }
-            let _ = Runner::Claude;
             Ok(lines.join("; "))
         },
         &mut failed,

@@ -79,7 +79,7 @@ verify-models:
 	cargo run --quiet --release -- models --verify
 
 help:
-	@echo "scopey Makefile targets (mirrors archastro/aster conventions):"
+	@echo "scopey Makefile targets:"
 	@echo "  make / make build     debug cargo build"
 	@echo "  make build-release    optimized binary in target/release/scopey"
 	@echo "  make install          cargo install --path . --force"

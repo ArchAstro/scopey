@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 /// Claude-style project directory encoding: absolute path with `/` → `-`.
 ///
-/// Example: `/Users/calvin/projects/scopey` → `-Users-calvin-projects-scopey`
+/// Example: `/Users/developer/projects/scopey` → `-Users-developer-projects-scopey`
 pub fn escape_project_path(abs: &Path) -> String {
     let s = abs.to_string_lossy();
     // Normalize to absolute-looking form without trailing slash (except root).
@@ -34,8 +34,8 @@ mod tests {
 
     #[test]
     fn escape_unix_path() {
-        let p = PathBuf::from("/Users/calvin/projects/scopey");
-        assert_eq!(escape_project_path(&p), "-Users-calvin-projects-scopey");
+        let p = PathBuf::from("/Users/developer/projects/scopey");
+        assert_eq!(escape_project_path(&p), "-Users-developer-projects-scopey");
     }
 
     #[test]
