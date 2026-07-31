@@ -12,7 +12,10 @@
 **Keep Claude Code, Codex, Grok, Pi, and OpenCode sessions aligned with your
 current intent.**
 
-scopey is a lightweight Rust CLI that installs harness hooks, caches user prompts, summarizes them into scope requirements with a cheap model, periodically judges trajectory (writes/bash especially), injects course-corrections that lag by ~2N tool calls, reminds the model of scope every M tools, and desktop-notifies you when things go off-track.
+Scopey is a lightweight Rust CLI that turns your prompts into a current scope,
+checks coding-agent activity against it, and surfaces sessions that need your
+attention. It can inject a correction into the active session and notify you
+when work drifts off scope.
 
 Scopey is pre-1.0 software. Config and session formats are designed to remain
 compatible, but may still evolve before the first stable release.
@@ -44,9 +47,9 @@ make lint
 make release-check
 ```
 
-Tests cover storm guards, session store, JSONL logs, judgement parsing, hook
-detection, config loading, model resolution, and hook CLI paths under isolated
-`SCOPEY_HOME`.
+Tests cover recursion guards, session storage, JSONL logs, judgement parsing,
+hook detection, config loading, model resolution, and hook CLI paths under
+isolated `SCOPEY_HOME`.
 
 Or without make:
 
@@ -143,36 +146,18 @@ scopey logs --session <id> --raw
 scopey logs --session <id> --path
 ```
 
-## Process-storm + hang guards (critical)
+## Runtime safety
 
-Headless `claude -p` / `codex exec` used for summarize/judge must **never** re-enter scopey hooks. That recursion was causing machine-killing process storms.
+Scopey keeps hooks responsive by doing model calls in bounded background jobs.
+It prevents its own model subprocesses from triggering Scopey again, limits
+machine-wide concurrency, and serializes work per session. If a session is
+busy, its hook returns without delaying the coding agent and queued analysis is
+picked up later.
 
-Hooks must also never block the agent turn. Session store exclusive flocks are held only for short read/write bursts — **not** across model network calls. Hook opens wait at most **~1.5s** for the lock; if busy they skip and exit 0 with empty stdout (never hang Codex’s 15s timeout).
-
-Deterministic guards in the CLI (not left to the model):
-
-| Guard | Behavior |
-|---|---|
-| `SCOPEY_INTERNAL=1` | Set on every child scopey/model process; **all hooks no-op** |
-| Per-session job lock | `~/.scopey/locks/<session>.job.lock` — **one** live summarize/judge per session |
-| Session store flock | Held only while reading/writing JSON; released before `model.complete` |
-| Hook lock wait | Max ~1.5s; then skip (exit 0, empty stdout) so the harness never hangs |
-| Tool journal | Judge reads structured tool events, not raw JSONL tails |
-| Deferred jobs | Throttled summarize/judge are queued and drained when free |
-| `min_job_interval_secs` | Default 60s between jobs for a session |
-| `max_global_jobs` | Default 2 concurrent bg workers machine-wide |
-| Claude hooks | **PostToolBatch only** (not PostToolUse) to avoid double count/spawn |
-| Internal prompt filter | UserPromptSubmit ignores scopey analyst/judge text |
-| Hook exit | Hooks always exit 0; errors go to stderr / logs only |
-
-```bash
-scopey purge              # SIGTERM leaked bg jobs / recursive claude storms
-scopey setup --force      # reinstall hooks (strips legacy PostToolUse)
-scopey uninstall          # remove hooks; keep ~/.scopey
-scopey uninstall --purge-data   # also delete config/sessions/logs/locks
-make uninstall            # same
-make uninstall PURGE=1    # with --purge-data
-```
+Use `scopey doctor` to check an installation. `scopey purge` stops stale
+background jobs, while `scopey setup --force` refreshes installed hooks.
+`scopey uninstall` removes hooks but keeps local data; add `--purge-data` to
+remove Scopey's config, sessions, logs, and locks as well.
 
 ## Herdr awareness
 
