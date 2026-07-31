@@ -682,27 +682,25 @@ fn clip(s: &str, max: usize) -> String {
 }
 
 /// Canonical ASCII Scopey gag used in course-corrections when enabled.
-/// Side-on monocular matching assets/scopey.jpg: tapered body left, big circular
-/// lens right with reticle, googly eyes + thick brows on the rim, bent wire arm.
+/// Side-on monocular matching assets/scopey.jpg.
 pub const ASCII_SCOPEY_SCOPED: &str = r#"
-                                    _________________
-                                   <  You got scoped!  >
-                                    -----------------
-                                           /
-                                          /
-                        .-~~-.  .-~~-.
-                       /  __  \/  __  \     thick Clippy brows
-                      |  (••) || (••)  |    googly eyes on the rim
-                       \  \/  /\  \/  /
-        .--------.______`----'`----'______.------------.
-       /  knurl  |        .----------.        |  knurl  \
-      |   (())   |       /   \  |  /   \       |  (())   |
-      |          |      |  --- + ---  |      |          |  big glass + reticle
-      |   body   |       \   /  |  \   /       |   face  |
-       \_________|        `----------'        |_________/
-            \__                               /
-               \__         wire arm         /
-                  `----._______________.---'
+                              _________________
+                             <  You got scoped!  >
+                              -----------------
+                                     /
+                                    /
+                         .-.   .-.
+                        (• •) (• •)
+                         '-'---'-'
+      .------.__________/           \______________.
+     /  (())  \        |   .-----.   |        / (()) \
+    |          |=======|  /  |  \  |=======|         |
+    |          |       | | --+-- | |       |         |
+    |          |=======|  \  |  /  |=======|         |
+     \________/        |   '-----'   |        \_____/
+          \__          '-------------'
+             \__
+                `---.______.
 "#;
 
 pub fn build_correction_injection(
@@ -730,20 +728,7 @@ Continue only with work that advances the scope requirements. Drop or reverse
 out-of-scope changes when safe. State a one-line re-plan before the next edit."#
     );
     if ascii_scopey {
-        out.push_str(
-            r#"
-
-MANDATORY ACK (do this before any other tool call):
-Print the ASCII Scopey below in a fenced code block (monospaced), including the
-exact line "You got scoped!". It should read like assets/scopey.jpg: side-on
-chrome monocular, big circular lens with crosshair reticle, two googly eyes and
-thick black eyebrows on the top rim, knurled rings, bent wire arm. Prefer the
-template as-is (or a tighter monospaced redraw that still looks like him). Then
-continue the re-plan.
-
-```
-"#,
-        );
+        out.push_str("\n\nPost the below:\n```\n");
         out.push_str(ASCII_SCOPEY_SCOPED.trim_start_matches('\n'));
         out.push_str("```\n");
     }
@@ -835,7 +820,7 @@ mod tests {
         assert!(c.contains("went sideways"));
         assert!(c.contains("revert foo"));
         assert!(c.contains("You got scoped!"));
-        assert!(c.contains("ASCII") || c.contains("monospaced") || c.contains("Scopey"));
+        assert!(c.contains("Post the below:"));
 
         let c_off = build_correction_injection(
             "- stay scoped",
@@ -846,6 +831,7 @@ mod tests {
         );
         assert!(c_off.contains("COURSE CORRECTION"));
         assert!(!c_off.contains("You got scoped!"));
+        assert!(!c_off.contains("Post the below:"));
 
         let r = build_reminder_injection("- rule one");
         assert!(r.contains("SCOPE REMINDER"));
