@@ -84,6 +84,9 @@ pub struct Config {
     /// Max tools lag after a judgement window before Ready injects are discarded as stale.
     /// Default: 2 * n_tool_calls (course-correction lag budget).
     pub judgement_max_lag_tools: u64,
+    /// When true, course-correction injections tell the model to render ASCII Scopey
+    /// saying "You got scoped!" before continuing. Set false to disable the gag.
+    pub ascii_scopey_on_correction: bool,
 
     /// Filled at load time — not serialized as user config preference.
     #[serde(skip)]
@@ -126,6 +129,7 @@ impl Default for Config {
             max_global_jobs: 2,
             tool_args_preview_chars: 400,
             judgement_max_lag_tools: 0, // 0 → 2 * n_tool_calls at load
+            ascii_scopey_on_correction: true,
             loaded_from: PathBuf::new(),
         }
     }
@@ -275,6 +279,7 @@ impl Config {
              max_global_jobs = {}         # cap concurrent scopey bg workers\n\
              tool_args_preview_chars = {} # journal / judge arg clip\n\
              judgement_max_lag_tools = {} # stale inject discard after this lag\n\
+             ascii_scopey_on_correction = {} # ASCII Scopey gag on course-correction\n\
              \n\
              Course-correction lag ≈ 2 * n_tool_calls tool events:\n\
                window k judged in background → injection applied at window k+1 boundary.\n\
@@ -317,6 +322,7 @@ impl Config {
             self.max_global_jobs,
             self.tool_args_preview_chars,
             self.judgement_max_lag_tools,
+            self.ascii_scopey_on_correction,
         )
     }
 }
@@ -485,6 +491,10 @@ tool_args_preview_chars = 400
 # Discard Ready warning/off_track injects once session advanced this many tools past window end.
 # 0 = auto (2 * n_tool_calls)
 judgement_max_lag_tools = 0
+
+# On course-correction, instruct the model to render ASCII Scopey saying "You got scoped!"
+# Set false to disable the gag.
+ascii_scopey_on_correction = true
 "#,
         work = default_work_root().display()
     )

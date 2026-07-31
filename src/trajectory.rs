@@ -681,13 +681,38 @@ fn clip(s: &str, max: usize) -> String {
     out
 }
 
+/// Canonical ASCII Scopey gag used in course-corrections when enabled.
+/// Matches the mascot: monocular body, thick Clippy brows, googly eyes on the
+/// lens rim, crosshair glass, knurled rings, bent wire arm.
+pub const ASCII_SCOPEY_SCOPED: &str = r#"
+                              _________________
+                             <  You got scoped!  >
+                              -----------------
+                                     /
+                                    /
+              __                  __
+             /  \                /  \     thick brows
+            | oo |              | oo |    googly eyes
+             \__/____.----._____\__/
+        .===|####|   /++++\   |####|===.
+       /    |####|  |  +   |  |####|    \
+      | ()  |####|  | + +  |  |####|  () |  knurls + reticle
+       \    |####|   \++++/   |####|    /
+        `===|####|____`---'____|####|==='
+             \__/              \__/
+               \___            /
+                   \____.-----'   bent wire arm
+                        Scopey
+"#;
+
 pub fn build_correction_injection(
     scope: &str,
     summary: &str,
     details: &str,
     verdict: &JudgementVerdict,
+    ascii_scopey: bool,
 ) -> String {
-    format!(
+    let mut out = format!(
         r#"[scopey COURSE CORRECTION — verdict: {verdict:?}]
 The recent trajectory was judged against the session scope and found issues.
 You must re-align immediately.
@@ -703,7 +728,26 @@ DETAILS / REQUIRED CORRECTIONS:
 
 Continue only with work that advances the scope requirements. Drop or reverse
 out-of-scope changes when safe. State a one-line re-plan before the next edit."#
-    )
+    );
+    if ascii_scopey {
+        out.push_str(
+            r#"
+
+MANDATORY ACK (do this before any other tool call):
+Render a monospaced ASCII version of Scopey (the cheesy optical-scope mascot with
+googly eyes and thick eyebrows) saying exactly: "You got scoped!"
+You may use the template below or a similar ASCII Scopey of your own; the line
+"You got scoped!" must appear. Put the ASCII art in a fenced code block so it
+renders monospaced. Then continue the re-plan.
+
+Example template:
+```
+"#,
+        );
+        out.push_str(ASCII_SCOPEY_SCOPED.trim_start_matches('\n'));
+        out.push_str("```\n");
+    }
+    out
 }
 
 pub fn build_reminder_injection(scope: &str) -> String {
@@ -784,11 +828,24 @@ mod tests {
             "went sideways",
             "revert foo",
             &JudgementVerdict::OffTrack,
+            true,
         );
         assert!(c.contains("COURSE CORRECTION"));
         assert!(c.contains("stay scoped"));
         assert!(c.contains("went sideways"));
         assert!(c.contains("revert foo"));
+        assert!(c.contains("You got scoped!"));
+        assert!(c.contains("ASCII") || c.contains("monospaced") || c.contains("Scopey"));
+
+        let c_off = build_correction_injection(
+            "- stay scoped",
+            "went sideways",
+            "revert foo",
+            &JudgementVerdict::OffTrack,
+            false,
+        );
+        assert!(c_off.contains("COURSE CORRECTION"));
+        assert!(!c_off.contains("You got scoped!"));
 
         let r = build_reminder_injection("- rule one");
         assert!(r.contains("SCOPE REMINDER"));
