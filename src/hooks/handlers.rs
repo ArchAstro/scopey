@@ -565,7 +565,13 @@ pub fn post_tool(cfg: &Config) -> Result<()> {
             .verdict
             .clone()
             .unwrap_or(crate::session::JudgementVerdict::Unknown);
-        let text = build_correction_injection(&scope, &summary, &details, &verdict);
+        let text = build_correction_injection(
+            &scope,
+            &summary,
+            &details,
+            &verdict,
+            cfg.ascii_scopey_on_correction,
+        );
         if let Some(id) = j.id.as_deref() {
             store.mark_judgement_injected(id);
         }
@@ -580,6 +586,7 @@ pub fn post_tool(cfg: &Config) -> Result<()> {
             json!({
                 "tool_count": count,
                 "verdict": format!("{:?}", verdict),
+                "ascii_scopey": cfg.ascii_scopey_on_correction,
             }),
         );
     }
@@ -726,7 +733,13 @@ pub fn stop(cfg: &Config) -> Result<()> {
             .verdict
             .clone()
             .unwrap_or(crate::session::JudgementVerdict::Unknown);
-        let text = build_correction_injection(&scope, &summary, &details, &verdict);
+        let text = build_correction_injection(
+            &scope,
+            &summary,
+            &details,
+            &verdict,
+            cfg.ascii_scopey_on_correction,
+        );
         if let Some(id) = j.id.as_deref() {
             store.mark_judgement_injected(id);
         }
@@ -737,7 +750,10 @@ pub fn stop(cfg: &Config) -> Result<()> {
             &sid,
             "hook.stop",
             "injected pending correction",
-            json!({ "tool_count": count }),
+            json!({
+                "tool_count": count,
+                "ascii_scopey": cfg.ascii_scopey_on_correction,
+            }),
         );
     } else {
         store.persist()?;

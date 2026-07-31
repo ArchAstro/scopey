@@ -507,14 +507,21 @@ Example:
   scopey summarize --session-id sid --cwd .
 "#;
 
-const NOTIFY_ABOUT: &str = r#"Send a desktop notification via the platform bridge (osascript on macOS).
+const NOTIFY_ABOUT: &str = r#"Send a notification the same way off-track alerts do.
 
-Uses config notify_sound unless --sound is passed. For full customization of
-off-track alerts, set notify_* keys in ~/.scopey/config.toml (see scopey config).
+Backend (config notify_backend, default auto):
+  herdr  → herdr notification show when Herdr is available (inside a Herdr
+           pane or server running). In-app toast when ui.toast.delivery=herdr.
+  os     → macOS osascript / Linux notify-send (always desktop)
+  auto   → Herdr when available, else OS
+  command → run notify_command template
+
+Uses config notify_sound / herdr_notify_sound unless --sound is passed.
+For full customization, set notify_* keys in ~/.scopey/config.toml.
 
 Examples:
   scopey notify --title scopey --body "Session may be off-track"
-  scopey notify --title scopey --body "test" --sound Glass
+  scopey notify --title scopey --body "test" --sound request
 "#;
 
 const LOGS_ABOUT: &str = r#"Read structured per-session debug logs written by scopey hooks and jobs.
@@ -743,11 +750,8 @@ fn run() -> Result<()> {
             trajectory::summarize_scope(&cfg, &session_id, &cwd, prompt.as_deref())
         }
         Commands::Notify { title, body, sound } => {
-            let sound = sound
-                .as_deref()
-                .or(cfg.notify_sound.as_deref())
-                .filter(|s| !s.is_empty());
-            notify::notify(&title, &body, sound)
+            let sound = sound.as_deref().filter(|s| !s.is_empty());
+            notify::notify(&cfg, &title, &body, sound)
         }
         Commands::Models { verify } => model::report_models(&cfg, verify),
         Commands::Herdr { probe } => cmd_herdr(&cfg, probe),
@@ -819,7 +823,7 @@ fn cmd_herdr(cfg: &Config, probe: bool) -> Result<()> {
             println!("probe: shown=false (Herdr accepted but delivery disabled/muted)");
             if cfg.notify_fallback_os_if_herdr_disabled {
                 println!("falling back to OS notify…");
-                notify::notify(title, body, cfg.notify_sound.as_deref())?;
+                notify::notify(cfg, title, body, cfg.notify_sound.as_deref())?;
             }
         }
         Err(e) => {

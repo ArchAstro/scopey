@@ -93,7 +93,7 @@ fn deliver(
     }
 
     if backend == "herdr" {
-        return deliver_herdr(cfg, title, body, ctx);
+        return deliver_herdr(cfg, title, body, sound, ctx);
     }
 
     if backend == "os" || backend == "system" {
@@ -110,7 +110,7 @@ fn deliver(
 
     let hctx = HerdrContext::detect();
     if hctx.can_notify() {
-        match deliver_herdr(cfg, title, body, ctx) {
+        match deliver_herdr(cfg, title, body, sound, ctx) {
             Ok(()) => return Ok(()),
             Err(e) => {
                 eprintln!("scopey herdr notify failed ({e:#}); falling back to OS");
@@ -125,27 +125,68 @@ fn deliver_herdr(
     cfg: &Config,
     title: &str,
     body: &str,
+    sound_override: Option<&str>,
     ctx: &NotifyContext<'_>,
 ) -> Result<()> {
-    let sound = herdr::herdr_sound_for(
-        ctx.verdict_label(),
-        cfg.herdr_notify_sound
-            .as_deref()
-            .or(cfg.notify_sound.as_deref()),
-    );
+    // Off-track / warning always use Herdr `request` (needs-attention) unless the
+    // caller explicitly chose none/done/request via herdr_notify_sound or --sound.
+    let explicit = cfg
+        .herdr_notify_sound
+        .as_deref()
+        .or(sound_override)
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    let sound = match ctx.verdict {
+        JudgementVerdict::OffTrack | JudgementVerdict::Warning => match explicit {
+            Some(s) => match s.to_ascii_lowercase().as_str() {
+                "none" | "off" | "silent" => "none",
+                "done" => "done",
+                // request, attention, blocked, default, Glass, … → attention ping
+                _ => "request",
+            },
+            None => "request",
+        },
+        _ => herdr::herdr_sound_for(ctx.verdict_label(), explicit.or(cfg.notify_sound.as_deref())),
+    };
     let position = cfg.herdr_notify_position.as_deref();
     let shown = herdr::notification_show(title, body, sound, position)?;
     if !shown && cfg.notify_fallback_os_if_herdr_disabled {
         eprintln!("scopey: herdr toast disabled; falling back to OS notification");
-        let os_sound = cfg.notify_sound.as_deref().filter(|s| !s.is_empty());
+        let os_sound = sound_override
+            .or(cfg.notify_sound.as_deref())
+            .filter(|s| !s.is_empty());
         return notify_os(title, body, os_sound);
+    }
+    if shown {
+        eprintln!("scopey notify: herdr toast shown (sound={sound})");
+    } else {
+        eprintln!(
+            "scopey notify: herdr accepted but toast not shown (delivery busy/disabled; no OS fallback)"
+        );
     }
     Ok(())
 }
 
-/// Fire a desktop notification on the current OS platform.
-pub fn notify(title: &str, body: &str, sound: Option<&str>) -> Result<()> {
-    notify_os(title, body, sound)
+/// Fire a notification using the same backend rules as off-track alerts.
+///
+/// When `notify_backend` is `auto`/`herdr` and Herdr is available (inside a
+/// pane or server up), calls `herdr notification show` with sound **request**.
+/// Otherwise uses OS desktop notify (osascript on macOS).
+pub fn notify(cfg: &Config, title: &str, body: &str, sound: Option<&str>) -> Result<()> {
+    // CLI notifies are attention alerts → Herdr sound "request" by default.
+    let verdict = JudgementVerdict::OffTrack;
+    let ctx = NotifyContext {
+        verdict: &verdict,
+        summary: body,
+        details: "",
+        session_id: "cli",
+        cwd: "",
+        from_count: 0,
+        to_count: 0,
+        harness: "cli",
+    };
+    let sound = sound.or(Some("request"));
+    deliver(cfg, title, body, sound, &ctx)
 }
 
 fn notify_os(title: &str, body: &str, sound: Option<&str>) -> Result<()> {
@@ -306,5 +347,15 @@ mod tests {
         let v2 = JudgementVerdict::Warning;
         let c2 = ctx(&v2);
         notify_judgement(&cfg, &c2).unwrap();
+    }
+
+    #[test]
+    fn notify_cli_uses_config_backend_not_raw_os() {
+        let mut cfg = Config::default();
+        cfg.notify_backend = "command".into();
+        cfg.notify_command = Some("true".into());
+        cfg.herdr_report_state = false;
+        // Would fail if this still always went to osascript-only path without config.
+        notify(&cfg, "t", "b", None).unwrap();
     }
 }
