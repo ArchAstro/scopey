@@ -1,8 +1,18 @@
 # scopey
 
+<p align="center">
+  <img src="assets/scopey.jpg" alt="Scopey — the Scope Guy" width="320" />
+</p>
+
+<p align="center"><em>It looks like you're writing code.<br/>Would you like help staying on scope?</em></p>
+
 **Keep Claude Code and Codex sessions on the original scope.**
 
 scopey is a lightweight Rust CLI that installs harness hooks, caches user prompts, summarizes them into scope requirements with a cheap model, periodically judges trajectory (writes/bash especially), injects course-corrections that lag by ~2N tool calls, reminds the model of scope every M tools, and desktop-notifies you when things go off-track.
+
+<p align="center">
+  <img src="assets/scopey-alt.jpg" alt="Scopey watching your trajectory" width="240" />
+</p>
 
 ## Install
 
