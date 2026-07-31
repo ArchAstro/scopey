@@ -22,10 +22,19 @@ compatible, but may still evolve before the first stable release.
 
 ## Install
 
-Prerequisites: stable Rust and at least one supported coding-agent CLI for live
-scope extraction. Tests do not require an agent CLI.
+Install the prebuilt binary with Homebrew:
 
-Install directly from GitHub:
+```bash
+brew install ArchAstro/tools/scopey
+scopey setup
+scopey doctor
+```
+
+For installation from source, prerequisites are stable Rust and at least one
+supported coding-agent CLI for live scope extraction. Tests do not require an
+agent CLI.
+
+Install from the GitHub source repository:
 
 ```bash
 cargo install --git https://github.com/ArchAstro/scopey.git

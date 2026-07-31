@@ -127,3 +127,53 @@ jobs:
             --verify-tag \
             --generate-notes \
             --title "Scopey ${RELEASE_TAG}"
+
+  homebrew:
+    name: Update Homebrew tap
+    needs: [prepare, publish]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.0
+        with:
+          path: dist
+          pattern: scopey-*
+          merge-multiple: true
+      - name: Update Scopey formula
+        env:
+          GH_TOKEN: ${{ secrets.ARCHASTRO_RELEASE_GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        shell: bash
+        run: |
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "ARCHASTRO_RELEASE_GITHUB_TOKEN is not configured" >&2
+            exit 1
+          fi
+
+          darwin_arm64_sha="$(sha256sum dist/scopey-darwin-arm64.tar.gz | cut -d ' ' -f 1)"
+          darwin_x64_sha="$(sha256sum dist/scopey-darwin-x64.tar.gz | cut -d ' ' -f 1)"
+          linux_arm64_sha="$(sha256sum dist/scopey-linux-arm64.tar.gz | cut -d ' ' -f 1)"
+          linux_x64_sha="$(sha256sum dist/scopey-linux-x64.tar.gz | cut -d ' ' -f 1)"
+
+          gh auth setup-git
+          git clone https://github.com/ArchAstro/homebrew-tools.git "$RUNNER_TEMP/homebrew-tools"
+          cd "$RUNNER_TEMP/homebrew-tools"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          ./scripts/update-scopey-formula.sh \
+            "$RELEASE_VERSION" \
+            "$darwin_arm64_sha" \
+            "$darwin_x64_sha" \
+            "$linux_arm64_sha" \
+            "$linux_x64_sha"
+
+          if [[ -z "$(git status --porcelain -- Formula/scopey.rb)" ]]; then
+            echo "Homebrew formula is already current"
+            exit 0
+          fi
+
+          git add Formula/scopey.rb
+          git commit -m "scopey v${RELEASE_VERSION}"
+          git push origin main
