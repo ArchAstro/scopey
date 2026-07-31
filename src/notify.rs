@@ -23,6 +23,7 @@ impl NotifyContext<'_> {
             JudgementVerdict::OnTrack => "on_track",
             JudgementVerdict::Warning => "warning",
             JudgementVerdict::OffTrack => "off_track",
+            JudgementVerdict::InsufficientEvidence => "insufficient_evidence",
             JudgementVerdict::Unknown => "unknown",
         }
     }
@@ -57,7 +58,7 @@ pub fn notify_judgement(cfg: &Config, ctx: &NotifyContext<'_>) -> Result<()> {
         let state = match ctx.verdict {
             JudgementVerdict::OffTrack | JudgementVerdict::Warning => "blocked",
             JudgementVerdict::OnTrack => "working",
-            JudgementVerdict::Unknown => "unknown",
+            JudgementVerdict::InsufficientEvidence | JudgementVerdict::Unknown => "unknown",
         };
         let msg = format!("{}: {}", ctx.verdict_label(), ctx.summary);
         if let Err(e) = herdr::report_agent_state(

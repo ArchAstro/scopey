@@ -12,6 +12,7 @@ mod model;
 mod notify;
 mod pathutil;
 mod session;
+mod tool_journal;
 mod trajectory;
 
 use anyhow::{Context, Result};
@@ -683,12 +684,21 @@ fn run() -> Result<()> {
                 Ok(())
             }
         },
-        Commands::Hook { event } => match event {
-            HookCmd::UserPrompt => hooks::handlers::user_prompt(&cfg),
-            HookCmd::SessionStart => hooks::handlers::session_start(&cfg),
-            HookCmd::PostTool => hooks::handlers::post_tool(&cfg),
-            HookCmd::Stop => hooks::handlers::stop(&cfg),
-        },
+        Commands::Hook { event } => {
+            // Hooks must never hang or fail the harness (exit 1 / invalid JSON).
+            // Log errors to stderr + session log; always return success with
+            // either empty stdout or a single valid inject JSON object.
+            let res = match event {
+                HookCmd::UserPrompt => hooks::handlers::user_prompt(&cfg),
+                HookCmd::SessionStart => hooks::handlers::session_start(&cfg),
+                HookCmd::PostTool => hooks::handlers::post_tool(&cfg),
+                HookCmd::Stop => hooks::handlers::stop(&cfg),
+            };
+            if let Err(e) = res {
+                eprintln!("scopey hook error (suppressed for harness): {e:#}");
+            }
+            Ok(())
+        }
         Commands::Judge {
             session_id,
             cwd,

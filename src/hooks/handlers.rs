@@ -1,12 +1,14 @@
 use crate::config::Config;
 use crate::eventlog;
 use crate::guard::{self, SessionJobGuard};
-use crate::session::{hash_prompt, SessionMessage, SessionStore};
+use crate::session::{hash_prompt, SessionMessage, SessionStore, ToolEvent};
+use crate::tool_journal::{counts_toward_n, preview_tool_input};
 use crate::trajectory::{
-    build_correction_injection, build_reminder_injection, spawn_background_judge,
+    build_correction_injection, build_reminder_injection, drain_pending_jobs, spawn_background_judge,
     spawn_background_summarize, transcript_len,
 };
 use anyhow::{Context, Result};
+use chrono::Utc;
 use serde::Deserialize;
 use serde_json::json;
 use std::io::{self, Read};
@@ -216,14 +218,79 @@ pub(crate) fn harness_from_event(ev: &HookEvent) -> String {
     "unknown".into()
 }
 
-fn emit_additional_context(hook_event_name: &str, context: &str) {
+/// Emit harness injection JSON on stdout.
+///
+/// Codex + Claude both accept `hookSpecificOutput.additionalContext`.
+/// - Context is hard-capped (harness limit ~10k).
+/// - `hookEventName` is forced to a canonical PascalCase event name.
+/// - Only a single JSON object is written (no trailing logs).
+fn emit_additional_context(session_id: &str, hook_event_name: &str, context: &str) {
+    // Harnesses cap hook strings ~10k; leave headroom for JSON framing.
+    let ctx = clip(context, 8_000);
+    let event = canonical_hook_event_name(hook_event_name);
     let out = json!({
         "hookSpecificOutput": {
-            "hookEventName": hook_event_name,
-            "additionalContext": context,
+            "hookEventName": event,
+            "additionalContext": ctx,
         }
     });
-    println!("{}", out);
+    let s = match serde_json::to_string(&out) {
+        Ok(s) => s,
+        Err(e) => {
+            eventlog::error(
+                session_id,
+                "hook.inject.stdout",
+                format!("failed to serialize inject JSON: {e}"),
+                json!({}),
+            );
+            return; // empty stdout is always valid
+        }
+    };
+    // Validate we only emit pure JSON (no control chars outside strings — serde handles this).
+    if !s.starts_with('{') {
+        eventlog::error(
+            session_id,
+            "hook.inject.stdout",
+            "refusing non-object inject payload",
+            json!({}),
+        );
+        return;
+    }
+    eventlog::info(
+        session_id,
+        "hook.inject.stdout",
+        "emitted additionalContext to harness",
+        json!({
+            "hook_event": event,
+            "context_chars": ctx.len(),
+            "stdout_chars": s.len(),
+            "marker": if ctx.contains("COURSE CORRECTION") {
+                "correction"
+            } else if ctx.contains("SCOPE REMINDER") {
+                "reminder"
+            } else {
+                "other"
+            },
+            "stdout_preview": clip(&s, 240),
+        }),
+    );
+    // Exactly one line of JSON — no trailing println noise.
+    use std::io::Write;
+    let mut stdout = std::io::stdout().lock();
+    let _ = writeln!(stdout, "{s}");
+    let _ = stdout.flush();
+}
+
+fn canonical_hook_event_name(name: &str) -> &'static str {
+    let n = name.to_ascii_lowercase().replace('-', "_");
+    match n.as_str() {
+        "posttooluse" | "post_tool_use" => "PostToolUse",
+        "posttoolbatch" | "post_tool_batch" => "PostToolBatch",
+        "userpromptsubmit" | "user_prompt_submit" => "UserPromptSubmit",
+        "sessionstart" | "session_start" => "SessionStart",
+        "stop" => "Stop",
+        _ => "PostToolUse",
+    }
 }
 
 fn clip(s: &str, n: usize) -> String {
@@ -254,12 +321,22 @@ pub fn user_prompt(cfg: &Config) -> Result<()> {
     }
 
     let harness = harness_from_event(&ev);
-    let mut store = SessionStore::open_or_create(cfg, &cwd, &sid, &harness)?;
+    let mut store = match SessionStore::open_or_create_hook(cfg, &cwd, &sid, &harness) {
+        Ok(s) => s,
+        Err(e) => {
+            eventlog::warn(
+                &sid,
+                "hook.user_prompt",
+                format!("skip (session lock): {e:#}"),
+                json!({}),
+            );
+            return Ok(()); // never hang / fail the harness
+        }
+    };
     if let Some(ref tp) = ev.transcript_path {
         store.set_transcript(Some(Path::new(tp)));
     }
     store.append(SessionMessage::user_prompt(&prompt, hash_prompt(&prompt)));
-    store.persist()?;
     eventlog::info(
         &sid,
         "hook.user_prompt",
@@ -271,26 +348,51 @@ pub fn user_prompt(cfg: &Config) -> Result<()> {
         }),
     );
 
-    // Single-flight + throttle: parent refuses if session already has a live worker.
+    // Single-flight + throttle: defer summarize when busy (drain later).
     if !SessionJobGuard::can_spawn(cfg, &sid)? {
+        store.mark_summarize_pending();
+        store.persist()?;
         eventlog::info(
             &sid,
             "hook.user_prompt",
-            "skip summarize (session busy/throttled)",
-            json!({}),
+            "defer summarize (session busy/throttled)",
+            json!({ "summarize_pending": true }),
         );
         return Ok(());
     }
-    if let Err(e) = spawn_background_summarize(cfg, &sid, &cwd) {
-        eventlog::error(
-            &sid,
-            "hook.user_prompt",
-            format!("failed to spawn summarize: {e:#}"),
-            json!({}),
-        );
+    store.clear_summarize_pending();
+    store.persist()?;
+    drop(store); // release flock before spawning child that will re-open
+    match spawn_background_summarize(cfg, &sid, &cwd) {
+        Ok(true) => {}
+        Ok(false) => {
+            if let Ok(mut s2) = SessionStore::open_or_create_hook(cfg, &cwd, &sid, &harness) {
+                s2.mark_summarize_pending();
+                let _ = s2.persist();
+            }
+            eventlog::info(
+                &sid,
+                "hook.user_prompt",
+                "defer summarize (spawn skipped busy/cap)",
+                json!({ "summarize_pending": true }),
+            );
+        }
+        Err(e) => {
+            if let Ok(mut s2) = SessionStore::open_or_create_hook(cfg, &cwd, &sid, &harness) {
+                s2.mark_summarize_pending();
+                let _ = s2.persist();
+            }
+            eventlog::error(
+                &sid,
+                "hook.user_prompt",
+                format!("failed to spawn summarize: {e:#}"),
+                json!({}),
+            );
+        }
     }
 
     // Silent stdout — do not inject on every prompt by default.
+    let _ = drain_pending_jobs(cfg, &sid, &cwd);
     Ok(())
 }
 
@@ -302,7 +404,18 @@ pub fn session_start(cfg: &Config) -> Result<()> {
     let sid = session_id(&ev)?;
     let cwd = cwd(&ev);
     let harness = harness_from_event(&ev);
-    let mut store = SessionStore::open_or_create(cfg, &cwd, &sid, &harness)?;
+    let mut store = match SessionStore::open_or_create_hook(cfg, &cwd, &sid, &harness) {
+        Ok(s) => s,
+        Err(e) => {
+            eventlog::warn(
+                &sid,
+                "hook.session_start",
+                format!("skip (session lock): {e:#}"),
+                json!({}),
+            );
+            return Ok(());
+        }
+    };
     if let Some(ref tp) = ev.transcript_path {
         store.set_transcript(Some(Path::new(tp)));
     }
@@ -352,31 +465,92 @@ pub fn post_tool(cfg: &Config) -> Result<()> {
         .clone()
         .unwrap_or_else(|| "PostToolUse".into());
 
-    // Prefer batch accounting: if this is PostToolUse and PostToolBatch is also
-    // installed historically, we only count batch events when present; for
-    // PostToolUse alone, count 1. Detect batch via tool_calls array.
-    let is_batch = ev.tool_calls.is_some() || hook_name == "PostToolBatch";
-    let delta: u64 = if let Some(ref batch) = ev.tool_calls {
-        batch.len().max(1) as u64
-    } else if is_batch {
-        1
-    } else {
-        // Per-tool PostToolUse: still count, but only spawn on N boundaries below.
-        1
-    };
-    let _ = is_batch;
+    let preview_chars = cfg.tool_args_preview_chars.max(32);
 
-    let mut store = SessionStore::open_or_create(cfg, &cwd, &sid, &harness)?;
+    // Expand batch or single tool into journal entries; only meaningful tools
+    // advance tool_call_count / N-windows (noise: write_stdin, wait_agent, …).
+    let mut journaled: Vec<(String, String, bool)> = Vec::new();
+    if let Some(ref batch) = ev.tool_calls {
+        for tc in batch {
+            let name = tc
+                .tool_name
+                .clone()
+                .unwrap_or_else(|| "unknown".into());
+            let noise = !counts_toward_n(&name);
+            journaled.push((name, String::new(), noise));
+        }
+        if journaled.is_empty() {
+            journaled.push(("batch".into(), String::new(), false));
+        }
+    } else {
+        let name = ev
+            .tool_name
+            .clone()
+            .unwrap_or_else(|| "unknown".into());
+        let args = preview_tool_input(ev.tool_input.as_ref(), preview_chars);
+        let noise = !counts_toward_n(&name);
+        journaled.push((name, args, noise));
+    }
+
+    let mut store = match SessionStore::open_or_create_hook(cfg, &cwd, &sid, &harness) {
+        Ok(s) => s,
+        Err(e) => {
+            // Never block the agent turn for >HOOK_LOCK_WAIT.
+            eventlog::warn(
+                &sid,
+                "hook.post_tool",
+                format!("skip (session lock): {e:#}"),
+                json!({ "tool": ev.tool_name }),
+            );
+            return Ok(());
+        }
+    };
     if let Some(ref tp) = ev.transcript_path {
         store.set_transcript(Some(Path::new(tp)));
     }
 
-    let prev = store.data.tool_call_count;
-    store.data.tool_call_count = prev.saturating_add(delta);
+    let mut meaningful_delta = 0u64;
+    for (name, args, noise) in journaled {
+        if noise {
+            store.append_tool_event(ToolEvent {
+                index: 0,
+                name,
+                args_preview: args,
+                ts: Utc::now(),
+                noise: true,
+            });
+        } else {
+            let next = store.data.tool_call_count.saturating_add(1);
+            store.data.tool_call_count = next;
+            meaningful_delta += 1;
+            store.append_tool_event(ToolEvent {
+                index: next,
+                name,
+                args_preview: args,
+                ts: Utc::now(),
+                noise: false,
+            });
+        }
+    }
     let count = store.data.tool_call_count;
+    let delta = meaningful_delta;
 
     let n = cfg.n_tool_calls.max(1);
     let m = cfg.m_reminder.max(1);
+    let max_lag = if cfg.judgement_max_lag_tools == 0 {
+        n.saturating_mul(2).max(30)
+    } else {
+        cfg.judgement_max_lag_tools
+    };
+    let expired = store.expire_stale_judgements(count, max_lag);
+    if expired > 0 {
+        eventlog::info(
+            &sid,
+            "hook.post_tool.stale",
+            format!("discarded {expired} stale judgement(s)"),
+            json!({ "tool_count": count, "max_lag": max_lag }),
+        );
+    }
 
     let mut injected = false;
 
@@ -397,7 +571,7 @@ pub fn post_tool(cfg: &Config) -> Result<()> {
         }
         store.append(SessionMessage::injection("correction", &text, count));
         store.data.last_injection_at_count = count;
-        emit_additional_context(&hook_name, &text);
+        emit_additional_context(&sid, &hook_name, &text);
         injected = true;
         eventlog::info(
             &sid,
@@ -417,7 +591,7 @@ pub fn post_tool(cfg: &Config) -> Result<()> {
             store.append(SessionMessage::injection("reminder", &text, count));
             store.data.last_reminder_at_count = count;
             store.data.last_injection_at_count = count;
-            emit_additional_context(&hook_name, &text);
+            emit_additional_context(&sid, &hook_name, &text);
             injected = true;
             eventlog::info(
                 &sid,
@@ -428,49 +602,16 @@ pub fn post_tool(cfg: &Config) -> Result<()> {
         }
     }
 
-    // 3) Every N tools: journal mark + at most one background judge
-    if count > 0 && count % n == 0 {
+    // 3) Every N *meaningful* tools: trajectory mark + background judge
+    let schedule_judge = if delta > 0 && count > 0 && count % n == 0 {
         let from = count.saturating_sub(n);
         let to = count;
-        let off = transcript_len(
-            store
-                .data
-                .transcript_path
-                .as_ref()
-                .map(Path::new),
-        );
+        let off = transcript_len(store.data.transcript_path.as_ref().map(Path::new));
         store.append(SessionMessage::trajectory_mark(count, off));
-        let tp = store
-            .data
-            .transcript_path
-            .as_ref()
-            .map(PathBuf::from);
+        let tp = store.data.transcript_path.as_ref().map(PathBuf::from);
+        let journal_len = store.data.tool_events.len();
         store.persist()?;
-
-        if !SessionJobGuard::can_spawn(cfg, &sid)? {
-            eventlog::info(
-                &sid,
-                "hook.post_tool.judge",
-                "skip judge (session busy/throttled)",
-                json!({ "from": from, "to": to, "tool_count": count }),
-            );
-        } else if let Err(e) =
-            spawn_background_judge(cfg, &sid, &cwd, from, to, tp.as_deref())
-        {
-            eventlog::error(
-                &sid,
-                "hook.post_tool.judge",
-                format!("failed to spawn judge: {e:#}"),
-                json!({ "from": from, "to": to }),
-            );
-        } else {
-            eventlog::info(
-                &sid,
-                "hook.post_tool.judge",
-                "scheduled background judge",
-                json!({ "from": from, "to": to, "tool_count": count, "delta": delta }),
-            );
-        }
+        Some((from, to, tp, journal_len))
     } else {
         store.persist()?;
         eventlog::debug(
@@ -484,9 +625,57 @@ pub fn post_tool(cfg: &Config) -> Result<()> {
                 "harness": harness,
             }),
         );
+        None
+    };
+    // Release flock before spawning bg jobs / drain (they re-open the store).
+    drop(store);
+
+    if let Some((from, to, tp, journal_len)) = schedule_judge {
+        match spawn_background_judge(cfg, &sid, &cwd, from, to, tp.as_deref()) {
+            Ok(true) => {
+                eventlog::info(
+                    &sid,
+                    "hook.post_tool.judge",
+                    "scheduled background judge",
+                    json!({
+                        "from": from,
+                        "to": to,
+                        "tool_count": count,
+                        "delta": delta,
+                        "journal_len": journal_len,
+                    }),
+                );
+            }
+            Ok(false) => {
+                if let Ok(mut s2) = SessionStore::open_or_create_hook(cfg, &cwd, &sid, &harness) {
+                    s2.set_pending_judge(from, to);
+                    let _ = s2.persist();
+                }
+                eventlog::info(
+                    &sid,
+                    "hook.post_tool.judge",
+                    "defer judge (session busy/throttled/cap)",
+                    json!({ "from": from, "to": to, "tool_count": count }),
+                );
+            }
+            Err(e) => {
+                if let Ok(mut s2) = SessionStore::open_or_create_hook(cfg, &cwd, &sid, &harness) {
+                    s2.set_pending_judge(from, to);
+                    let _ = s2.persist();
+                }
+                eventlog::error(
+                    &sid,
+                    "hook.post_tool.judge",
+                    format!("failed to spawn judge: {e:#}"),
+                    json!({ "from": from, "to": to }),
+                );
+            }
+        }
     }
 
     let _ = injected;
+    // Drain any deferred summarize/judge if free.
+    let _ = drain_pending_jobs(cfg, &sid, &cwd);
     Ok(())
 }
 
@@ -503,10 +692,29 @@ pub fn stop(cfg: &Config) -> Result<()> {
         .clone()
         .unwrap_or_else(|| "Stop".into());
 
-    let mut store = SessionStore::open_or_create(cfg, &cwd, &sid, &harness)?;
+    let mut store = match SessionStore::open_or_create_hook(cfg, &cwd, &sid, &harness) {
+        Ok(s) => s,
+        Err(e) => {
+            eventlog::warn(
+                &sid,
+                "hook.stop",
+                format!("skip (session lock): {e:#}"),
+                json!({}),
+            );
+            return Ok(());
+        }
+    };
     if let Some(ref tp) = ev.transcript_path {
         store.set_transcript(Some(Path::new(tp)));
     }
+
+    let count = store.data.tool_call_count;
+    let max_lag = if cfg.judgement_max_lag_tools == 0 {
+        cfg.n_tool_calls.saturating_mul(2).max(30)
+    } else {
+        cfg.judgement_max_lag_tools
+    };
+    let _ = store.expire_stale_judgements(count, max_lag);
 
     if let Some(j) = store.ready_judgement_for_injection().cloned() {
         let scope = store
@@ -522,10 +730,9 @@ pub fn stop(cfg: &Config) -> Result<()> {
         if let Some(id) = j.id.as_deref() {
             store.mark_judgement_injected(id);
         }
-        let count = store.data.tool_call_count;
         store.append(SessionMessage::injection("correction_stop", &text, count));
         store.persist()?;
-        emit_additional_context(&hook_name, &text);
+        emit_additional_context(&sid, &hook_name, &text);
         eventlog::info(
             &sid,
             "hook.stop",
@@ -536,6 +743,9 @@ pub fn stop(cfg: &Config) -> Result<()> {
         store.persist()?;
         eventlog::debug(&sid, "hook.stop", "no pending correction", json!({}));
     }
+    drop(store);
+
+    let _ = drain_pending_jobs(cfg, &sid, &cwd);
     Ok(())
 }
 

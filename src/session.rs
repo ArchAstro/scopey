@@ -1,12 +1,18 @@
 use crate::config::Config;
 use crate::pathutil::{abs_cwd, canonicalize_best_effort, escape_project_path};
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use chrono::{DateTime, Utc};
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
+
+/// How long hooks may wait for the session flock before giving up (never hang the harness).
+pub const HOOK_LOCK_WAIT: Duration = Duration::from_millis(1500);
+/// Background jobs may wait longer — they are not on the agent critical path.
+pub const JOB_LOCK_WAIT: Duration = Duration::from_secs(30);
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -25,7 +31,30 @@ pub enum JudgementVerdict {
     OnTrack,
     Warning,
     OffTrack,
+    /// Judge saw no actionable tool events — never inject or notify.
+    InsufficientEvidence,
     Unknown,
+}
+
+/// One meaningful (or noise) tool observation for structured judging.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ToolEvent {
+    /// 1-based meaningful tool index after this event (0 if noise / uncounted).
+    pub index: u64,
+    pub name: String,
+    #[serde(default)]
+    pub args_preview: String,
+    pub ts: DateTime<Utc>,
+    /// Noise tools (write_stdin, wait_agent, …) are stored optionally but never open N-windows.
+    #[serde(default)]
+    pub noise: bool,
+}
+
+/// Deferred judge window when spawn was throttled.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PendingJudgeWindow {
+    pub from_count: u64,
+    pub to_count: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -193,7 +222,19 @@ pub struct SessionData {
     pub messages: Vec<SessionMessageWire>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pending_judgement_id: Option<String>,
+    /// Structured tool journal (hook-side). Source of truth for judge windows.
+    #[serde(default)]
+    pub tool_events: Vec<ToolEvent>,
+    /// User prompt arrived while summarize was busy — drain when free.
+    #[serde(default)]
+    pub summarize_pending: bool,
+    /// Judge N-boundary hit while busy — drain when free (latest window wins).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pending_judge: Option<PendingJudgeWindow>,
 }
+
+/// Cap retained journal size so long sessions stay small.
+pub const MAX_TOOL_EVENTS: usize = 500;
 
 /// Wire format with `type` field name.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -292,18 +333,39 @@ impl SessionStore {
 
     pub fn open(cfg: &Config, cwd: &Path, session_id: &str) -> Result<Self> {
         let path = Self::session_path(cfg, cwd, session_id)?;
-        Self::open_path(path, session_id, cwd)
+        Self::open_path(path, session_id, cwd, JOB_LOCK_WAIT)
     }
 
+    /// Open or create with default (job) lock wait.
     pub fn open_or_create(
         cfg: &Config,
         cwd: &Path,
         session_id: &str,
         harness: &str,
     ) -> Result<Self> {
+        Self::open_or_create_wait(cfg, cwd, session_id, harness, JOB_LOCK_WAIT)
+    }
+
+    /// Open or create for hooks — short lock wait so PostToolUse never hangs the harness.
+    pub fn open_or_create_hook(
+        cfg: &Config,
+        cwd: &Path,
+        session_id: &str,
+        harness: &str,
+    ) -> Result<Self> {
+        Self::open_or_create_wait(cfg, cwd, session_id, harness, HOOK_LOCK_WAIT)
+    }
+
+    pub fn open_or_create_wait(
+        cfg: &Config,
+        cwd: &Path,
+        session_id: &str,
+        harness: &str,
+        lock_wait: Duration,
+    ) -> Result<Self> {
         let path = Self::session_path(cfg, cwd, session_id)?;
         if path.exists() {
-            let mut s = Self::open_path(path, session_id, cwd)?;
+            let mut s = Self::open_path(path, session_id, cwd, lock_wait)?;
             if s.data.harness.is_empty() && !harness.is_empty() {
                 s.data.harness = harness.to_string();
             }
@@ -327,6 +389,9 @@ impl SessionStore {
             transcript_path: None,
             messages: vec![],
             pending_judgement_id: None,
+            tool_events: vec![],
+            summarize_pending: false,
+            pending_judge: None,
         };
         let lock_path = path.with_extension("json.lock");
         let lock_file = OpenOptions::new()
@@ -336,7 +401,8 @@ impl SessionStore {
             .truncate(false)
             .open(&lock_path)
             .with_context(|| format!("open lock {}", lock_path.display()))?;
-        lock_file.lock_exclusive()?;
+        lock_wait_exclusive(&lock_file, lock_wait)
+            .with_context(|| format!("lock {}", lock_path.display()))?;
         let mut store = Self {
             path,
             data,
@@ -346,7 +412,12 @@ impl SessionStore {
         Ok(store)
     }
 
-    fn open_path(path: PathBuf, session_id: &str, cwd: &Path) -> Result<Self> {
+    fn open_path(
+        path: PathBuf,
+        session_id: &str,
+        cwd: &Path,
+        lock_wait: Duration,
+    ) -> Result<Self> {
         let lock_path = path.with_extension("json.lock");
         if let Some(parent) = lock_path.parent() {
             fs::create_dir_all(parent)?;
@@ -358,7 +429,8 @@ impl SessionStore {
             .truncate(false)
             .open(&lock_path)
             .with_context(|| format!("open lock {}", lock_path.display()))?;
-        lock_file.lock_exclusive()?;
+        lock_wait_exclusive(&lock_file, lock_wait)
+            .with_context(|| format!("lock {}", lock_path.display()))?;
 
         let mut f = File::open(&path).with_context(|| format!("open session {}", path.display()))?;
         let mut buf = String::new();
@@ -423,6 +495,7 @@ impl SessionStore {
     }
 
     /// Ready judgement that has not been injected yet (prefer newest).
+    /// Never returns InsufficientEvidence / OnTrack / Unknown.
     pub fn ready_judgement_for_injection(&self) -> Option<&SessionMessageWire> {
         self.data.messages.iter().rev().find(|m| {
             m.type_ == MessageType::Judgement
@@ -433,6 +506,60 @@ impl SessionStore {
                 )
         })
     }
+
+    /// Drop Ready off-track/warning judgements older than `max_lag` tools past their window end.
+    pub fn expire_stale_judgements(&mut self, current_count: u64, max_lag: u64) -> usize {
+        let mut n = 0;
+        for m in self.data.messages.iter_mut() {
+            if m.type_ != MessageType::Judgement || m.status != Some(JudgementStatus::Ready) {
+                continue;
+            }
+            if !matches!(
+                m.verdict,
+                Some(JudgementVerdict::OffTrack) | Some(JudgementVerdict::Warning)
+            ) {
+                continue;
+            }
+            let to = m.to_count.unwrap_or(0);
+            if current_count.saturating_sub(to) > max_lag {
+                m.status = Some(JudgementStatus::Failed);
+                m.summary = Some(format!(
+                    "stale judgement discarded (window ended at {to}, now at {current_count})"
+                ));
+                n += 1;
+            }
+        }
+        n
+    }
+
+    pub fn append_tool_event(&mut self, ev: ToolEvent) {
+        self.data.tool_events.push(ev);
+        if self.data.tool_events.len() > MAX_TOOL_EVENTS {
+            let excess = self.data.tool_events.len() - MAX_TOOL_EVENTS;
+            self.data.tool_events.drain(0..excess);
+        }
+    }
+
+    pub fn tool_events_in_window(&self, from: u64, to: u64) -> Vec<ToolEvent> {
+        crate::tool_journal::events_in_window(&self.data.tool_events, from, to)
+    }
+
+    pub fn mark_summarize_pending(&mut self) {
+        self.data.summarize_pending = true;
+    }
+
+    pub fn clear_summarize_pending(&mut self) {
+        self.data.summarize_pending = false;
+    }
+
+    pub fn set_pending_judge(&mut self, from: u64, to: u64) {
+        self.data.pending_judge = Some(PendingJudgeWindow {
+            from_count: from,
+            to_count: to,
+        });
+    }
+
+
 
     pub fn mark_judgement_injected(&mut self, id: &str) {
         for m in self.data.messages.iter_mut() {
@@ -580,6 +707,25 @@ pub fn hash_prompt(s: &str) -> String {
     format!("{:x}", h.finalize())
 }
 
+/// Acquire exclusive flock without hanging forever. Spins with short sleeps.
+fn lock_wait_exclusive(file: &File, max_wait: Duration) -> Result<()> {
+    let start = Instant::now();
+    loop {
+        match file.try_lock_exclusive() {
+            Ok(()) => return Ok(()),
+            Err(_) if start.elapsed() < max_wait => {
+                std::thread::sleep(Duration::from_millis(15));
+            }
+            Err(e) => {
+                bail!(
+                    "session store lock busy for {}ms (another scopey job may be holding it): {e}",
+                    start.elapsed().as_millis()
+                );
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -676,6 +822,92 @@ mod tests {
             "",
         ));
         assert!(s.ready_judgement_for_injection().is_none());
+    }
+
+    #[test]
+    fn insufficient_evidence_not_injected() {
+        let dir = tempfile::tempdir().unwrap();
+        let cfg = test_cfg(dir.path());
+        let cwd = dir.path().join("proj");
+        fs::create_dir_all(&cwd).unwrap();
+        let mut s = SessionStore::open_or_create(&cfg, &cwd, "j3", "codex").unwrap();
+        s.upsert_judgement(SessionMessage::judgement(
+            0,
+            15,
+            JudgementVerdict::InsufficientEvidence,
+            JudgementStatus::Ready,
+            "no tools",
+            "",
+        ));
+        assert!(s.ready_judgement_for_injection().is_none());
+    }
+
+    #[test]
+    fn stale_judgements_expire() {
+        let dir = tempfile::tempdir().unwrap();
+        let cfg = test_cfg(dir.path());
+        let cwd = dir.path().join("proj");
+        fs::create_dir_all(&cwd).unwrap();
+        let mut s = SessionStore::open_or_create(&cfg, &cwd, "j4", "codex").unwrap();
+        let j = SessionMessage::judgement(
+            0,
+            15,
+            JudgementVerdict::Warning,
+            JudgementStatus::Ready,
+            "old",
+            "",
+        );
+        s.upsert_judgement(j);
+        assert!(s.ready_judgement_for_injection().is_some());
+        let n = s.expire_stale_judgements(100, 30);
+        assert_eq!(n, 1);
+        assert!(s.ready_judgement_for_injection().is_none());
+    }
+
+    #[test]
+    fn tool_events_window_and_cap() {
+        let dir = tempfile::tempdir().unwrap();
+        let cfg = test_cfg(dir.path());
+        let cwd = dir.path().join("proj");
+        fs::create_dir_all(&cwd).unwrap();
+        let mut s = SessionStore::open_or_create(&cfg, &cwd, "j5", "codex").unwrap();
+        for i in 1..=20 {
+            s.append_tool_event(ToolEvent {
+                index: i,
+                name: format!("t{i}"),
+                args_preview: "x".into(),
+                ts: Utc::now(),
+                noise: false,
+            });
+        }
+        let w = s.tool_events_in_window(10, 15);
+        assert_eq!(w.len(), 5);
+        assert_eq!(w[0].index, 11);
+    }
+
+    #[test]
+    fn hook_lock_wait_gives_up_quickly() {
+        let dir = tempfile::tempdir().unwrap();
+        let cfg = test_cfg(dir.path());
+        let cwd = dir.path().join("proj");
+        fs::create_dir_all(&cwd).unwrap();
+        let s1 = SessionStore::open_or_create(&cfg, &cwd, "lock-me", "codex").unwrap();
+        // Hold s1's exclusive lock; a concurrent open with short wait must fail fast.
+        let start = Instant::now();
+        let err = SessionStore::open_or_create_wait(
+            &cfg,
+            &cwd,
+            "lock-me",
+            "codex",
+            Duration::from_millis(80),
+        );
+        assert!(err.is_err(), "expected lock busy error");
+        assert!(
+            start.elapsed() < Duration::from_millis(500),
+            "hook wait must not hang: {:?}",
+            start.elapsed()
+        );
+        drop(s1);
     }
 
     #[test]
