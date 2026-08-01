@@ -319,6 +319,181 @@ fn insights_reports_and_filters_off_scope_sessions() {
     assert_eq!(ghost_report["sessions"][0]["scope_quality"], "contaminated");
 }
 
+/// Like run_hook, but with an explicit config so work_root stays inside the
+/// isolated home (the default config would use the developer's real
+/// ~/.scopey/config.toml work_root).
+fn run_hook_cfg(
+    home: &std::path::Path,
+    config: &std::path::Path,
+    sub: &str,
+    payload: &str,
+) -> std::process::Output {
+    Command::new(scopey_bin())
+        .args(["--config", config.to_str().unwrap(), "hook", sub])
+        .env("SCOPEY_HOME", home)
+        .env_remove("SCOPEY_INTERNAL")
+        .env_remove("SCOPEY_HOOKS_DISABLED")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .and_then(|mut c| {
+            use std::io::Write;
+            c.stdin.take().unwrap().write_all(payload.as_bytes())?;
+            c.wait_with_output()
+        })
+        .expect("spawn hook")
+}
+
+#[test]
+fn subagent_events_are_ignored_across_harness_shapes() {
+    let home = tempfile::tempdir().unwrap();
+    let cwd = home.path().join("proj");
+    fs::create_dir_all(&cwd).unwrap();
+    let config = home.path().join("config.toml");
+    fs::write(
+        &config,
+        format!("work_root = '{}'\n", home.path().join("work").display()),
+    )
+    .unwrap();
+
+    // Claude Code: agent_id is present on every hook fired inside a Task
+    // subagent; the session id stays the parent's, so without the guard this
+    // event would advance the parent's tool count and could inject reminders
+    // into the subagent's context.
+    let claude_subagent = format!(
+        r#"{{
+          "session_id":"parent-sess",
+          "cwd":"{0}",
+          "hook_event_name":"PostToolBatch",
+          "agent_id":"agent-def456",
+          "agent_type":"Explore",
+          "tool_calls":[{{"tool_name":"Read"}},{{"tool_name":"Bash"}}]
+        }}"#,
+        cwd.display()
+    );
+    let out = run_hook_cfg(home.path(), &config, "post-tool", &claude_subagent);
+    assert!(
+        out.status.success(),
+        "stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stdout.is_empty(),
+        "subagent event must never inject: {}",
+        String::from_utf8_lossy(&out.stdout)
+    );
+
+    // Subagent user prompts are the orchestrator's instructions, never scope.
+    let claude_subagent_prompt = format!(
+        r#"{{"session_id":"parent-sess","cwd":"{0}","prompt":"explore the repo","agent_id":"agent-def456","agent_type":"Explore"}}"#,
+        cwd.display()
+    );
+    let out = run_hook_cfg(home.path(), &config, "user-prompt", &claude_subagent_prompt);
+    assert!(out.status.success());
+    assert!(out.stdout.is_empty());
+
+    // OpenCode: child sessions carry a parent id (camelCase spelling).
+    let opencode_child = format!(
+        r#"{{"sessionId":"child-1","parentID":"parent-1","cwd":"{0}","hook_event_name":"PostToolUse","tool_name":"bash","harness":"opencode"}}"#,
+        cwd.display()
+    );
+    let out = run_hook_cfg(home.path(), &config, "post-tool", &opencode_child);
+    assert!(out.status.success());
+    assert!(out.stdout.is_empty());
+
+    // Adapter-tagged subagent (pi/opencode escape hatch).
+    let tagged = format!(
+        r#"{{"session_id":"pi-child","subagent":true,"cwd":"{0}","hook_event_name":"PostToolUse","tool_name":"bash","harness":"pi"}}"#,
+        cwd.display()
+    );
+    let out = run_hook_cfg(home.path(), &config, "post-tool", &tagged);
+    assert!(out.status.success());
+    assert!(out.stdout.is_empty());
+
+    // None of the above may create session work stores.
+    let work = home.path().join("work");
+    let stores = if work.exists() {
+        walkdir_json(&work)
+    } else {
+        Vec::new()
+    };
+    assert!(
+        stores.is_empty(),
+        "subagent events must not create session stores: {stores:?}"
+    );
+
+    // A plain main-session event on the same parent id still works.
+    let main_event = format!(
+        r#"{{"session_id":"parent-sess","cwd":"{0}","hook_event_name":"PostToolBatch","tool_calls":[{{"tool_name":"Read"}}]}}"#,
+        cwd.display()
+    );
+    let out = run_hook_cfg(home.path(), &config, "post-tool", &main_event);
+    assert!(
+        out.status.success(),
+        "stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stores = walkdir_json(&home.path().join("work"));
+    assert!(
+        stores.iter().any(|p| {
+            fs::read_to_string(p)
+                .unwrap_or_default()
+                .contains("parent-sess")
+        }),
+        "main-session event must still create its store: {stores:?}"
+    );
+}
+
+#[test]
+fn subagent_guard_can_be_disabled_in_config() {
+    let home = tempfile::tempdir().unwrap();
+    let cwd = home.path().join("proj");
+    fs::create_dir_all(&cwd).unwrap();
+    fs::write(
+        home.path().join("config.toml"),
+        format!(
+            "ignore_subagents = false\nwork_root = '{}'\n",
+            home.path().join("work").display()
+        ),
+    )
+    .unwrap();
+    let payload = format!(
+        r#"{{"session_id":"parent-sess","cwd":"{0}","hook_event_name":"PostToolBatch","agent_id":"agent-x","tool_calls":[{{"tool_name":"Read"}}]}}"#,
+        cwd.display()
+    );
+    let out = Command::new(scopey_bin())
+        .args([
+            "--config",
+            home.path().join("config.toml").to_str().unwrap(),
+            "hook",
+            "post-tool",
+        ])
+        .env("SCOPEY_HOME", home.path())
+        .env_remove("SCOPEY_INTERNAL")
+        .env_remove("SCOPEY_HOOKS_DISABLED")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .and_then(|mut c| {
+            use std::io::Write;
+            c.stdin.take().unwrap().write_all(payload.as_bytes())?;
+            c.wait_with_output()
+        })
+        .expect("spawn hook");
+    assert!(out.status.success());
+    let stores = walkdir_json(&home.path().join("work"));
+    assert!(
+        stores.iter().any(|p| {
+            fs::read_to_string(p)
+                .unwrap_or_default()
+                .contains("parent-sess")
+        }),
+        "with ignore_subagents=false the event must be processed: {stores:?}"
+    );
+}
+
 fn walkdir_json(root: &std::path::Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
     let Ok(rd) = fs::read_dir(root) else {

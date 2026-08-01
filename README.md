@@ -84,6 +84,31 @@ scopey setup --force
 scopey setup --no-claude --no-codex --grok --no-pi --no-opencode   # grok only
 ```
 
+## Subagents
+
+Scopey tracks the conversation between **you and the top-level agent** and
+stays out of subagent/child-agent sessions entirely (`ignore_subagents = true`,
+default): their prompts come from the orchestrating agent, not from you, and
+injecting scope reminders into delegated work derails it. Suppressed events do
+not count tools, create sessions, schedule judges, or inject anything; each is
+logged at debug level as `hook.subagent`.
+
+Detection per harness:
+
+| Harness | Signal |
+|---------|--------|
+| Claude Code | `agent_id` in the hook input — present on every hook fired inside a Task subagent, and only there. Bare `agent_type` (a `claude --agent <name>` top-level session) keeps full scopey behavior. There is no settings.json matcher or env var for this; filtering must parse hook stdin. |
+| Codex | Same two fields. Codex multi-agent (`collaborationspawn_agent`) runs children whose `PostToolUse` carries `agent_id` + `agent_type` while `session_id` stays the parent's — verified live. The orchestrator's own spawn call still counts; `collaborationwait_agent` is bookkeeping noise. |
+| Grok | No subagent payload documented; generic markers apply. |
+| Pi | The extension skips events whose event/context carries a subagent or parent-session marker before invoking scopey. |
+| OpenCode | The plugin tracks child sessions (session objects with a parent id) from `session.created` and never calls scopey for them; a `parentID` reaching the binary is dropped there too. |
+
+Generic markers the binary honors from any harness or adapter: a truthy
+`subagent`/`is_subagent` field, a non-empty `parent_session_id` (any common
+spelling), a transcript path under a `subagents/` folder, or
+`SCOPEY_SUBAGENT=1` in the hook environment. Set `ignore_subagents = false`
+to restore the old behavior.
+
 ## Model selection
 
 Summarize/judge use a **cheap/fast** model on the **same harness as the agent session** when possible.
@@ -260,6 +285,8 @@ legacy files at `work/<escaped-cwd>/<session_id>.json` are migrated into
 | `claude_fast_model` | `haiku` | Claude fast alias |
 | `codex_fast_model` | `gpt-5.6-terra` | Codex fast/mini-like tier |
 | `notify_on_off_track` | true | Desktop alert on off-track judgement |
+| `ignore_subagents` | true | No-op for subagent/child-agent hook events (see Subagents) |
+| `log_raw_events` | false | Debug-log each hook's raw stdin payload (contains prompts) |
 
 Project overlay: `<cwd>/.scopey/config.toml` wins when present.
 
