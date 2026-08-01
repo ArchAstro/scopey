@@ -7,6 +7,27 @@ and the project intends to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Hook events fired inside a subagent session are ignored, so delegated work no
+  longer receives scope reminders and course corrections meant for the
+  conversation between the user and the top-level agent. Because subagent
+  events reuse the parent's session id, their tool calls had also been
+  inflating the parent's tool count and shifting judge and reminder cadence.
+  Claude Code and Codex subagents are recognized by the `agent_id` their hooks
+  carry, OpenCode by its child sessions, and Pi by its subagent event markers.
+  Top-level sessions started with `--agent` keep their previous behavior.
+- Codex names its multi-agent tools without a separator, so a blocking
+  `collaborationwait_agent` call escaped the noise list and counted as real
+  tool activity.
+
+### Added
+
+- `ignore_subagents` restores the previous behavior when set to `false`.
+- `log_raw_events` records each hook's raw stdin payload in the session log for
+  debugging. Payloads include prompts, so it carries the same sensitivity as
+  the rest of `~/.scopey`.
+
 ## [0.1.1] - 2026-07-31
 
 ### Changed
