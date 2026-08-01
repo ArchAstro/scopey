@@ -24,7 +24,7 @@ fn hooks_disabled() -> bool {
     false
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 pub struct HookEvent {
     /// Claude/Codex snake_case; Grok camelCase (`sessionId`); env fallbacks applied later.
     #[serde(default, alias = "sessionId")]
@@ -57,6 +57,32 @@ pub struct HookEvent {
     /// Explicit harness tag from adapters (pi/opencode/grok).
     #[serde(default)]
     pub harness: Option<String>,
+    /// Claude Code: present on every hook event fired inside a subagent
+    /// (Task tool) call, and only there.
+    #[serde(default, alias = "agentId")]
+    pub agent_id: Option<String>,
+    /// Claude Code: subagent name, but ALSO present for top-level sessions
+    /// started with `claude --agent <name>` — informational, never a
+    /// suppression signal on its own.
+    #[serde(
+        default,
+        alias = "agentType",
+        alias = "subagent_type",
+        alias = "subagentType"
+    )]
+    pub agent_type: Option<String>,
+    /// OpenCode child sessions and other harnesses that expose a parent link.
+    #[serde(
+        default,
+        alias = "parentSessionId",
+        alias = "parentId",
+        alias = "parentID",
+        alias = "parent_id"
+    )]
+    pub parent_session_id: Option<String>,
+    /// Adapter-tagged subagent flag (pi/opencode templates).
+    #[serde(default, alias = "isSubagent", alias = "subagent")]
+    pub is_subagent: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -66,7 +92,7 @@ pub struct ToolCall {
     pub tool_name: Option<String>,
 }
 
-fn read_event() -> Result<HookEvent> {
+fn read_event(cfg: &Config, hook: &str) -> Result<HookEvent> {
     let mut buf = String::new();
     io::stdin()
         .read_to_string(&mut buf)
@@ -85,7 +111,78 @@ fn read_event() -> Result<HookEvent> {
     let mut ev: HookEvent = serde_json::from_value(obj)
         .with_context(|| format!("decode hook event: {}", clip(&buf, 200)))?;
     normalize_event(&mut ev);
+    if cfg.log_raw_events {
+        let sid = ev
+            .session_id
+            .clone()
+            .unwrap_or_else(|| "unknown-session".into());
+        eventlog::debug(
+            &sid,
+            "hook.raw_event",
+            clip(&buf, 4_000),
+            json!({ "hook": hook, "chars": buf.len() }),
+        );
+    }
     Ok(ev)
+}
+
+/// Why this event is a subagent event, or `None` for top-level activity.
+///
+/// Signals, per harness:
+/// - Claude Code sets `agent_id` on every hook fired inside a Task subagent
+///   (and only there — `agent_type` alone can be a legitimate `--agent`
+///   top-level session, so it never suppresses by itself).
+/// - OpenCode child sessions carry a parent session id (also filtered at the
+///   plugin, this is the backstop).
+/// - The pi/opencode adapters may tag `subagent: true` explicitly, and any
+///   adapter can export `SCOPEY_SUBAGENT=1` around child-agent work.
+/// - A transcript path under a `subagents/` folder is a subagent transcript.
+pub(crate) fn subagent_marker(ev: &HookEvent) -> Option<String> {
+    if ev.is_subagent == Some(true) {
+        return Some("subagent flag".into());
+    }
+    if let Some(id) = ev.agent_id.as_deref().filter(|s| !s.trim().is_empty()) {
+        let kind = ev.agent_type.clone().unwrap_or_else(|| "unknown".into());
+        return Some(format!("agent_id={id} agent_type={kind}"));
+    }
+    if let Some(parent) = ev
+        .parent_session_id
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+    {
+        return Some(format!("parent_session_id={parent}"));
+    }
+    if let Some(tp) = ev.transcript_path.as_deref() {
+        if tp.replace('\\', "/").contains("/subagents/") {
+            return Some("transcript under subagents/".into());
+        }
+    }
+    if std::env::var("SCOPEY_SUBAGENT").is_ok_and(|v| v == "1" || v.eq_ignore_ascii_case("true")) {
+        return Some("SCOPEY_SUBAGENT env".into());
+    }
+    None
+}
+
+/// True when this event must be ignored because it belongs to a subagent.
+/// Logged once per event under the parent-facing session id.
+fn skip_subagent_event(cfg: &Config, ev: &HookEvent, hook: &str) -> bool {
+    if !cfg.ignore_subagents {
+        return false;
+    }
+    let Some(reason) = subagent_marker(ev) else {
+        return false;
+    };
+    let sid = ev
+        .session_id
+        .clone()
+        .unwrap_or_else(|| "unknown-session".into());
+    eventlog::debug(
+        &sid,
+        "hook.subagent",
+        format!("no-op ({hook}): {reason}"),
+        json!({ "hook": hook }),
+    );
+    true
 }
 
 /// Normalize cross-harness quirks into Claude-like fields.
@@ -307,7 +404,10 @@ pub fn user_prompt(cfg: &Config) -> Result<()> {
     if hooks_disabled() {
         return Ok(());
     }
-    let ev = read_event()?;
+    let ev = read_event(cfg, "user-prompt")?;
+    if skip_subagent_event(cfg, &ev, "user-prompt") {
+        return Ok(());
+    }
     let sid = session_id(&ev)?;
     let cwd = cwd(&ev);
     let prompt = ev.prompt.clone().unwrap_or_default();
@@ -406,7 +506,10 @@ pub fn session_start(cfg: &Config) -> Result<()> {
     if hooks_disabled() {
         return Ok(());
     }
-    let ev = read_event()?;
+    let ev = read_event(cfg, "session-start")?;
+    if skip_subagent_event(cfg, &ev, "session-start") {
+        return Ok(());
+    }
     let sid = session_id(&ev)?;
     let cwd = cwd(&ev);
     let harness = harness_from_event(&ev);
@@ -462,7 +565,10 @@ pub fn post_tool(cfg: &Config) -> Result<()> {
     if hooks_disabled() {
         return Ok(());
     }
-    let ev = read_event()?;
+    let ev = read_event(cfg, "post-tool")?;
+    if skip_subagent_event(cfg, &ev, "post-tool") {
+        return Ok(());
+    }
     let sid = session_id(&ev)?;
     let cwd = cwd(&ev);
     let harness = harness_from_event(&ev);
@@ -690,7 +796,10 @@ pub fn stop(cfg: &Config) -> Result<()> {
     if hooks_disabled() {
         return Ok(());
     }
-    let ev = read_event()?;
+    let ev = read_event(cfg, "stop")?;
+    if skip_subagent_event(cfg, &ev, "stop") {
+        return Ok(());
+    }
     let sid = session_id(&ev)?;
     let cwd = cwd(&ev);
     let harness = harness_from_event(&ev);
@@ -770,31 +879,15 @@ mod tests {
     fn harness_from_transcript_path() {
         let claude = HookEvent {
             session_id: Some("s".into()),
-            cwd: None,
             transcript_path: Some("/Users/x/.claude/projects/foo/s.jsonl".into()),
-            hook_event_name: None,
-            prompt: None,
-            tool_name: None,
-            tool_input: None,
-            tool_calls: None,
-            source: None,
-            model: None,
-            harness: None,
+            ..Default::default()
         };
         assert_eq!(harness_from_event(&claude), "claude");
 
         let codex = HookEvent {
             session_id: Some("s".into()),
-            cwd: None,
             transcript_path: Some("/Users/x/.codex/sessions/rollout.jsonl".into()),
-            hook_event_name: None,
-            prompt: None,
-            tool_name: None,
-            tool_input: None,
-            tool_calls: None,
-            source: None,
-            model: None,
-            harness: None,
+            ..Default::default()
         };
         assert_eq!(harness_from_event(&codex), "codex");
     }
@@ -802,39 +895,20 @@ mod tests {
     #[test]
     fn harness_from_model_slug() {
         let ev = HookEvent {
-            session_id: None,
-            cwd: None,
-            transcript_path: None,
-            hook_event_name: None,
-            prompt: None,
-            tool_name: None,
-            tool_input: None,
-            tool_calls: None,
-            source: None,
             model: Some("gpt-5.6-sol".into()),
-            harness: None,
+            ..Default::default()
         };
         assert_eq!(harness_from_event(&ev), "codex");
 
         let ev2 = HookEvent {
             model: Some("claude-fable-5".into()),
-            harness: None,
-            ..ev
+            ..Default::default()
         };
         assert_eq!(harness_from_event(&ev2), "claude");
 
         let ev3 = HookEvent {
             model: Some("grok-3-mini".into()),
-            harness: None,
-            session_id: None,
-            cwd: None,
-            transcript_path: None,
-            hook_event_name: None,
-            prompt: None,
-            tool_name: None,
-            tool_input: None,
-            tool_calls: None,
-            source: None,
+            ..Default::default()
         };
         assert_eq!(harness_from_event(&ev3), "grok");
     }
@@ -842,24 +916,90 @@ mod tests {
     #[test]
     fn harness_explicit_tag() {
         let ev = HookEvent {
-            session_id: None,
-            cwd: None,
-            transcript_path: None,
-            hook_event_name: None,
-            prompt: None,
-            tool_name: None,
-            tool_input: None,
-            tool_calls: None,
-            source: None,
-            model: None,
             harness: Some("pi".into()),
+            ..Default::default()
         };
         assert_eq!(harness_from_event(&ev), "pi");
         let ev2 = HookEvent {
             harness: Some("opencode".into()),
-            ..ev
+            ..Default::default()
         };
         assert_eq!(harness_from_event(&ev2), "opencode");
+    }
+
+    #[test]
+    fn subagent_marker_detects_claude_agent_id() {
+        let ev = HookEvent {
+            session_id: Some("main".into()),
+            agent_id: Some("agent-def456".into()),
+            agent_type: Some("Explore".into()),
+            ..Default::default()
+        };
+        let marker = subagent_marker(&ev).expect("agent_id must mark subagent");
+        assert!(marker.contains("agent-def456"));
+        assert!(marker.contains("Explore"));
+    }
+
+    #[test]
+    fn subagent_marker_ignores_bare_agent_type() {
+        // `claude --agent <name>` top-level sessions carry agent_type without
+        // agent_id and must keep full scopey behavior.
+        let ev = HookEvent {
+            session_id: Some("main".into()),
+            agent_type: Some("security-reviewer".into()),
+            ..Default::default()
+        };
+        assert_eq!(subagent_marker(&ev), None);
+    }
+
+    #[test]
+    fn subagent_marker_detects_parent_session_and_flag() {
+        let parent = HookEvent {
+            parent_session_id: Some("ses_parent".into()),
+            ..Default::default()
+        };
+        assert!(subagent_marker(&parent).is_some());
+
+        let flagged = HookEvent {
+            is_subagent: Some(true),
+            ..Default::default()
+        };
+        assert!(subagent_marker(&flagged).is_some());
+
+        let nested_transcript = HookEvent {
+            transcript_path: Some(
+                "/Users/x/.claude/projects/p/abc123/subagents/agent-def.jsonl".into(),
+            ),
+            ..Default::default()
+        };
+        assert!(subagent_marker(&nested_transcript).is_some());
+    }
+
+    #[test]
+    fn subagent_marker_none_for_plain_main_session() {
+        let ev = HookEvent {
+            session_id: Some("main".into()),
+            transcript_path: Some("/Users/x/.claude/projects/p/abc123.jsonl".into()),
+            ..Default::default()
+        };
+        assert_eq!(subagent_marker(&ev), None);
+    }
+
+    #[test]
+    fn subagent_fields_deserialize_across_harness_spellings() {
+        let claude: HookEvent = serde_json::from_str(
+            r#"{"session_id":"s","agent_id":"agent-1","agent_type":"Explore"}"#,
+        )
+        .unwrap();
+        assert_eq!(claude.agent_id.as_deref(), Some("agent-1"));
+
+        let opencode: HookEvent =
+            serde_json::from_str(r#"{"sessionId":"child","parentID":"parent-1"}"#).unwrap();
+        assert_eq!(opencode.parent_session_id.as_deref(), Some("parent-1"));
+
+        let adapter: HookEvent =
+            serde_json::from_str(r#"{"session_id":"s","subagent":true}"#).unwrap();
+        assert_eq!(adapter.is_subagent, Some(true));
     }
 
     #[test]
@@ -874,19 +1014,7 @@ mod tests {
 
     #[test]
     fn harness_unknown_without_signals() {
-        let ev = HookEvent {
-            session_id: None,
-            cwd: None,
-            transcript_path: None,
-            hook_event_name: None,
-            prompt: None,
-            tool_name: None,
-            tool_input: None,
-            tool_calls: None,
-            source: None,
-            model: None,
-            harness: None,
-        };
+        let ev = HookEvent::default();
         assert_eq!(harness_from_event(&ev), "unknown");
     }
 }

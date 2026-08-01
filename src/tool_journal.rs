@@ -28,7 +28,11 @@ pub fn counts_toward_n(tool_name: &str) -> bool {
         // Unknown hooks still count once — better over-count than miss writes.
         return true;
     }
-    !NOISE_TOOLS.iter().any(|t| n == *t)
+    // Codex ships its multi-agent tools namespaced without a separator
+    // (`collaborationwait_agent`), so compare the bare name too. Spawning an
+    // agent is a real decision and still counts; waiting/listing is not.
+    let bare = n.strip_prefix("collaboration").unwrap_or(&n);
+    !NOISE_TOOLS.iter().any(|t| n == *t || bare == *t)
 }
 
 fn normalize_name(name: &str) -> String {
@@ -191,6 +195,16 @@ mod tests {
         assert!(counts_toward_n("exec_command"));
         assert!(counts_toward_n("Bash"));
         assert!(counts_toward_n("Edit"));
+    }
+
+    #[test]
+    fn codex_collab_tools_classified_by_bare_name() {
+        // Observed live from Codex multi-agent runs: the collab namespace has
+        // no separator, so the bare suffix decides. Waiting on a child agent
+        // is bookkeeping; spawning one is a real delegation decision.
+        assert!(!counts_toward_n("collaborationwait_agent"));
+        assert!(!counts_toward_n("collaborationlist_agents"));
+        assert!(counts_toward_n("collaborationspawn_agent"));
     }
 
     #[test]

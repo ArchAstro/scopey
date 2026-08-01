@@ -88,6 +88,17 @@ pub struct Config {
     /// When true, course-correction injections tell the model to render ASCII Scopey
     /// saying "You got scoped!" before continuing. Set false to disable the gag.
     pub ascii_scopey_on_correction: bool,
+    /// When true (default), hook events that originate inside a subagent /
+    /// child-agent session (Claude Code Task agents send `agent_id`; OpenCode
+    /// child sessions have a parent id; adapters may tag `subagent: true`)
+    /// are ignored entirely: no tool counting, no reminders, no corrections.
+    /// Scope belongs to the conversation between the user and the top-level
+    /// agent; a subagent's prompt is the orchestrator's, not the user's.
+    pub ignore_subagents: bool,
+    /// Log each hook's raw stdin payload (clipped) to the session log at
+    /// debug level. Diagnostics only — payloads include prompts, so this
+    /// inherits the same privacy caveats as the rest of `~/.scopey`.
+    pub log_raw_events: bool,
 
     /// Filled at load time — not serialized as user config preference.
     #[serde(skip)]
@@ -131,6 +142,8 @@ impl Default for Config {
             tool_args_preview_chars: 400,
             judgement_max_lag_tools: 0, // 0 → 2 * n_tool_calls at load
             ascii_scopey_on_correction: true,
+            ignore_subagents: true,
+            log_raw_events: false,
             loaded_from: PathBuf::new(),
         }
     }
@@ -282,6 +295,8 @@ impl Config {
              tool_args_preview_chars = {} # journal / judge arg clip\n\
              judgement_max_lag_tools = {} # stale inject discard after this lag\n\
              ascii_scopey_on_correction = {} # ASCII Scopey gag on course-correction\n\
+             ignore_subagents = {}        # no-op for subagent/child-agent hook events\n\
+             log_raw_events = {}          # debug-log raw hook stdin payloads\n\
              \n\
              Course-correction lag ≈ 2 * n_tool_calls tool events:\n\
                window k judged in background → injection applied at window k+1 boundary.\n\
@@ -325,6 +340,8 @@ impl Config {
             self.tool_args_preview_chars,
             self.judgement_max_lag_tools,
             self.ascii_scopey_on_correction,
+            self.ignore_subagents,
+            self.log_raw_events,
         )
     }
 }
@@ -420,6 +437,14 @@ judgement_max_lag_tools = 0
 # On course-correction, instruct the model to render ASCII Scopey saying "You got scoped!"
 # Set false to disable the gag.
 ascii_scopey_on_correction = true
+
+# Ignore hook events fired inside subagent / child-agent sessions (Claude Code
+# Task agents, OpenCode child sessions, adapter-tagged subagents). Scope belongs
+# to the top-level conversation; subagent prompts come from the orchestrator,
+# and injecting reminders into them derails delegated work.
+ignore_subagents = true
+# Debug aid: log each hook's raw stdin payload (clipped) to the session log.
+log_raw_events = false
 "#,
         work = default_work_root().display()
     )

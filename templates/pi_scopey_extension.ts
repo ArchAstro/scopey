@@ -59,6 +59,25 @@ function callScopey(
   return (r.stdout || "").trim();
 }
 
+/**
+ * Subagent/child-agent activity never reaches scopey: scope belongs to the
+ * top-level conversation, and injecting reminders into delegated work derails
+ * it. Pi's event/context shapes for nested agents vary by version, so check
+ * the common spellings; the scopey binary also drops anything that still
+ * carries a parent/subagent marker.
+ */
+function isSubagentContext(event: any, ctx: any): boolean {
+  return Boolean(
+    event?.isSubagent ||
+      event?.subagent ||
+      event?.parentSessionId ||
+      event?.parentSession ||
+      ctx?.isSubagent ||
+      ctx?.parentSession ||
+      ctx?.parentSessionId,
+  );
+}
+
 function parseAdditionalContext(stdout: string): string | undefined {
   if (!stdout) return undefined;
   try {
@@ -75,6 +94,7 @@ function parseAdditionalContext(stdout: string): string | undefined {
 
 export default function scopeyExtension(pi: ExtensionAPI): void {
   pi.on("session_start", async (event, ctx) => {
+    if (isSubagentContext(event, ctx)) return;
     const sid = sessionId(ctx);
     callScopey("session-start", {
       session_id: sid,
@@ -86,6 +106,7 @@ export default function scopeyExtension(pi: ExtensionAPI): void {
   });
 
   pi.on("before_agent_start", async (event, ctx) => {
+    if (isSubagentContext(event, ctx)) return;
     const sid = sessionId(ctx);
     const prompt = event.prompt || "";
     const stdout = callScopey("user-prompt", {
@@ -109,6 +130,7 @@ export default function scopeyExtension(pi: ExtensionAPI): void {
 
   // Count each completed tool as one post-tool event (scopey batches/throttles internally).
   pi.on("tool_result", async (event, ctx) => {
+    if (isSubagentContext(event, ctx)) return;
     const sid = sessionId(ctx);
     callScopey("post-tool", {
       session_id: sid,
@@ -120,7 +142,8 @@ export default function scopeyExtension(pi: ExtensionAPI): void {
     });
   });
 
-  pi.on("agent_end", async (_event, ctx) => {
+  pi.on("agent_end", async (event, ctx) => {
+    if (isSubagentContext(event, ctx)) return;
     const sid = sessionId(ctx);
     const stdout = callScopey("stop", {
       session_id: sid,
