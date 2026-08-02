@@ -1,4 +1,4 @@
-.PHONY: all build build-release install uninstall test test-all clean fmt fmt-check lint check \
+.PHONY: all build build-release install uninstall test test-all e2e-local clean fmt fmt-check lint check \
 	install-pre-commit \
 	setup setup-hooks doctor verify-models release-check help
 
@@ -31,6 +31,14 @@ test:
 # Full test suite
 test-all:
 	cargo test --all-targets --all-features
+
+# Real-auth end-to-end: hook → detached worker → your local claude/codex CLIs.
+# One poisoned CLAUDE_CODE_SIMPLE=1 test (the issue-15 regression, claude) plus
+# a clean 10-concurrent-session burst per runner verifying sub-model invocation
+# and artifact placement. All scopey state is isolated in a temp home. Spends
+# ~21 cheap fast-model calls with both CLIs available.
+e2e-local:
+	cargo test --test e2e_local -- --ignored --nocapture
 
 # Clean build artifacts and local scratch (not ~/.scopey)
 clean:
@@ -85,6 +93,7 @@ help:
 	@echo "  make install          cargo install --path . --force"
 	@echo "  make test             cargo test"
 	@echo "  make test-all         all targets + features"
+	@echo "  make e2e-local        real-auth e2e vs local claude/codex (spends model calls)"
 	@echo "  make check            cargo check"
 	@echo "  make fmt              format all Rust targets"
 	@echo "  make fmt-check        verify formatting without changes"

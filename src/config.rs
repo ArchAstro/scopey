@@ -34,6 +34,9 @@ pub struct Config {
     pub notify_on_off_track: bool,
     /// Also notify on warning judgements.
     pub notify_on_warning: bool,
+    /// Notify when background summarize/judge model calls fail persistently
+    /// (scope tracking silently degrades to echoing the latest prompt).
+    pub notify_on_model_fallback: bool,
     /// Title template for off_track alerts.
     /// Placeholders: {verdict} {summary} {details} {session_id} {cwd} {from_count} {to_count} {harness}
     pub notify_title_off_track: String,
@@ -120,6 +123,7 @@ impl Default for Config {
             model_command: None,
             notify_on_off_track: true,
             notify_on_warning: false,
+            notify_on_model_fallback: true,
             notify_title_off_track: "scopey: off-track".into(),
             notify_title_warning: "scopey: scope warning".into(),
             notify_body: "{summary} (session {session_id})".into(),
@@ -273,6 +277,7 @@ impl Config {
              model_command = {:?}\n\
              notify_on_off_track = {}\n\
              notify_on_warning = {}\n\
+             notify_on_model_fallback = {} # alert when bg model calls keep failing\n\
              notify_title_off_track = {:?}\n\
              notify_title_warning = {:?}\n\
              notify_body = {:?}\n\
@@ -318,6 +323,7 @@ impl Config {
             self.model_command,
             self.notify_on_off_track,
             self.notify_on_warning,
+            self.notify_on_model_fallback,
             self.notify_title_off_track,
             self.notify_title_warning,
             self.notify_body,
@@ -384,10 +390,15 @@ pi_fast_model = ""
 opencode_fast_model = ""
 
 # Optional full command. Placeholders: {{model}} {{prompt_file}} {{runner}}
-# model_command = "claude -p --model {{model}} --bare \"$(cat {{prompt_file}})\""
+# Runs through `sh -c`; shell operators and substitutions are supported.
+# Scopey disables nested hooks and removes CLAUDE_CODE_SIMPLE so OAuth remains available.
+# model_command = "claude -p --model {{model}} \"$(cat {{prompt_file}})\""
 
 notify_on_off_track = true
 notify_on_warning = false
+# Alert when background summarize/judge model calls fail repeatedly and scope
+# tracking degrades to echoing the latest prompt. Details: scopey doctor.
+notify_on_model_fallback = true
 
 # Notification copy (templates). Placeholders:
 #   {{verdict}} {{summary}} {{details}} {{session_id}} {{session}} {{cwd}}

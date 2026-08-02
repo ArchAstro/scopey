@@ -7,6 +7,36 @@ and the project intends to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Claude-backed summarize and judge jobs now remove inherited
+  `CLAUDE_CODE_SIMPLE` before invoking Claude, so OAuth/keychain credentials
+  remain available in live hook-spawned workers as well as direct model probes.
+  Custom `model_command` invocations receive the same OAuth-safe recursion
+  guards, and failures now report the child status plus non-empty stderr or
+  stdout instead of an empty error.
+
+### Added
+
+- A failing model runner is no longer silent. Background summarize/judge
+  outcomes are recorded in `~/.scopey/model_health.json`; `scopey doctor` now
+  fails a `model jobs` check when calls fail persistently, `scopey status`
+  prints a MODEL UNAVAILABLE banner when the stored scope is only the
+  fallback echo of the latest prompt, `scopey models --verify` reports live
+  job outcomes so a green probe cannot mask a broken production path, and a
+  desktop notification fires after repeated failures
+  (`notify_on_model_fallback`, default `true`).
+- `make e2e-local`: opt-in end-to-end tests that drive a real hook through a
+  detached worker against locally authenticated `claude`/`codex` CLIs. One
+  test covers the poisoned `CLAUDE_CODE_SIMPLE=1` flow (failing if scope
+  extraction falls back instead of using OAuth credentials); a clean
+  10-session concurrency burst per runner requires every session to spawn its
+  own worker, invoke its cheap sub-model for real, log the full expected
+  event trail, and leave each artifact — session JSONL, worker log, by-id
+  store, health file — exactly where it belongs. Model-health updates are now
+  flock-serialized so concurrent workers cannot lose counts, letting the
+  tests assert exact totals. All scopey state stays in a temp home.
+
 ## [0.1.2] - 2026-08-02
 
 ### Fixed

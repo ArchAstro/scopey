@@ -10,6 +10,7 @@ mod herdr;
 mod hooks;
 mod insights;
 mod model;
+mod model_health;
 mod notify;
 mod pathutil;
 mod session;
