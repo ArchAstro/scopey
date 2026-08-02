@@ -22,6 +22,11 @@ use std::path::PathBuf;
 pub const PERSISTENT_FAILURE_THRESHOLD: u64 = 2;
 /// While the streak continues, re-notify at most this often.
 const RENOTIFY_INTERVAL_HOURS: i64 = 6;
+/// Refuse to parse a health file larger than this. Writers keep the file far
+/// smaller (`model_health_history` bounds `recent`, errors are clipped), so
+/// anything bigger is corrupt or foreign and is treated as empty; the next
+/// recorded outcome rewrites it at a bounded size.
+const MAX_HEALTH_FILE_BYTES: u64 = 262_144;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
@@ -40,6 +45,21 @@ pub struct ModelHealth {
     /// Job kind of the most recent outcome: "summarize" or "judge".
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_kind: Option<String>,
+    /// Recent job outcomes, oldest first. Truncated to `model_health_history`
+    /// on every write so the file stays small.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub recent: Vec<JobRecord>,
+}
+
+/// One background job outcome in the bounded `recent` history.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JobRecord {
+    pub at: DateTime<Utc>,
+    /// "summarize" or "judge".
+    pub kind: String,
+    pub ok: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 impl ModelHealth {
@@ -56,9 +76,14 @@ fn health_path() -> PathBuf {
     Config::scopey_home().join("model_health.json")
 }
 
-/// Best-effort read; a missing or corrupt file is an empty record.
+/// Best-effort read; a missing, corrupt, or oversized file is an empty record.
 pub fn load() -> ModelHealth {
-    fs::read_to_string(health_path())
+    let path = health_path();
+    match fs::metadata(&path) {
+        Ok(meta) if meta.len() <= MAX_HEALTH_FILE_BYTES => {}
+        _ => return ModelHealth::default(),
+    }
+    fs::read_to_string(path)
         .ok()
         .and_then(|text| serde_json::from_str(&text).ok())
         .unwrap_or_default()
@@ -95,14 +120,31 @@ fn take_update_lock() -> Option<fs::File> {
     Some(file)
 }
 
+/// Drop the oldest entries beyond the configured history size.
+fn truncate_recent(health: &mut ModelHealth, cfg: &Config) {
+    let cap = cfg.model_health_history;
+    if health.recent.len() > cap {
+        let excess = health.recent.len() - cap;
+        health.recent.drain(..excess);
+    }
+}
+
 /// Record a successful background model call, clearing the failure streak.
-pub fn record_success(kind: &str) {
+pub fn record_success(cfg: &Config, kind: &str) {
+    let now = Utc::now();
     let _lock = take_update_lock();
     let mut health = load();
     health.consecutive_failures = 0;
     health.total_successes = health.total_successes.saturating_add(1);
-    health.last_success_at = Some(Utc::now());
+    health.last_success_at = Some(now);
     health.last_kind = Some(kind.to_string());
+    health.recent.push(JobRecord {
+        at: now,
+        kind: kind.to_string(),
+        ok: true,
+        error: None,
+    });
+    truncate_recent(&mut health, cfg);
     if let Err(e) = store(&health) {
         eprintln!("scopey model-health: write failed: {e:#}");
     }
@@ -113,11 +155,19 @@ pub fn record_failure(cfg: &Config, kind: &str, error: &str) {
     let now = Utc::now();
     let _lock = take_update_lock();
     let mut health = load();
+    let clipped = clip(error, 500);
     health.consecutive_failures = health.consecutive_failures.saturating_add(1);
     health.total_failures = health.total_failures.saturating_add(1);
-    health.last_error = Some(clip(error, 500));
+    health.last_error = Some(clipped.clone());
     health.last_failure_at = Some(now);
     health.last_kind = Some(kind.to_string());
+    health.recent.push(JobRecord {
+        at: now,
+        kind: kind.to_string(),
+        ok: false,
+        error: Some(clipped),
+    });
+    truncate_recent(&mut health, cfg);
 
     let notify_now = cfg.notify_on_model_fallback && should_notify(&health, now);
     if notify_now {
@@ -180,12 +230,65 @@ mod tests {
             assert_eq!(h.last_kind.as_deref(), Some("judge"));
             assert!(h.last_error.unwrap().contains("boom again"));
 
-            record_success("summarize");
+            record_success(&cfg, "summarize");
             let h = load();
             assert_eq!(h.consecutive_failures, 0);
             assert_eq!(h.total_successes, 1);
             assert_eq!(h.total_failures, 2);
             assert!(!h.failing_persistently());
+            assert_eq!(h.recent.len(), 3);
+            assert!(h.recent[2].ok);
+        });
+    }
+
+    #[test]
+    fn recent_history_truncates_to_configured_cap() {
+        Config::with_temp_scopey_home(|_| {
+            let cfg = Config {
+                model_health_history: 3,
+                notify_on_model_fallback: false,
+                ..Config::default()
+            };
+            record_failure(&cfg, "summarize", "e1");
+            record_success(&cfg, "judge");
+            record_failure(&cfg, "summarize", "e3");
+            record_failure(&cfg, "judge", "e4");
+            record_success(&cfg, "summarize");
+
+            let h = load();
+            // Oldest two dropped, order preserved, newest last.
+            assert_eq!(h.recent.len(), 3);
+            assert_eq!(h.recent[0].error.as_deref(), Some("e3"));
+            assert_eq!(h.recent[1].error.as_deref(), Some("e4"));
+            assert!(h.recent[2].ok);
+            // Counters still cover every outcome, not just retained ones.
+            assert_eq!(h.total_failures, 3);
+            assert_eq!(h.total_successes, 2);
+        });
+    }
+
+    #[test]
+    fn zero_history_disables_recent_records() {
+        Config::with_temp_scopey_home(|_| {
+            let cfg = Config {
+                model_health_history: 0,
+                notify_on_model_fallback: false,
+                ..Config::default()
+            };
+            record_failure(&cfg, "summarize", "boom");
+            record_success(&cfg, "judge");
+            let h = load();
+            assert!(h.recent.is_empty());
+            assert_eq!(h.attempts(), 2);
+        });
+    }
+
+    #[test]
+    fn oversized_health_file_reads_as_empty() {
+        Config::with_temp_scopey_home(|dir| {
+            let big = "x".repeat((MAX_HEALTH_FILE_BYTES + 1) as usize);
+            fs::write(dir.join("model_health.json"), big).unwrap();
+            assert_eq!(load().attempts(), 0);
         });
     }
 

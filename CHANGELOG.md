@@ -25,7 +25,10 @@ and the project intends to follow [Semantic Versioning](https://semver.org/).
   fallback echo of the latest prompt, `scopey models --verify` reports live
   job outcomes so a green probe cannot mask a broken production path, and a
   desktop notification fires after repeated failures
-  (`notify_on_model_fallback`, default `true`).
+  (`notify_on_model_fallback`, default `true`). The health file keeps a
+  bounded list of recent job outcomes — `model_health_history` (default 50,
+  0 disables) truncates the oldest on every write — and oversized or corrupt
+  files are treated as empty, so reads stay small.
 - `make e2e-local`: opt-in end-to-end tests that drive a real hook through a
   detached worker against locally authenticated `claude`/`codex` CLIs. One
   test covers the poisoned `CLAUDE_CODE_SIMPLE=1` flow (failing if scope

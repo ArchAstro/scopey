@@ -37,6 +37,9 @@ use std::time::{Duration, Instant};
 const WORKER_WAIT: Duration = Duration::from_secs(120);
 const CONCURRENT_SESSIONS: usize = 10;
 const CONCURRENCY_WAIT: Duration = Duration::from_secs(240);
+/// Deliberately smaller than CONCURRENT_SESSIONS so the concurrency run also
+/// proves `model_health_history` truncation end-to-end.
+const HEALTH_HISTORY_CAP: usize = 4;
 
 fn scopey_bin() -> PathBuf {
     if let Ok(p) = std::env::var("CARGO_BIN_EXE_scopey") {
@@ -74,8 +77,9 @@ fn read_or_empty(path: &Path) -> String {
 /// model, keep all scopey state under the temp home, and keep every
 /// notification backend inert so a failing run cannot toast the developer's
 /// desktop mid-test. `max_global_jobs = 0` lifts the worker cap so concurrency
-/// tests genuinely run all sessions at once.
-fn write_config(home: &Path, runner: &str, max_global_jobs: u64) -> PathBuf {
+/// tests genuinely run all sessions at once; `model_health_history` bounds the
+/// health file's recent-outcome list so truncation can be proven end-to-end.
+fn write_config(home: &Path, runner: &str, max_global_jobs: u64, health_history: usize) -> PathBuf {
     let config_path = home.join("config.toml");
     fs::write(
         &config_path,
@@ -85,6 +89,7 @@ model_runner = "{runner}"
 model = "auto"
 model_timeout_secs = 90
 max_global_jobs = {max_global_jobs}
+model_health_history = {health_history}
 notify_on_off_track = false
 notify_on_warning = false
 notify_on_model_fallback = false
@@ -312,7 +317,9 @@ fn assert_home_layout(home: &Path, sids: &[String]) {
 }
 
 /// Exact health counters — deterministic because updates are flock-serialized.
-fn assert_health_exact(home: &Path, successes: u64) {
+/// `expected_recent` proves history truncation: counters cover every job while
+/// the recent list holds exactly min(jobs, model_health_history) entries.
+fn assert_health_exact(home: &Path, successes: u64, expected_recent: usize) {
     let health: serde_json::Value =
         serde_json::from_str(&read_or_empty(&home.join("model_health.json")))
             .expect("model_health.json written by worker");
@@ -331,6 +338,24 @@ fn assert_health_exact(home: &Path, successes: u64) {
         Some(0),
         "health: {health}"
     );
+    let recent = health["recent"].as_array().cloned().unwrap_or_default();
+    assert_eq!(
+        recent.len(),
+        expected_recent,
+        "recent history not truncated to the configured cap: {health}"
+    );
+    for record in &recent {
+        assert_eq!(
+            record["ok"],
+            serde_json::Value::Bool(true),
+            "health: {health}"
+        );
+        assert_eq!(
+            record["kind"],
+            serde_json::Value::String("summarize".into()),
+            "health: {health}"
+        );
+    }
 }
 
 /// The single poisoned-flow test body: one session, hook fired with
@@ -344,7 +369,7 @@ fn run_poisoned_e2e(runner: &str, sid: &str) {
     let home = tempfile::tempdir().unwrap();
     let proj = home.path().join("proj");
     fs::create_dir_all(&proj).unwrap();
-    let config_path = write_config(home.path(), runner, 2);
+    let config_path = write_config(home.path(), runner, 2, 50);
 
     fire_user_prompt(
         home.path(),
@@ -370,7 +395,7 @@ fn run_poisoned_e2e(runner: &str, sid: &str) {
     let sids = vec![sid.to_string()];
     assert_session_summarized(home.path(), sid, runner);
     assert_home_layout(home.path(), &sids);
-    assert_health_exact(home.path(), 1);
+    assert_health_exact(home.path(), 1, 1);
 
     eprintln!("OK {runner} e2e: real summarize with fallback=false despite CLAUDE_CODE_SIMPLE=1");
 }
@@ -388,7 +413,9 @@ fn run_concurrency_e2e(runner: &str, sid_prefix: &str) {
     let home = tempfile::tempdir().unwrap();
     let proj = home.path().join("proj");
     fs::create_dir_all(&proj).unwrap();
-    let config_path = write_config(home.path(), runner, 0);
+    // History capped below the session count so the run proves truncation:
+    // 10 successes must leave exactly HEALTH_HISTORY_CAP recent records.
+    let config_path = write_config(home.path(), runner, 0, HEALTH_HISTORY_CAP);
 
     let handles: Vec<_> = (0..CONCURRENT_SESSIONS)
         .map(|i| {
@@ -435,11 +462,12 @@ fn run_concurrency_e2e(runner: &str, sid_prefix: &str) {
         assert_session_summarized(home.path(), sid, runner);
     }
     assert_home_layout(home.path(), &sids);
-    assert_health_exact(home.path(), CONCURRENT_SESSIONS as u64);
+    assert_health_exact(home.path(), CONCURRENT_SESSIONS as u64, HEALTH_HISTORY_CAP);
 
     eprintln!(
         "OK {runner} concurrency e2e: {CONCURRENT_SESSIONS} concurrent sessions, \
-         all sub-models invoked, all artifacts in place"
+         all sub-models invoked, all artifacts in place, history truncated to \
+         {HEALTH_HISTORY_CAP}"
     );
 }
 
