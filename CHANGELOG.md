@@ -7,6 +7,8 @@ and the project intends to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-08-02
+
 ### Fixed
 
 - Hook events fired inside a subagent session are ignored, so delegated work no
