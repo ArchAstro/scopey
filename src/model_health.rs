@@ -22,11 +22,12 @@ use std::path::PathBuf;
 pub const PERSISTENT_FAILURE_THRESHOLD: u64 = 2;
 /// While the streak continues, re-notify at most this often.
 const RENOTIFY_INTERVAL_HOURS: i64 = 6;
-/// Refuse to parse a health file larger than this. Writers keep the file far
-/// smaller (`model_health_history` bounds `recent`, errors are clipped), so
-/// anything bigger is corrupt or foreign and is treated as empty; the next
-/// recorded outcome rewrites it at a bounded size.
-const MAX_HEALTH_FILE_BYTES: u64 = 262_144;
+/// Hard cap on the characters of any stored error string. `recent` is capped
+/// by `model_health_history` and `kind` is a fixed internal label, so every
+/// entry — and therefore the whole file — is bounded by construction. That is
+/// the only size limit: a separate byte cap could contradict a large
+/// configured history and misread a healthy file as oversized.
+const MAX_ERROR_CHARS: usize = 500;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
@@ -76,14 +77,9 @@ fn health_path() -> PathBuf {
     Config::scopey_home().join("model_health.json")
 }
 
-/// Best-effort read; a missing, corrupt, or oversized file is an empty record.
+/// Best-effort read; a missing or corrupt file is an empty record.
 pub fn load() -> ModelHealth {
-    let path = health_path();
-    match fs::metadata(&path) {
-        Ok(meta) if meta.len() <= MAX_HEALTH_FILE_BYTES => {}
-        _ => return ModelHealth::default(),
-    }
-    fs::read_to_string(path)
+    fs::read_to_string(health_path())
         .ok()
         .and_then(|text| serde_json::from_str(&text).ok())
         .unwrap_or_default()
@@ -153,34 +149,40 @@ pub fn record_success(cfg: &Config, kind: &str) {
 /// Record a failed background model call; notify once the failure is persistent.
 pub fn record_failure(cfg: &Config, kind: &str, error: &str) {
     let now = Utc::now();
-    let _lock = take_update_lock();
-    let mut health = load();
-    let clipped = clip(error, 500);
-    health.consecutive_failures = health.consecutive_failures.saturating_add(1);
-    health.total_failures = health.total_failures.saturating_add(1);
-    health.last_error = Some(clipped.clone());
-    health.last_failure_at = Some(now);
-    health.last_kind = Some(kind.to_string());
-    health.recent.push(JobRecord {
-        at: now,
-        kind: kind.to_string(),
-        ok: false,
-        error: Some(clipped),
-    });
-    truncate_recent(&mut health, cfg);
+    let clipped = clip(error, MAX_ERROR_CHARS);
 
-    let notify_now = cfg.notify_on_model_fallback && should_notify(&health, now);
-    if notify_now {
-        health.last_notified_at = Some(now);
-    }
-    if let Err(e) = store(&health) {
-        eprintln!("scopey model-health: write failed: {e:#}");
-    }
+    // Update under the lock; deliver the notification outside it so a slow
+    // notifier backend cannot block other workers' health updates.
+    let (notify_now, streak) = {
+        let _lock = take_update_lock();
+        let mut health = load();
+        health.consecutive_failures = health.consecutive_failures.saturating_add(1);
+        health.total_failures = health.total_failures.saturating_add(1);
+        health.last_error = Some(clipped.clone());
+        health.last_failure_at = Some(now);
+        health.last_kind = Some(kind.to_string());
+        health.recent.push(JobRecord {
+            at: now,
+            kind: kind.to_string(),
+            ok: false,
+            error: Some(clipped),
+        });
+        truncate_recent(&mut health, cfg);
+
+        let notify_now = cfg.notify_on_model_fallback && should_notify(&health, now);
+        if notify_now {
+            health.last_notified_at = Some(now);
+        }
+        if let Err(e) = store(&health) {
+            eprintln!("scopey model-health: write failed: {e:#}");
+        }
+        (notify_now, health.consecutive_failures)
+    };
+
     if notify_now {
         let body = format!(
-            "{} {kind}/model call(s) failed in a row — scope tracking is degraded \
+            "{streak} {kind}/model call(s) failed in a row — scope tracking is degraded \
              to echoing the latest prompt. Run `scopey doctor`. Last error: {}",
-            health.consecutive_failures,
             clip(error, 160),
         );
         if let Err(e) = crate::notify::notify(cfg, "scopey: model unavailable", &body, None) {
@@ -284,11 +286,30 @@ mod tests {
     }
 
     #[test]
-    fn oversized_health_file_reads_as_empty() {
+    fn file_stays_bounded_even_with_unbounded_error_input() {
         Config::with_temp_scopey_home(|dir| {
-            let big = "x".repeat((MAX_HEALTH_FILE_BYTES + 1) as usize);
-            fs::write(dir.join("model_health.json"), big).unwrap();
-            assert_eq!(load().attempts(), 0);
+            let cfg = Config {
+                model_health_history: 5,
+                notify_on_model_fallback: false,
+                ..Config::default()
+            };
+            let huge = "x".repeat(1_000_000);
+            for _ in 0..8 {
+                record_failure(&cfg, "summarize", &huge);
+            }
+
+            let h = load();
+            assert_eq!(h.recent.len(), 5);
+            for record in &h.recent {
+                // clip appends an ellipsis, hence +1.
+                let chars = record.error.as_ref().unwrap().chars().count();
+                assert!(chars <= MAX_ERROR_CHARS + 1, "unclipped entry: {chars}");
+            }
+            // Entry count and entry size are both capped, so the whole file is
+            // bounded by construction: generous 4 KiB/entry + fixed fields.
+            let len = fs::metadata(dir.join("model_health.json")).unwrap().len();
+            let bound = 8 * 1024 + 5 * 4096;
+            assert!(len <= bound, "file unexpectedly large: {len} > {bound}");
         });
     }
 
