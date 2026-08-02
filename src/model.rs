@@ -182,13 +182,21 @@ pub fn complete(cfg: &Config, prompt: &str, session_harness: &str) -> Result<Str
             .arg(&cmd_str)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
-        crate::guard::apply_internal_env(&mut cmd);
+        // Custom commands may invoke an OAuth-authenticated Claude CLI. Keep
+        // recursion guards, but do not force Claude's API-key-only SIMPLE mode.
+        crate::guard::apply_hook_disable_env(&mut cmd);
         let output = run_with_timeout(cmd, cfg.model_timeout_secs, "model_command")?;
         if !output.status.success() {
-            bail!(
-                "model_command failed: {}",
-                String::from_utf8_lossy(&output.stderr)
-            );
+            let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+            let detail = if !stderr.is_empty() {
+                format!("stderr={stderr}")
+            } else if !stdout.is_empty() {
+                format!("stdout={stdout}")
+            } else {
+                "(empty stdout/stderr)".to_string()
+            };
+            bail!("model_command failed: status={} {detail}", output.status);
         }
         return Ok(String::from_utf8_lossy(&output.stdout).trim().to_string());
     }
@@ -506,6 +514,29 @@ pub fn report_models(cfg: &Config, verify: bool) -> Result<()> {
         }
     }
 
+    // Probes run in this shell's environment; live jobs run detached from
+    // hooks. Surface the recorded job outcomes so a green probe cannot mask a
+    // failing production path (the issue-15 trap).
+    let health = crate::model_health::load();
+    if health.attempts() > 0 {
+        println!(
+            "\nbackground jobs (live summarize/judge): ok={} failed={}",
+            health.total_successes, health.total_failures
+        );
+        if health.consecutive_failures > 0 {
+            println!(
+                "WARNING: the last {} background model call(s) failed even though probes \
+                 may pass; scope extraction falls back to echoing the latest prompt.\n\
+                 last error: {}",
+                health.consecutive_failures,
+                health
+                    .last_error
+                    .as_deref()
+                    .unwrap_or("(no error captured)")
+            );
+        }
+    }
+
     if failed > 0 {
         bail!("{failed} model probe(s) failed");
     }
@@ -640,5 +671,45 @@ mod tests {
         assert_eq!(c.runner, Runner::Claude);
         assert_eq!(c.model, "haiku");
         assert!(!c.reason.is_empty());
+    }
+
+    #[test]
+    fn model_command_removes_inherited_claude_simple_and_uses_shell() {
+        Config::with_temp_scopey_home(|_| {
+            let previous = std::env::var_os("CLAUDE_CODE_SIMPLE");
+            std::env::set_var("CLAUDE_CODE_SIMPLE", "1");
+
+            let cfg = Config {
+                model_runner: "claude".into(),
+                model: "haiku".into(),
+                model_command: Some(
+                    "test -z \"${CLAUDE_CODE_SIMPLE+x}\" && printf \"$(printf pong)\"".into(),
+                ),
+                ..Config::default()
+            };
+            let result = complete(&cfg, "ignored", "claude");
+
+            match previous {
+                Some(value) => std::env::set_var("CLAUDE_CODE_SIMPLE", value),
+                None => std::env::remove_var("CLAUDE_CODE_SIMPLE"),
+            }
+
+            assert_eq!(result.unwrap(), "pong");
+        });
+    }
+
+    #[test]
+    fn model_command_failure_reports_status_and_stdout() {
+        let cfg = Config {
+            model_runner: "claude".into(),
+            model: "haiku".into(),
+            model_command: Some("printf auth-error; exit 7".into()),
+            ..Config::default()
+        };
+
+        let error = complete(&cfg, "ignored", "claude").unwrap_err();
+        let message = error.to_string();
+        assert!(message.contains("status=exit status: 7"), "{message}");
+        assert!(message.contains("stdout=auth-error"), "{message}");
     }
 }

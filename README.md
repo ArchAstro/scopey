@@ -120,7 +120,8 @@ Summarize/judge use a **cheap/fast** model on the **same harness as the agent se
 | `claude_fast_model` | `haiku` | Claude Code alias for current fast Haiku |
 | `codex_fast_model` | `gpt-5.6-terra` | Codex mini-like / lower-cost GPT-5.6 tier |
 
-Claude invoke: `claude -p --model <fast> --bare`  
+Claude invoke: OAuth-compatible `claude -p --model <fast>` first, with `--bare`
+as an API-key/provider fallback.
 Codex invoke: `codex exec --ephemeral -m <fast> --output-last-message …`
 
 ```bash

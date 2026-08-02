@@ -683,6 +683,40 @@ pub fn run_doctor(cfg: &Config) -> Result<()> {
     );
 
     check(
+        "model jobs",
+        || {
+            use crate::model_health;
+            let health = model_health::load();
+            if health.attempts() == 0 {
+                return Ok("(no background summarize/judge outcomes recorded yet)".into());
+            }
+            let last_error = health
+                .last_error
+                .clone()
+                .unwrap_or_else(|| "(no error captured)".into());
+            if health.failing_persistently() {
+                return Err(format!(
+                    "last {} summarize/judge model call(s) failed — scope extraction is \
+                     falling back to echoing the latest prompt; last error: {last_error}",
+                    health.consecutive_failures
+                ));
+            }
+            let mut msg = format!(
+                "ok={} failed={}",
+                health.total_successes, health.total_failures
+            );
+            if health.consecutive_failures == 1 {
+                msg.push_str(&format!(" (last call failed: {last_error})"));
+            }
+            if let Some(t) = health.last_success_at {
+                msg.push_str(&format!(" last_success={}", t.format("%Y-%m-%d %H:%M UTC")));
+            }
+            Ok(msg)
+        },
+        &mut failed,
+    );
+
+    check(
         "claude hooks",
         || {
             let p = dirs::home_dir().unwrap().join(".claude/settings.json");

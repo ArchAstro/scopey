@@ -47,6 +47,10 @@ fn env_truthy(key: &str) -> bool {
 pub fn apply_hook_disable_env(cmd: &mut std::process::Command) {
     cmd.env(ENV_INTERNAL, "1");
     cmd.env(ENV_HOOKS_DISABLED, "1");
+    // A parent Scopey worker may itself have inherited SIMPLE. Merely avoiding
+    // setting it again is not enough: Claude Code treats any inherited value
+    // as API-key-only mode and skips OAuth/keychain credentials.
+    cmd.env_remove("CLAUDE_CODE_SIMPLE");
     // Defensive: some Claude wrappers honor this without disabling OAuth.
     cmd.env("CLAUDE_CODE_DISABLE_HOOKS", "1");
 }
@@ -427,8 +431,27 @@ mod tests {
     fn apply_internal_env_sets_keys() {
         let mut cmd = std::process::Command::new("true");
         apply_internal_env(&mut cmd);
+        let internal_env = cmd.get_envs().collect::<std::collections::HashMap<_, _>>();
+        assert_eq!(
+            internal_env.get(std::ffi::OsStr::new(ENV_INTERNAL)),
+            Some(&Some(std::ffi::OsStr::new("1")))
+        );
+        assert_eq!(
+            internal_env.get(std::ffi::OsStr::new("CLAUDE_CODE_SIMPLE")),
+            Some(&Some(std::ffi::OsStr::new("1")))
+        );
+
         let mut cmd2 = std::process::Command::new("true");
         apply_hook_disable_env(&mut cmd2);
+        let oauth_env = cmd2.get_envs().collect::<std::collections::HashMap<_, _>>();
+        assert_eq!(
+            oauth_env.get(std::ffi::OsStr::new(ENV_INTERNAL)),
+            Some(&Some(std::ffi::OsStr::new("1")))
+        );
+        assert_eq!(
+            oauth_env.get(std::ffi::OsStr::new("CLAUDE_CODE_SIMPLE")),
+            Some(&None)
+        );
     }
 
     #[test]

@@ -116,7 +116,8 @@ fn recent_prompt_context(prompts: &[String], max_chars: usize) -> String {
 
 fn fallback_scope(latest_prompt: &str) -> String {
     format!(
-        "- (fallback scope — model unavailable)\n- Respond only to the latest user request:\n{}",
+        "- {}\n- Respond only to the latest user request:\n{}",
+        crate::session::FALLBACK_SCOPE_MARKER,
         clip(latest_prompt, 1500)
     )
 }
@@ -191,8 +192,12 @@ pub fn summarize_scope(
     );
 
     let (transition, out) = match model::complete(cfg, &sys, &harness) {
-        Ok(t) => extract_scope_transition(&t),
+        Ok(t) => {
+            crate::model_health::record_success("summarize");
+            extract_scope_transition(&t)
+        }
         Err(e) => {
+            crate::model_health::record_failure(cfg, "summarize", &format!("{e:#}"));
             // Fallback: latest request only, so offline mode cannot resurrect stale scope.
             eventlog::warn(
                 session_id,
@@ -399,8 +404,12 @@ Respond with EXACTLY this JSON object (no markdown fences):
     );
 
     let raw = match model::complete(cfg, &prompt, &harness) {
-        Ok(t) => t,
+        Ok(t) => {
+            crate::model_health::record_success("judge");
+            t
+        }
         Err(e) => {
+            crate::model_health::record_failure(cfg, "judge", &format!("{e:#}"));
             let mut store = SessionStore::open_or_create(cfg, cwd, session_id, &harness)?;
             let failed = SessionMessage::judgement(
                 from_count,
@@ -729,8 +738,10 @@ where
     cmd.stdin(Stdio::null())
         .stdout(Stdio::from(log.try_clone()?))
         .stderr(Stdio::from(log));
-    // Critical: children must never re-enter hooks.
-    guard::apply_internal_env(&mut cmd);
+    // Critical: children must never re-enter hooks. Do not set
+    // CLAUDE_CODE_SIMPLE on the worker itself: it would be inherited by the
+    // worker's OAuth-authenticated `claude -p` child before model selection.
+    guard::apply_hook_disable_env(&mut cmd);
 
     #[cfg(unix)]
     {

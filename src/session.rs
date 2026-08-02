@@ -14,6 +14,11 @@ pub const HOOK_LOCK_WAIT: Duration = Duration::from_millis(1500);
 /// Background jobs may wait longer — they are not on the agent critical path.
 pub const JOB_LOCK_WAIT: Duration = Duration::from_secs(30);
 
+/// Stamped into scope text when the model was unavailable and the stored scope
+/// is only an echo of the latest user prompt (FALLBACK_LATEST). Status output
+/// detects it so a degraded install cannot masquerade as a working one.
+pub const FALLBACK_SCOPE_MARKER: &str = "(fallback scope — model unavailable)";
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum MessageType {
@@ -730,6 +735,12 @@ impl SessionStore {
             ),
             None => "last_judgement: (none)".into(),
         };
+        let model_warning = if scope.contains(FALLBACK_SCOPE_MARKER) {
+            "\nMODEL UNAVAILABLE: the scope below is a fallback echo of the latest user\n\
+             prompt, not an extracted scope. Run `scopey doctor` for details.\n"
+        } else {
+            ""
+        };
         format!(
             "session_id: {}\n\
              path: {}\n\
@@ -740,6 +751,7 @@ impl SessionStore {
              last_reminder_at_count: {}\n\
              transcript_path: {}\n\
              {j_line}\n\
+             {model_warning}\
              \n\
              scope_requirements:\n{scope_preview}\n",
             self.data.session_id,
@@ -1014,6 +1026,25 @@ mod tests {
             Some("- stay on task")
         );
         assert!(s2.summary().contains("roundtrip-1"));
+        assert!(!s2.summary().contains("MODEL UNAVAILABLE"));
+    }
+
+    #[test]
+    fn summary_flags_fallback_scope_loudly() {
+        let dir = tempfile::tempdir().unwrap();
+        let cfg = test_cfg(dir.path());
+        let cwd = dir.path().join("proj");
+        fs::create_dir_all(&cwd).unwrap();
+        let mut s = SessionStore::open_or_create(&cfg, &cwd, "fb-1", "claude").unwrap();
+        s.append(SessionMessage::scope_requirements(
+            format!(
+                "- {FALLBACK_SCOPE_MARKER}\n- Respond only to the latest user request:\nfix it"
+            ),
+            None,
+        ));
+        let summary = s.summary();
+        assert!(summary.contains("MODEL UNAVAILABLE"), "{summary}");
+        assert!(summary.contains("scopey doctor"), "{summary}");
     }
 
     #[test]
