@@ -193,7 +193,7 @@ pub fn summarize_scope(
 
     let (transition, out) = match model::complete(cfg, &sys, &harness) {
         Ok(t) => {
-            crate::model_health::record_success("summarize");
+            crate::model_health::record_success(cfg, "summarize");
             extract_scope_transition(&t)
         }
         Err(e) => {
@@ -405,7 +405,7 @@ Respond with EXACTLY this JSON object (no markdown fences):
 
     let raw = match model::complete(cfg, &prompt, &harness) {
         Ok(t) => {
-            crate::model_health::record_success("judge");
+            crate::model_health::record_success(cfg, "judge");
             t
         }
         Err(e) => {
