@@ -1,0 +1,250 @@
+\documentclass[10pt]{article}
+
+\usepackage[letterpaper,margin=0.78in]{geometry}
+\usepackage{booktabs}
+\usepackage{microtype}
+\usepackage{tabularx}
+\usepackage[table]{xcolor}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{xspace}
+
+\definecolor{scopeblue}{HTML}{16324F}
+\definecolor{scopeaccent}{HTML}{2D6A8A}
+\definecolor{scopewash}{HTML}{EDF4F7}
+\definecolor{scopegray}{HTML}{59636E}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=scopeaccent,
+  urlcolor=scopeaccent,
+  pdftitle={Token Cost and Early-Termination Break-Even Analysis for Scopey},
+  pdfauthor={ArchAstro}
+}
+
+\newcommand{\scopey}{\textsc{Scopey}\xspace}
+\newcommand{\tokens}{\text{tokens}}
+\newcommand{\result}[1]{\textcolor{scopeblue}{\textbf{#1}}}
+\renewcommand{\arraystretch}{1.14}
+
+\title{\vspace{-1.5em}\textbf{Token Cost and Early-Termination Break-Even Analysis for \scopey}\\
+\large A controlled component evaluation of local Qwen3.5 9B Q4}
+\author{ArchAstro Engineering}
+\date{3 August 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We extend the \scopey scope-transition benchmark with explicit token accounting.
+The experiment compares a no-\scopey control with the selected local summarizer,
+Qwen3.5 9B Q4 served by llama.cpp, over 12 synthetic scenarios, 22 scored turns,
+and three repetitions. Per repetition, the measured component workload contains
+431 main-session user-context tokens, 7,958 \scopey analyzer-input tokens, and
+1,613 \scopey-generated tokens. Total analyzer overhead is 9,571 tokens, or 435
+tokens per scored turn. Because the component corpus contains no main-agent
+generations or tool transcripts, early-termination savings are not observed.
+Instead, we report the falsifiable break-even condition: an intervention must
+prevent an average of \result{798 future main-session tokens per scenario} to
+recover analyzer overhead. If one intervention prevents a 2,500-token suffix in
+each scenario, the projected reduction is \result{20,429 tokens per corpus
+repetition (67.1\%)}. This projection is a sensitivity result, not a causal
+end-to-end measurement.
+\end{abstract}
+
+\section{Question and experimental boundary}
+
+The practical question is whether the tokens spent maintaining an explicit
+task scope are repaid when \scopey stops an agent from continuing down an
+obsolete or off-track trajectory. The accounting separates three quantities:
+
+\begin{enumerate}
+  \item \textbf{Main-session tokens} ($M$): cumulative user-request context in
+  the component fixture. Main-agent output, reasoning, tool calls, and tool
+  results are absent and therefore are not counted.
+  \item \textbf{\scopey analyzer input} ($S_i$): tokens submitted to the local
+  scope-state transformer, including its instructions, prior scope, recent
+  requests, and latest request.
+  \item \textbf{\scopey-generated tokens} ($S_o$): completion tokens produced
+  by the local model. Total analyzer overhead is $H=S_i+S_o$.
+\end{enumerate}
+
+This boundary matters. The evaluation measures summarization cost exactly for
+the chosen local runtime, but it does not measure a full coding-agent session.
+Consequently, avoided future work is expressed as a parameter rather than
+silently inferred from synthetic scope text.
+
+\section{Method}
+
+\subsection{Configurations}
+
+The control exposes only the latest user prompt and performs no model-backed
+scope analysis. The treatment uses the selected local Qwen3.5 9B Q4 GGUF model
+through a warm llama.cpp server. Decoding uses temperature zero, seed 42, a
+256-token completion limit, and validated JSON normalized into \scopey's scope
+format. The runtime revision is
+\texttt{fe2adf0e722f30f5\allowbreak{}295fdec8a0f1dc78\allowbreak{}8f7498bc}; the
+model SHA-256 is
+\texttt{d784ce9eda1a5a7b\allowbreak{}51e8f705a9e63108\allowbreak{}44bf4f173654d115\allowbreak{}823c775fdea56d43}.
+
+The 12 cases exercise additions, narrowing, subtraction, explicit and implicit
+replacement, read-only queries, administration, combined mutations,
+constraint preservation, non-invention, and reference resolution. Each run
+contains 22 scored scope transitions. Three repetitions produce 66 samples per
+configuration and 132 samples overall.
+
+\subsection{Counting and projection}
+
+Qwen tokenization is used for main-session fixture text. The llama.cpp
+OpenAI-compatible response supplies analyzer prompt and completion usage, so
+the \scopey counts are runtime-reported rather than byte estimates. Counts in
+Tables~\ref{tab:aggregate}--\ref{tab:scenarios} are normalized to one corpus
+repetition.
+
+Let $N=12$ scenarios and let $A$ be the future main-session tokens prevented by
+one successful early termination in each scenario. The modeled totals are
+
+\begin{align}
+T_{\mathrm{no\ scopey}}(A) &= M + NA,\\
+T_{\mathrm{scopey}} &= M + H,\\
+\Delta(A) &= NA-H.
+\end{align}
+
+Positive $\Delta$ indicates net token savings. The corpus breaks even at
+$A=H/N=9{,}571/12=797.6$ tokens per scenario. Scenario-specific break-even
+values use each scenario's measured analyzer overhead.
+
+\section{Results}
+
+\begin{table}[ht]
+\centering
+\caption{Aggregate token accounting per 12-scenario corpus repetition.}
+\label{tab:aggregate}
+\begin{tabular}{lrr}
+\toprule
+Token bucket & No \scopey & Local \scopey \\
+\midrule
+Main-session user context ($M$) & 431 & 431 \\
+Analyzer input ($S_i$) & 0 & 7,958 \\
+\scopey-generated output ($S_o$) & 0 & 1,613 \\
+Total analyzer overhead ($H$) & 0 & \result{9,571} \\
+Observed component total & 431 & 10,002 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Analyzer input accounts for 83.1\% of \scopey overhead and generated output for
+16.9\%. The model generates 73.3 tokens per scored turn on average; full
+analyzer cost is 435.0 tokens per turn. The no-\scopey control has no analyzer
+cost. Without an avoided future trajectory, it is necessarily cheaper in token
+terms; \scopey's value appears only when a correction prevents enough later
+main-session work.
+
+\clearpage
+\begin{table}[ht]
+\centering
+\caption{Per-scenario token cost and break-even, averaged over three repetitions.
+``Main'' is cumulative user-request context. ``Generated'' is model output.}
+\label{tab:scenarios}
+\small
+\begin{tabularx}{\textwidth}{@{}Xrrrrrr@{}}
+\toprule
+Scenario & Turns & Main & Input & Gen. & Cost & Net at 2.5k \\
+\midrule
+Initial concrete addition & 1 & 15 & 352 & 65 & 417 & 2,083 \\
+Follow-up preserving work & 2 & 32 & 707 & 120 & 827 & 1,673 \\
+Narrow target & 2 & 42 & 738 & 147 & 885 & 1,615 \\
+Subtract requirement & 2 & 44 & 738 & 143 & 881 & 1,619 \\
+Explicit task replacement & 2 & 47 & 726 & 157 & 883 & 1,617 \\
+Implicit topic switch & 2 & 40 & 717 & 140 & 857 & 1,643 \\
+Query preserves work & 2 & 38 & 715 & 147 & 862 & 1,638 \\
+Administration preserves work & 2 & 31 & 713 & 141 & 854 & 1,646 \\
+Combined subtract/add & 2 & 47 & 737 & 158 & 895 & 1,605 \\
+Cross-platform constraints & 2 & 51 & 757 & 201 & 958 & 1,542 \\
+No invented administration & 1 & 10 & 347 & 53 & 400 & 2,100 \\
+Reference resolution & 2 & 34 & 711 & 141 & 852 & 1,648 \\
+\midrule
+\textbf{Corpus total} & \textbf{22} & \textbf{431} & \textbf{7,958} &
+\textbf{1,613} & \textbf{9,571} & \textbf{20,429} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Early-termination sensitivity}
+
+Table~\ref{tab:sensitivity} makes the counterfactual assumption visible. At
+zero avoided tokens, \scopey adds its full 9,571-token analyzer cost. Savings
+turn positive near 798 tokens per scenario. At the requested illustrative
+2,500-token suffix, the no-\scopey continuation would consume 30,431 tokens,
+whereas the terminated \scopey path consumes 10,002, a 67.1\% reduction.
+
+\begin{table}[ht]
+\centering
+\caption{Sensitivity to assumed future main-session tokens prevented per scenario.}
+\label{tab:sensitivity}
+\begin{tabular}{rrr}
+\toprule
+Avoided per scenario ($A$) & Net corpus savings $\Delta(A)$ & Reduction \\
+\midrule
+0 & -9,571 & -2,220.6\% \\
+250 & -6,571 & -191.5\% \\
+500 & -3,571 & -55.5\% \\
+800 & 29 & 0.3\% \\
+1,000 & 2,429 & 19.5\% \\
+2,500 & \result{20,429} & \result{67.1\%} \\
+5,000 & 50,429 & 83.4\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The local model retained the earlier quality result during this run: 100\%
+format compliance, 100\% required-concept recall, 100\% forbidden-concept
+rejection, zero call failures, and 59.1\% exact transition-label agreement.
+Median latency was 1,190 ms. The lower transition-label score reflects a
+coarser operation taxonomy; the active scope body consumed by the product
+remained correct on all measured concepts.
+
+\section{Threats to validity}
+
+\begin{itemize}
+  \item \textbf{No causal termination measurement.} The 2,500-token suffix is a
+  sensitivity parameter. No main agent was actually stopped in this component
+  experiment.
+  \item \textbf{Partial main-session accounting.} The 431-token main bucket
+  contains user-request context only. It omits system prompts, assistant output,
+  reasoning, cache reads/writes, and tool payloads.
+  \item \textbf{One tokenizer.} Counts use the selected Qwen tokenizer. Cloud
+  providers may tokenize identical text differently.
+  \item \textbf{Synthetic cases.} The corpus is deterministic and auditable but
+  is smaller and cleaner than long production coding sessions.
+  \item \textbf{Intervention frequency.} The projection assumes one successful
+  termination per scenario. Real prevalence and false-positive rates determine
+  realized savings.
+\end{itemize}
+
+\section{Conclusion and next experiment}
+
+Local scope summarization is not token-free: the selected configuration costs
+about 435 analyzer tokens per scored turn and 798 tokens per scenario. It is
+token-positive only when a correction prevents more future main-session work
+than that overhead. Under a 2,500-token prevented-suffix scenario, the modeled
+benefit is substantial, but it remains projected.
+
+The next evaluation should run paired disposable coding tasks with matched
+model, prompt, seed, repository state, and stopping rule. It must capture
+provider-reported input, output, cached, and reasoning tokens at every main-agent
+step; record the precise intervention token index; continue the no-\scopey arm
+to completion; and score task success plus false interventions. That experiment
+would replace $A$ with observed counterfactual trajectory differences and turn
+this break-even analysis into an end-to-end causal estimate.
+
+\section*{Reproducibility}
+
+The evaluator, case corpus, run command, and machine-readable schema live under
+\path{eval/}. The source paper is
+\path{eval/paper/scopey-token-accounting.tex}. The selected model and runtime
+are documented in \path{eval/LOCAL_MODEL_DECISION.md}. Runtime and model
+projects: \url{https://github.com/ggml-org/llama.cpp} and
+\url{https://huggingface.co/Qwen/Qwen3.5-9B}.
+
+\end{document}
