@@ -8,7 +8,7 @@
       "user": "Build a file watcher that works on macOS, Linux, and Windows without adding runtime dependencies.",
       "expect": {
         "operations": ["ADD"],
-        "must_include": [["file watcher", "watch files"], ["macOS"], ["Linux"], ["Windows"], ["without", "no runtime dependencies", "zero runtime dependencies"]],
+        "must_include": [["file watcher", "watch files"], ["macOS"], ["Linux"], ["Windows"], ["without", "no runtime dependencies", "zero runtime dependencies", "do not add runtime dependencies"]],
         "must_exclude": []
       }
     },

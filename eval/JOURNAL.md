@@ -168,3 +168,31 @@ scores, but latency grew to 2.4× the current Claude baseline. Two responses als
 duplicated operation labels (`ADD,ADD` and `MODIFY,MODIFY`), which now correctly
 fail the “every operation once” output contract. This variant is safer but not a
 good production choice at its measured latency.
+
+## 2026-08-03 — Isolated next-Codex experiment
+
+### Command
+
+```text
+python3 eval/run.py --variant next-codex \
+  --output-dir eval/results/20260803-next-codex-r1
+```
+
+The candidate used the compact `next` prompt with Codex's `gpt-5.6-terra`
+model. A rubric synonym was added for the valid wording “Do not add runtime
+dependencies,” and the saved outputs were rescored without another model call.
+
+### Rescored result
+
+- transition exact match: 90.9%
+- format compliance: 100%
+- required-concept recall: 100%
+- forbidden-concept rejection: 100%
+- errors: 0%
+- median wall time: 4,975 ms per turn
+
+The candidate retained the current Codex baseline's perfect active-scope scores
+while reducing median latency by about 13%. Its two transition-label misses had
+semantically correct scope bodies, so this becomes the cloud reference point
+for local-model comparisons. The sample remains too small for a production
+decision and will be expanded before final selection.
