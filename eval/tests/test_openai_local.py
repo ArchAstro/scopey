@@ -47,9 +47,21 @@ class ScopeRenderingTest(unittest.TestCase):
         self.assertIn("- Identify affected files.", output)
         self.assertIn("- Do not edit files.", output)
 
-    def test_rejects_empty_requirements(self) -> None:
-        with self.assertRaisesRegex(ValueError, "invalid requirements"):
+    def test_rejects_empty_active_scope(self) -> None:
+        with self.assertRaisesRegex(ValueError, "empty active scope"):
             ADAPTER.render_scope({"operations": ["ADD"], "requirements": []})
+
+    def test_accepts_query_without_implementation_requirements(self) -> None:
+        output = ADAPTER.render_scope(
+            {"operations": ["QUERY"], "requirements": [], "queries": ["Explain it."], "boundaries": []}
+        )
+        self.assertEqual("<!-- scope-transition: QUERY -->\n- Explain it.", output)
+
+    def test_parses_json_after_empty_think_wrapper(self) -> None:
+        parsed = ADAPTER.parse_json_content(
+            '<think>\n\n</think>\n\n{"operations":["ADD"],"requirements":["x"]}'
+        )
+        self.assertEqual(["ADD"], parsed["operations"])
 
 
 if __name__ == "__main__":

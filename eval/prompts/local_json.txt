@@ -28,3 +28,5 @@ Latest request:
 Return the applied transitions, complete implementation requirements, active
 read-only queries, and active negative boundaries in their separate response
 schema fields. Use empty arrays when a field has none.
+Return exactly one JSON object with these array fields: `operations`,
+`requirements`, `queries`, and `boundaries`.

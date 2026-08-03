@@ -135,6 +135,12 @@ UI, and set an unpredictable API key before treating the server lifecycle as a
 product feature; the ad-hoc benchmark server intentionally has no remote
 exposure but still emits a permissive-CORS warning.
 
+The selected local candidate is `local-qwen3.5-9b-q4`. It uses unconstrained
+JSON because this model's empty thinking wrapper currently conflicts with
+llama.cpp's generated JSON grammar; the adapter still parses, validates, and
+normalizes every response before scoring it. See
+`reports/2026-08-03-local-qwen35-9b-q4.md` for the repeated result.
+
 ## Reproducibility rules
 
 - Never overwrite a result directory.

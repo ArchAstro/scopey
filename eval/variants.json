@@ -48,6 +48,13 @@
       "prompt": "local_json",
       "command": ["python3", "eval/adapters/openai_local.py", "--model-id", "Qwen3-4B-Instruct-2507-Q4_K_M"],
       "timeout_secs": 30
+    },
+    "local-qwen3.5-9b-q4": {
+      "adapter": "command",
+      "description": "Warm Qwen3.5 9B Q4_K_M through a local llama.cpp OpenAI-compatible server.",
+      "prompt": "local_json",
+      "command": ["python3", "eval/adapters/openai_local.py", "--model-id", "Qwen3.5-9B-Q4_K_M", "--unconstrained-json"],
+      "timeout_secs": 30
     }
   }
 }

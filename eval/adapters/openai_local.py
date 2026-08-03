@@ -25,7 +25,6 @@ RESPONSE_SCHEMA = {
         "requirements": {
             "type": "array",
             "items": {"type": "string"},
-            "minItems": 1,
             "maxItems": 15,
         },
         "queries": {
@@ -57,7 +56,6 @@ def render_scope(payload: dict[str, object]) -> str:
         raise ValueError("model returned invalid operations")
     if (
         not isinstance(requirements, list)
-        or not requirements
         or len(requirements) > 15
         or any(not isinstance(item, str) or not item.strip() for item in requirements)
     ):
@@ -71,8 +69,22 @@ def render_scope(payload: dict[str, object]) -> str:
     unique_items = list(
         dict.fromkeys(item.strip() for item in [*requirements, *queries, *boundaries])
     )
+    if not unique_items:
+        raise ValueError("model returned an empty active scope")
     bullets = "\n".join(f"- {item}" for item in unique_items)
     return f"<!-- scope-transition: {','.join(unique_operations)} -->\n{bullets}"
+
+
+def parse_json_content(content: str) -> dict[str, object]:
+    """Parse JSON even when a reasoning model emits an empty think wrapper."""
+    start = content.find("{")
+    end = content.rfind("}")
+    if start < 0 or end < start:
+        raise ValueError("model completion contains no JSON object")
+    parsed = json.loads(content[start : end + 1])
+    if not isinstance(parsed, dict):
+        raise ValueError("model completion JSON is not an object")
+    return parsed
 
 
 def main() -> int:
@@ -86,12 +98,13 @@ def main() -> int:
     parser.add_argument("--timeout", type=float, default=30)
     parser.add_argument("--max-tokens", type=int, default=256)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--unconstrained-json", action="store_true")
     args = parser.parse_args()
 
     started = time.perf_counter()
     try:
         request = json.load(sys.stdin)
-        body = {
+        body: dict[str, object] = {
             "model": args.model,
             "messages": [
                 {
@@ -104,15 +117,17 @@ def main() -> int:
             "max_tokens": args.max_tokens,
             "seed": args.seed,
             "stream": False,
-            "response_format": {
+            "chat_template_kwargs": {"enable_thinking": False},
+        }
+        if not args.unconstrained_json:
+            body["response_format"] = {
                 "type": "json_schema",
                 "json_schema": {
                     "name": "scope_transition",
                     "strict": True,
                     "schema": RESPONSE_SCHEMA,
                 },
-            },
-        }
+            }
         http_request = urllib.request.Request(
             args.url.rstrip("/") + "/v1/chat/completions",
             data=json.dumps(body).encode("utf-8"),
@@ -121,7 +136,7 @@ def main() -> int:
         with urllib.request.urlopen(http_request, timeout=args.timeout) as response:
             completion = json.load(response)
         content = completion["choices"][0]["message"]["content"]
-        output = render_scope(json.loads(content))
+        output = render_scope(parse_json_content(content))
         json.dump(
             {
                 "output": output,

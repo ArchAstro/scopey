@@ -296,3 +296,41 @@ The model is therefore the fast local baseline, not yet the recommended default.
 The ad-hoc server bound to `127.0.0.1`, but llama.cpp warned that CORS allowed
 all origins because no API key was configured. Product integration must use a
 random per-install or per-process key, keep loopback binding, and disable the UI.
+
+## 2026-08-03 — Qwen3.5 9B local winner
+
+The stronger local control used `Qwen_Qwen3.5-9B-Q4_K_M.gguf` (6,169,341,984
+bytes, SHA-256
+`d784ce9eda1a5a7b51e8f705a9e6310844bf4f173654d115823c775fdea56d43`)
+through the same pinned warm llama.cpp Metal server. Qwen3.5's chat template
+emits an empty `<think>` wrapper even when thinking is disabled. Combining that
+template with llama.cpp's JSON-schema grammar caused sampler initialization to
+fail because the generated grammar root did not account for the wrapper. The
+adapter therefore requests JSON without a grammar for this model, strips only
+the wrapper around the first JSON object, validates every field, and renders the
+normal Scopey format.
+
+The first full run exposed two evaluator assumptions: implementation
+requirements can legitimately be empty for a pure query, and “must not add
+runtime dependencies” is a valid synonym for the corpus constraint. After
+fixing those generic rubric/adapter issues, the 22-turn run produced:
+
+- transition exact match: 59.1%
+- format compliance: 100%
+- required-concept recall: 100%
+- forbidden-concept rejection: 100%
+- errors: 0%
+- median wall time: 1,143 ms per turn
+
+A three-repetition stability run (66 scored turns) held the same semantic and
+format scores with 1,390 ms median wall time. Transition labels remain coarser
+than the gold taxonomy, but every active scope body is correct. Relative to the
+single-run Codex reference, the stable local median is about 3.6× faster; the
+best single local run is about 4.35× faster. The local model also avoids network
+and provider availability, at the cost of a 6.17 GB model plus runtime and
+roughly 6–7 GB of resident model memory.
+
+Qwen3.5 9B Q4_K_M is the selected local default candidate. Qwen3 4B remains a
+lower-footprint opt-in candidate for users who accept lower scope accuracy.
+Text diffusion is not selected: both tested diffusion models missed semantic
+gates and/or exceeded the cloud latency reference.
