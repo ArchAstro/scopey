@@ -112,6 +112,58 @@ class ScoringTest(unittest.TestCase):
         self.assertEqual(1.0, result["required_concept_recall"])
         self.assertEqual(1.0, result["forbidden_concept_rejection"])
 
+    def test_summary_separates_main_and_scopey_tokens(self) -> None:
+        sample = RUN.Sample(
+            variant="local",
+            case_id="c",
+            category="add",
+            repetition=1,
+            turn=1,
+            expected_operations=["ADD"],
+            actual_operations=["ADD"],
+            transition_exact=True,
+            format_valid=True,
+            include_matches=1,
+            include_total=1,
+            exclude_rejections=0,
+            exclude_total=0,
+            elapsed_ms=3.0,
+            output="<!-- scope-transition: ADD -->\n- x",
+            error=None,
+            main_session_tokens=100,
+            scopey_input_tokens=40,
+            scopey_generated_tokens=10,
+            scopey_total_tokens=50,
+            token_source="adapter-reported",
+        )
+        result = RUN.summarize([sample], avoided_tokens=2500)["variants"]["local"]
+        self.assertEqual(100, result["tokens"]["main_session"])
+        self.assertEqual(10, result["tokens"]["scopey_generated"])
+        self.assertEqual(50, result["tokens"]["scopey_total"])
+        self.assertEqual(2450, result["scenarios"]["c"]["projected_net_savings"])
+
+
+class TokenAccountingTest(unittest.TestCase):
+    def test_proxy_counts_utf8_bytes_in_labeled_quarters(self) -> None:
+        counter = RUN.TokenCounter()
+        self.assertEqual(3, counter.count("abcdefghij"))
+        self.assertEqual("utf8-bytes-div-4-proxy", counter.source)
+
+    def test_tokenizer_arguments_must_be_paired(self) -> None:
+        with self.assertRaisesRegex(ValueError, "must be used together"):
+            RUN.TokenCounter(Path("tokenizer"), None)
+
+    def test_usage_accepts_openai_and_responses_field_names(self) -> None:
+        self.assertEqual(
+            (12, 3),
+            RUN.usage_tokens({"usage": {"prompt_tokens": 12, "completion_tokens": 3}}),
+        )
+        self.assertEqual(
+            (9, 2),
+            RUN.usage_tokens({"usage": {"input_tokens": 9, "output_tokens": 2}}),
+        )
+        self.assertIsNone(RUN.usage_tokens({"usage": None}))
+
 
 class CaseValidationTest(unittest.TestCase):
     def test_all_checked_in_cases_validate(self) -> None:

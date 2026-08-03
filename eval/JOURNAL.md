@@ -334,3 +334,54 @@ Qwen3.5 9B Q4_K_M is the selected local default candidate. Qwen3 4B remains a
 lower-footprint opt-in candidate for users who accept lower scope accuracy.
 Text diffusion is not selected: both tested diffusion models missed semantic
 gates and/or exceeded the cloud latency reference.
+# 2026-08-03 - Token accounting and early-termination sensitivity
+
+Question: how much token overhead does the selected local summarizer add, and
+how many main-session tokens must an early Scopey intervention avoid to pay for
+that overhead?
+
+Implementation:
+
+- Added per-sample main-session, Scopey-input, Scopey-generated, total-overhead,
+  token-source, and scenario-breakdown fields.
+- Preserved a standard-library-only fallback (`ceil(UTF-8 bytes / 4)`) and
+  labeled it as a proxy rather than billed usage.
+- Added optional exact `llama-tokenize` support. The local OpenAI-compatible
+  adapter's usage object takes precedence, so the Qwen run below uses the
+  server's actual prompt/completion counts.
+- Added an early-termination sensitivity parameter. It is explicitly reported
+  as projected because the component fixtures do not contain main-agent output
+  or tool transcripts.
+
+Command:
+
+```sh
+python3 eval/run.py \
+  --variant no-scopey \
+  --variant local-qwen3.5-9b-q4 \
+  --repeat 3 \
+  --tokenizer-bin ~/.scopey/eval-runtimes/llama.cpp/fe2adf0e722f30f5295fdec8a0f1dc788f7498bc/build/bin/llama-tokenize \
+  --tokenizer-model ~/.scopey/eval-models/qwen3.5-9b-q4_k_m/Qwen_Qwen3.5-9B-Q4_K_M.gguf \
+  --output-dir eval/results/20260803-token-accounting-qwen35-r3
+```
+
+Results per one 12-scenario / 22-turn repetition (three repetitions were run):
+
+- main-session user context: 431 tokens in both variants;
+- no-Scopey analyzer usage: 0 tokens;
+- Qwen Scopey input: 7,958 tokens;
+- Qwen Scopey-generated output: 1,613 tokens;
+- total Scopey analyzer overhead: 9,571 tokens, or 435 tokens per scored turn;
+- mean per-scenario break-even: 798 avoided main-session tokens (range 400-958);
+- at an assumed 2,500-token prevented suffix per scenario, projected net saving:
+  20,429 tokens per corpus repetition, a 67.1% reduction from the modeled
+  no-Scopey continuation total.
+
+Accuracy remained unchanged from the selected candidate: 100% format,
+required-concept recall, and forbidden-concept rejection, zero errors, and
+59.1% transition-label exact match. Median latency was 1,190 ms.
+
+Decision: publish the break-even result, not a claim of measured end-to-end
+savings. The next agent-level benchmark must capture provider usage at every
+main-agent response and compare paired trajectories to establish causal early
+termination savings.

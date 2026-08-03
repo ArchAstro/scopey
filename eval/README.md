@@ -81,6 +81,35 @@ The runner reports both micro-averaged and worst-category metrics:
 - peak resident memory when the platform exposes it;
 - model/runtime disk footprint supplied by the variant manifest.
 
+It also reports token accounting in two deliberately separate buckets:
+
+- `main_session`: cumulative user-request context visible in this component
+  corpus. It excludes main-agent output and tool transcripts because those do
+  not exist in the scope-transition fixtures.
+- `scopey_input` and `scopey_generated`: analyzer prompt and completion tokens.
+  Their sum is Scopey's model overhead. OpenAI-compatible adapters use
+  provider-reported usage when available.
+
+The dependency-free default is a labeled UTF-8-bytes/4 proxy. Exact local
+counts can use the candidate model's own tokenizer:
+
+```sh
+python3 eval/run.py \
+  --variant no-scopey \
+  --variant local-qwen3.5-9b-q4 \
+  --repeat 3 \
+  --tokenizer-bin /path/to/llama-tokenize \
+  --tokenizer-model /path/to/model.gguf
+```
+
+Early-termination savings are a sensitivity projection, not an observed
+component metric. The reported break-even point is the number of future
+main-session tokens that Scopey must prevent to recover its analyzer overhead.
+Use `--early-termination-avoided-tokens` to change the projected suffix. A
+causal claim requires the future trajectory benchmark to record the same agent
+with and without Scopey, including main-model input, output, cached, reasoning,
+and tool-result tokens.
+
 The initial promotion gate is:
 
 - 100% output-format compliance;
