@@ -106,7 +106,11 @@ def parse_operations(output: str) -> tuple[list[str], bool, str]:
     if not match:
         return [], False, output.strip()
     operations = [part.strip() for part in match.group(1).split(",") if part.strip()]
-    valid = bool(operations) and all(operation in VALID_OPERATIONS for operation in operations)
+    valid = (
+        bool(operations)
+        and len(operations) == len(set(operations))
+        and all(operation in VALID_OPERATIONS for operation in operations)
+    )
     body = output.strip()[match.end() :].strip()
     bullets_only = bool(body) and all(
         not line.strip()
@@ -137,6 +141,7 @@ NEGATIVE_REQUIREMENT_MARKERS = (
     "no longer",
     "out of scope",
     "not required",
+    "no implementation",
     "without adding",
     "remove ",
     "drop ",

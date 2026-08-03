@@ -35,6 +35,13 @@ class ParseOperationsTest(unittest.TestCase):
         self.assertEqual(["INVENT"], operations)
         self.assertFalse(valid)
 
+    def test_rejects_duplicate_operations(self) -> None:
+        operations, valid, _ = RUN.parse_operations(
+            "<!-- scope-transition: MODIFY,MODIFY -->\n- Change it"
+        )
+        self.assertEqual(["MODIFY", "MODIFY"], operations)
+        self.assertFalse(valid)
+
     def test_rejects_preamble(self) -> None:
         operations, valid, _ = RUN.parse_operations(
             "Here is the scope:\n<!-- scope-transition: ADD -->\n- Work"
@@ -73,6 +80,9 @@ class ScoringTest(unittest.TestCase):
         )
         self.assertFalse(
             RUN.actively_requires_group("- Do not implement the fix.", ["implement"])
+        )
+        self.assertFalse(
+            RUN.actively_requires_group("- No implementation is permitted.", ["implement"])
         )
         self.assertTrue(
             RUN.actively_requires_group("- Add sorting to the endpoint.", ["sorting"])

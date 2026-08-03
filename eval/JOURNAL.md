@@ -141,3 +141,30 @@ loss of explicit read-only constraints, and coarser transition labels. This
 result motivates a `next` configuration that both strengthens the transformation
 instruction and invokes Claude with tools, session persistence, slash commands,
 and customizations disabled.
+
+## 2026-08-03 — Isolated next-Claude experiment
+
+### Command
+
+```text
+python3 eval/run.py --variant next-claude \
+  --output-dir eval/results/20260803-next-claude-r1
+```
+
+The candidate used the compact `next` prompt plus Claude safe mode, no tools, no
+slash commands, no session persistence, and a transformation-only system prompt.
+
+### Rescored result
+
+- transition exact match: 81.8%
+- format compliance: 90.9%
+- required-concept recall: 98.9%
+- forbidden-concept rejection: 100%
+- errors: 0%
+- median wall time: 17,525 ms per turn
+
+Isolation eliminated the direct-answer/tool contamination and improved semantic
+scores, but latency grew to 2.4× the current Claude baseline. Two responses also
+duplicated operation labels (`ADD,ADD` and `MODIFY,MODIFY`), which now correctly
+fail the “every operation once” output contract. This variant is safer but not a
+good production choice at its measured latency.

@@ -8,7 +8,7 @@
       "user": "Explain how session locking prevents concurrent summarizers.",
       "expect": {
         "operations": ["QUERY"],
-        "must_include": [["explain"], ["session"], ["locking", "lock"], ["concurrent"], ["summarizer", "summarizers"]],
+        "must_include": [["explain", "explanation"], ["session"], ["locking", "lock"], ["concurrent"], ["summarizer", "summarizers"]],
         "must_exclude": [["implement"], ["commit"], ["pull request", "PR"], ["deploy"]]
       }
     }

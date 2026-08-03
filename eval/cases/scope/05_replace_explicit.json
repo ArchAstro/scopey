@@ -16,7 +16,7 @@
       "user": "Forget that task. Instead, investigate why first-run config is not written and report the cause; do not change code.",
       "expect": {
         "operations": ["REPLACE", "QUERY"],
-        "must_include": [["first-run", "first run"], ["config"], ["investigate", "cause", "report"], ["do not change", "no code changes", "read-only"]],
+        "must_include": [["first-run", "first run"], ["config"], ["investigate", "cause", "report"], ["do not change", "no code changes", "code modification is out of scope", "read-only"]],
         "must_exclude": [["mascot"], ["analytics"], ["implement the fix", "fix the bug"]]
       }
     }
