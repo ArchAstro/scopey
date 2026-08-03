@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "variants": {
+    "no-scopey": {
+      "adapter": "latest-prompt",
+      "description": "Control: no accumulated scope; expose only the latest user prompt.",
+      "prompt": "current",
+      "timeout_secs": 5
+    },
+    "current-claude": {
+      "adapter": "command",
+      "description": "Current production analyzer prompt using Claude's configured fast model.",
+      "prompt": "current",
+      "command": ["python3", "eval/adapters/model_cli.py", "--runner", "claude", "--model", "haiku"],
+      "timeout_secs": 120
+    },
+    "current-codex": {
+      "adapter": "command",
+      "description": "Current production analyzer prompt using Codex's configured fast model.",
+      "prompt": "current",
+      "command": ["python3", "eval/adapters/model_cli.py", "--runner", "codex", "--model", "gpt-5.6-terra"],
+      "timeout_secs": 120
+    }
+  }
+}

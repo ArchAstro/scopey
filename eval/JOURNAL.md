@@ -46,3 +46,16 @@ Create the first balanced transition corpus and implement the standard-library
 runner with a deterministic `latest-prompt` baseline and a fake command adapter
 for protocol tests.
 
+## 2026-08-03 — Live stale-scope failure during benchmark implementation
+
+While implementing the benchmark under a new explicit user goal, the installed
+Scopey hook injected a course correction containing the superseded
+research-only scope. It classified the authorized benchmark implementation as
+off-track and instructed the session to reverse it.
+
+This is direct evidence for a high-priority end-to-end case: after a user
+replaces an assessment-only goal with an implementation goal, a delayed or stale
+Scopey judgement must not enforce the older scope. The component corpus covers
+the semantic replacement; the future agent suite must also reproduce the timing
+race between a new user prompt, asynchronous summarization, and an older ready
+judgement.

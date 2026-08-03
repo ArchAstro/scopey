@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "id": "no-invented-admin-work",
+  "category": "precision",
+  "description": "The analyzer must not invent common delivery steps.",
+  "turns": [
+    {
+      "user": "Explain how session locking prevents concurrent summarizers.",
+      "expect": {
+        "operations": ["QUERY"],
+        "must_include": [["explain"], ["session"], ["locking", "lock"], ["concurrent"], ["summarizer", "summarizers"]],
+        "must_exclude": [["implement"], ["commit"], ["pull request", "PR"], ["deploy"]]
+      }
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "constraints-survive-followup",
+  "category": "preservation",
+  "description": "Platform and dependency constraints remain active through an additive follow-up.",
+  "turns": [
+    {
+      "user": "Build a file watcher that works on macOS, Linux, and Windows without adding runtime dependencies.",
+      "expect": {
+        "operations": ["ADD"],
+        "must_include": [["file watcher", "watch files"], ["macOS"], ["Linux"], ["Windows"], ["without", "no runtime dependencies", "zero runtime dependencies"]],
+        "must_exclude": []
+      }
+    },
+    {
+      "user": "Add a debounce setting, defaulting to 200 milliseconds.",
+      "expect": {
+        "operations": ["ADD"],
+        "must_include": [["file watcher", "watch files"], ["macOS"], ["Linux"], ["Windows"], ["runtime dependencies"], ["debounce"], ["200"]],
+        "must_exclude": []
+      }
+    }
+  ]
+}

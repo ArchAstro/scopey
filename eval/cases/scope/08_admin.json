@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "admin-preserves-relevant-work",
+  "category": "admin",
+  "description": "An administrative follow-up retains the work it applies to.",
+  "turns": [
+    {
+      "user": "Fix the duplicate notification bug and add a regression test.",
+      "expect": {
+        "operations": ["ADD"],
+        "must_include": [["duplicate"], ["notification"], ["regression test"]],
+        "must_exclude": []
+      }
+    },
+    {
+      "user": "Commit those changes with a concise message.",
+      "expect": {
+        "operations": ["ADMIN"],
+        "must_include": [["duplicate"], ["notification"], ["regression test"], ["commit"], ["concise", "short"]],
+        "must_exclude": [["push"], ["deploy"]]
+      }
+    }
+  ]
+}

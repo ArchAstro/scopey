@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "reference-resolves-without-resurrection",
+  "category": "reference",
+  "description": "A short referential follow-up preserves only the current task.",
+  "turns": [
+    {
+      "user": "Remove the legacy XML parser and update the migration guide.",
+      "expect": {
+        "operations": ["ADD"],
+        "must_include": [["remove"], ["XML"], ["parser"], ["migration guide"]],
+        "must_exclude": []
+      }
+    },
+    {
+      "user": "Also add a before-and-after example to that guide.",
+      "expect": {
+        "operations": ["ADD"],
+        "must_include": [["remove"], ["XML"], ["parser"], ["migration guide", "guide"], ["before-and-after", "before and after"], ["example"]],
+        "must_exclude": [["deploy"], ["analytics"]]
+      }
+    }
+  ]
+}

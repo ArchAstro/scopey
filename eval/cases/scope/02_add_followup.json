@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "add-followup-preserves-existing",
+  "category": "add",
+  "description": "A follow-up adds a constraint without losing the original task.",
+  "turns": [
+    {
+      "user": "Add a JSON export endpoint for audit events.",
+      "expect": {
+        "operations": ["ADD"],
+        "must_include": [["JSON"], ["export"], ["audit"]],
+        "must_exclude": []
+      }
+    },
+    {
+      "user": "Also make sure it streams results instead of buffering the whole response.",
+      "expect": {
+        "operations": ["ADD"],
+        "must_include": [["JSON"], ["export"], ["audit"], ["stream", "streaming"], ["buffer", "buffering"]],
+        "must_exclude": []
+      }
+    }
+  ]
+}

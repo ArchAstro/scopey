@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "id": "add-initial-concrete-task",
+  "category": "add",
+  "description": "A concrete first request becomes the active scope.",
+  "turns": [
+    {
+      "user": "Add CSV export to the reports page and cover it with an integration test.",
+      "expect": {
+        "operations": ["ADD"],
+        "must_include": [["CSV"], ["export"], ["reports"], ["integration test", "integration tests"]],
+        "must_exclude": [["deploy"], ["commit"]]
+      }
+    }
+  ]
+}

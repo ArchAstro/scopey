@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "combined-subtract-and-add",
+  "category": "combined",
+  "description": "One prompt can remove an old constraint and add a replacement.",
+  "turns": [
+    {
+      "user": "Create a scheduled cleanup job. It should run hourly and permanently delete expired previews.",
+      "expect": {
+        "operations": ["ADD"],
+        "must_include": [["cleanup"], ["hourly"], ["delete"], ["expired"], ["preview"]],
+        "must_exclude": []
+      }
+    },
+    {
+      "user": "Do not permanently delete them. Move expired previews to trash daily instead.",
+      "expect": {
+        "operations": ["ADD", "MODIFY", "SUBTRACT"],
+        "must_include": [["cleanup"], ["trash"], ["daily"], ["expired"], ["preview"]],
+        "must_exclude": [["permanently delete", "permanent deletion"], ["hourly"]]
+      }
+    }
+  ]
+}

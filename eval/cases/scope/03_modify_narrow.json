@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "modify-narrows-target",
+  "category": "modify",
+  "description": "A later turn narrows one part of an existing task.",
+  "turns": [
+    {
+      "user": "Add import support for CSV and JSON files, with tests for both formats.",
+      "expect": {
+        "operations": ["ADD"],
+        "must_include": [["CSV"], ["JSON"], ["import"], ["test", "tests"]],
+        "must_exclude": []
+      }
+    },
+    {
+      "user": "Actually, support CSV only; keep the test requirement.",
+      "expect": {
+        "operations": ["MODIFY", "SUBTRACT"],
+        "must_include": [["CSV"], ["import"], ["test", "tests"]],
+        "must_exclude": [["JSON"]]
+      }
+    }
+  ]
+}

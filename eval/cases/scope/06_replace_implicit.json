@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "replace-implicit-topic-switch",
+  "category": "replace",
+  "description": "A clear unrelated new task replaces stale work without an explicit cancel phrase.",
+  "turns": [
+    {
+      "user": "Update the billing page copy and open a pull request.",
+      "expect": {
+        "operations": ["ADD", "ADMIN"],
+        "must_include": [["billing"], ["copy"], ["pull request", "PR"]],
+        "must_exclude": []
+      }
+    },
+    {
+      "user": "Now let's diagnose the flaky websocket test. Just tell me the root cause.",
+      "expect": {
+        "operations": ["REPLACE", "QUERY"],
+        "must_include": [["websocket"], ["flaky"], ["test"], ["root cause", "diagnose"]],
+        "must_exclude": [["billing"], ["copy"], ["pull request", "PR"]]
+      }
+    }
+  ]
+}

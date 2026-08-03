@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "subtract-one-requirement",
+  "category": "subtract",
+  "description": "An explicit cancellation removes only the named requirement.",
+  "turns": [
+    {
+      "user": "Add pagination, sorting, and a total-count field to the users endpoint.",
+      "expect": {
+        "operations": ["ADD"],
+        "must_include": [["pagination"], ["sorting"], ["total-count", "total count"], ["users"]],
+        "must_exclude": []
+      }
+    },
+    {
+      "user": "Drop sorting from this; pagination and total count are still required.",
+      "expect": {
+        "operations": ["SUBTRACT"],
+        "must_include": [["pagination"], ["total-count", "total count"], ["users"]],
+        "must_exclude": [["sorting"]]
+      }
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "replace-explicit-unrelated-task",
+  "category": "replace",
+  "description": "An explicit topic replacement retires the old implementation task.",
+  "turns": [
+    {
+      "user": "Build a mascot picker and add analytics for each selection.",
+      "expect": {
+        "operations": ["ADD"],
+        "must_include": [["mascot"], ["analytics"]],
+        "must_exclude": []
+      }
+    },
+    {
+      "user": "Forget that task. Instead, investigate why first-run config is not written and report the cause; do not change code.",
+      "expect": {
+        "operations": ["REPLACE", "QUERY"],
+        "must_include": [["first-run", "first run"], ["config"], ["investigate", "cause", "report"], ["do not change", "no code changes", "read-only"]],
+        "must_exclude": [["mascot"], ["analytics"], ["implement the fix", "fix the bug"]]
+      }
+    }
+  ]
+}
