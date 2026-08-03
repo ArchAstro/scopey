@@ -7,6 +7,8 @@ and the project intends to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-08-03
+
 ### Fixed
 
 - Claude-backed summarize and judge jobs now remove inherited
