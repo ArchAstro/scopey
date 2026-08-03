@@ -284,6 +284,62 @@ class TokenAccountingTest(unittest.TestCase):
             result = RUN.paired_termination_summary(runs)
             self.assertEqual(350, result["net_tokens_saved"])
 
+    def test_markdown_includes_observed_main_usage_and_pair(self) -> None:
+        sample = RUN.Sample(
+            variant="local",
+            case_id="case",
+            category="add",
+            repetition=1,
+            turn=1,
+            expected_operations=["ADD"],
+            actual_operations=["ADD"],
+            transition_exact=True,
+            format_valid=True,
+            include_matches=1,
+            include_total=1,
+            exclude_rejections=0,
+            exclude_total=0,
+            elapsed_ms=1,
+            output="<!-- scope-transition: ADD -->\n- x",
+            error=None,
+        )
+        control = RUN.MainUsageRun(
+            variant="control",
+            arm="control",
+            case_id="case",
+            repetition=1,
+            usage=RUN.MainSessionUsage(
+                harness="codex", input_tokens=900, output_tokens=100,
+                total_tokens=1000, usage_events=1
+            ),
+        )
+        treatment = RUN.MainUsageRun(
+            variant="local",
+            arm="scopey",
+            case_id="case",
+            repetition=1,
+            usage=RUN.MainSessionUsage(
+                harness="codex", input_tokens=450, output_tokens=50,
+                total_tokens=500, usage_events=1
+            ),
+            scopey_input_tokens=100,
+            scopey_generated_tokens=50,
+        )
+        summary = RUN.summarize([sample], main_usage_runs=[control, treatment])
+        rendered = RUN.markdown_summary(
+            {
+                "run_id": "r",
+                "git": {"commit": "c"},
+                "case_count": 1,
+                "repeat": 1,
+                "early_termination_avoided_tokens": 2500,
+            },
+            summary,
+        )
+        self.assertIn("Provider-reported main-session usage", rendered)
+        self.assertIn("Observed paired early termination", rendered)
+        self.assertIn("| 1 | 1000 | 500 | 500 | 150 | 350 | 35.0% |", rendered)
+
 
 class CaseValidationTest(unittest.TestCase):
     def test_all_checked_in_cases_validate(self) -> None:

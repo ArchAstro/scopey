@@ -829,6 +829,37 @@ def markdown_summary(metadata: dict[str, Any], summary: dict[str, Any]) -> str:
             "",
         ]
     )
+    observed_variants = [
+        (name, result["tokens"]["observed_main_session"])
+        for name, result in summary["variants"].items()
+        if result["tokens"]["observed_main_session"] is not None
+    ]
+    if observed_variants:
+        lines.extend(
+            [
+                "## Provider-reported main-session usage",
+                "",
+                "Cached input and reasoning output are reported subsets and are not added twice.",
+                "",
+                "| Variant | Runs | Input | Cached input | Cache write | Output | Reasoning | Total |",
+                "|---|---:|---:|---:|---:|---:|---:|---:|",
+            ]
+        )
+        for name, observed_usage in observed_variants:
+            lines.append(
+                "| {name} | {runs} | {input} | {cached} | {cache_write} | "
+                "{output} | {reasoning} | {total} |".format(
+                    name=name,
+                    runs=observed_usage["runs"],
+                    input=observed_usage["input_tokens"],
+                    cached=observed_usage["cached_input_tokens"],
+                    cache_write=observed_usage["cache_write_input_tokens"],
+                    output=observed_usage["output_tokens"],
+                    reasoning=observed_usage["reasoning_output_tokens"],
+                    total=observed_usage["total_tokens"],
+                )
+            )
+        lines.append("")
     observed = summary["paired_early_termination"]
     if observed["complete_pairs"]:
         lines.extend(
