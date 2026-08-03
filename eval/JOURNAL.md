@@ -108,3 +108,36 @@ The two remaining transition misses had correct final scope bodies:
 This suggests transition taxonomy accuracy and active-scope accuracy should stay
 separate metrics. The marker is diagnostically useful, but the product consumes
 the scope body rather than branching on the operation label.
+
+## 2026-08-03 — First current-Claude component baseline
+
+### Command
+
+```text
+python3 eval/run.py --variant current-claude \
+  --output-dir eval/results/20260803-current-claude-r1
+```
+
+The 22-turn run used the same production prompt with Claude's `haiku` alias.
+
+### Result
+
+- transition exact match: 68.2%
+- format compliance: 95.5%
+- required-concept recall: 95.7%
+- forbidden-concept rejection: 95.5%
+- errors: 0%
+- median wall time: 7,283 ms per turn
+
+The important failure was not cosmetic. For the single-turn request “Explain
+how session locking prevents concurrent summarizers,” `claude -p` ignored the
+scope-transformation contract, inspected repository-specific behavior, and
+answered the embedded user request directly. The current production invocation
+does not disable Claude Code tools or project customizations, so it is not a
+pure model completion boundary.
+
+Other misses included invented implementation details and completion criteria,
+loss of explicit read-only constraints, and coarser transition labels. This
+result motivates a `next` configuration that both strengthens the transformation
+instruction and invokes Claude with tools, session persistence, slash commands,
+and customizations disabled.
