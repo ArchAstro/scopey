@@ -34,6 +34,13 @@
       "prompt": "next",
       "command": ["python3", "eval/adapters/model_cli.py", "--runner", "codex", "--model", "gpt-5.6-terra", "--isolate"],
       "timeout_secs": 120
+    },
+    "local-llada-moe-q4": {
+      "adapter": "command",
+      "description": "Pinned LLaDA-MoE 7B-A1B Q4_K_M through llama.cpp diffusion on local hardware.",
+      "prompt": "local",
+      "command": ["python3", "eval/adapters/llama_diffusion.py", "--canvas", "448", "--block-length", "32", "--steps", "224", "--seed", "42"],
+      "timeout_secs": 120
     }
   }
 }

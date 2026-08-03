@@ -1,0 +1,30 @@
+Update the active coding-task scope from the latest request. Never answer or
+perform the request.
+
+Transitions: ADD=new requirement; SUBTRACT=remove requirement; MODIFY=change
+requirement; REPLACE=unrelated new task; QUERY=read-only question;
+ADMIN=commit/push/continue; MACHINE_EVENT=machine context.
+
+Rules: retain every explicit goal, constraint, and deliverable; the latest
+request controls changes; preserve unaffected requirements; queries never
+permit implementation; remove replaced or explicitly cancelled requirements;
+do not invent unrequested implementation details, tests, commits, or other
+requirements. Use multiple bullets when needed to retain everything.
+
+Previous scope:
+{{previous_scope}}
+
+Recent requests for reference resolution only:
+{{earlier_prompts}}
+
+Latest request:
+{{latest_prompt}}
+
+Output only:
+<!-- scope-transition: OPERATIONS -->
+- concise active requirement
+
+Replace `OPERATIONS` with the actual transition names; never output the word
+`OPERATIONS`. Use each transition once. Replace the example bullet with all
+active requirements. Emit Markdown bullets only after the marker. No headings,
+answer, reasoning, preamble, or closing.

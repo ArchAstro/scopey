@@ -196,3 +196,54 @@ while reducing median latency by about 13%. Its two transition-label misses had
 semantically correct scope bodies, so this becomes the cloud reference point
 for local-model comparisons. The sample remains too small for a production
 decision and will be expanded before final selection.
+
+## 2026-08-03 — LLaDA-MoE local diffusion spike
+
+### Reproducible artifacts
+
+- host: Apple arm64, Metal, 128 GB unified memory
+- runtime: llama.cpp `fe2adf0e722f30f5295fdec8a0f1dc788f7498bc`
+- build target: `llama-diffusion-cli`, Release, Metal and Accelerate enabled
+- model: `LLaDA-MoE-7B-A1B-Instruct.Q4_K_M.gguf`
+- bytes: `4,520,661,184`
+- SHA-256: `a8fc1d9d43718a742b55b122cdca739a9cc2e790e38b2316b1a5b10e84489b27`
+- owned roots: `~/.scopey/eval-runtimes`, `~/.scopey/eval-models`, and
+  `~/.scopey/eval-download-cache`
+
+The model was downloaded with the Hugging Face `hf` CLI and Xet transport into
+the explicit Scopey directory. This was dramatically faster than a resumable
+plain `curl` transfer on this run and avoided the shared global model cache.
+
+### Runtime findings
+
+The experimental CLI writes generated text to stderr alongside progress logs.
+Its output canvas is `ubatch`, not `n-predict`, and block scheduling requires
+both `canvas % block_length == 0` and
+`steps % (canvas / block_length) == 0`; violating the latter aborts the process.
+The checked-in adapter validates those invariants and extracts the completion
+at Scopey's output marker.
+
+A 1,024-token canvas with the cloud-oriented prompt produced malformed output
+in 9.85 seconds. A compact model-specific prompt with a 512-token canvas and
+128 steps produced one valid answer in 4.61 seconds, but shorter inputs filled
+the remaining canvas with repetitive output and polluted subsequent scope.
+Deterministic duplicate/trailing-marker cleanup and a 448-token canvas with 224
+steps fixed formatting, but not semantics.
+
+### Adversarial slice result
+
+The three two-turn cases covered modification, explicit replacement, and a
+read-only query. Six scored turns produced:
+
+- transition exact match: 50.0%
+- format compliance after deterministic cleanup: 100%
+- required-concept recall: 78.3%
+- forbidden-concept rejection: 50.0%
+- errors: 0%
+- median wall time: 7,717 ms per turn
+
+The model repeatedly classified later turns as `ADD`, retained cancelled or
+replaced work, and omitted explicit requirements. It is slower and much less
+accurate than the preliminary Codex cloud reference. LLaDA-MoE Q4 is therefore
+eliminated as Scopey's default candidate; the adapter remains as a reproducible
+negative baseline for later runtime or quantization improvements.

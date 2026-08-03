@@ -113,6 +113,21 @@ The response contains `output` and may include runtime metrics. This protocol
 lets the runner compare cloud CLIs, local llama.cpp adapters, and frozen Scopey
 prompt variants without embedding provider-specific behavior in the scorer.
 
+### Local diffusion experiment
+
+`local-llada-moe-q4` is a reproducible experimental variant, not a recommended
+default. It expects these removable, user-owned artifacts unless paths are
+overridden with `SCOPEY_LLAMA_DIFFUSION_BIN` and `SCOPEY_LLADA_MODEL`:
+
+- runtime: `~/.scopey/eval-runtimes/llama.cpp/<pinned-revision>/`
+- model: `~/.scopey/eval-models/llada-moe-7b-a1b-instruct-q4_k_m/`
+- optional download cache: `~/.scopey/eval-download-cache/huggingface/`
+
+The adapter records the runtime revision, model filename and SHA-256, canvas,
+block length, diffusion steps, and seed. Removing those Scopey-owned model and
+runtime subdirectories fully removes the experiment; setting `SCOPEY_DISABLE=1`
+continues to disable Scopey itself without deleting artifacts.
+
 ## Reproducibility rules
 
 - Never overwrite a result directory.
@@ -123,4 +138,3 @@ prompt variants without embedding provider-specific behavior in the scorer.
 - Do not publish raw private sessions. New benchmark cases must be synthetic or
   explicitly sanitized.
 - Record every attempted configuration in `JOURNAL.md`, including failures.
-
