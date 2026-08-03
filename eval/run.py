@@ -24,6 +24,9 @@ import sys
 import time
 from typing import Any
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from transcript_usage import MainSessionUsage, usage_between  # noqa: E402
+
 
 ROOT = Path(__file__).resolve().parent.parent
 EVAL_ROOT = ROOT / "eval"
@@ -62,6 +65,99 @@ class Sample:
     scopey_generated_tokens: int = 0
     scopey_total_tokens: int = 0
     token_source: str = "utf8-bytes-div-4-proxy"
+
+
+@dataclass(frozen=True)
+class MainUsageRun:
+    variant: str
+    arm: str
+    case_id: str
+    repetition: int
+    usage: MainSessionUsage
+    scopey_input_tokens: int = 0
+    scopey_generated_tokens: int = 0
+
+
+def _manifest_int(entry: dict[str, Any], field: str, default: int = 0) -> int:
+    value = entry.get(field, default)
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise ValueError(f"main usage entry has invalid {field}: {value!r}")
+    return value
+
+
+def load_main_usage_manifest(path: Path) -> list[MainUsageRun]:
+    """Load exact provider usage for paired end-to-end scenario runs."""
+    manifest = load_json(path)
+    if manifest.get("schema_version") != 1 or not isinstance(manifest.get("runs"), list):
+        raise ValueError("main usage manifest requires schema_version 1 and a runs array")
+    runs: list[MainUsageRun] = []
+    identities: set[tuple[str, int, str]] = set()
+    for entry in manifest["runs"]:
+        if not isinstance(entry, dict):
+            raise ValueError("main usage run must be an object")
+        arm = entry.get("arm")
+        if arm not in ("control", "scopey"):
+            raise ValueError("main usage arm must be control or scopey")
+        case_id = entry.get("case_id")
+        variant = entry.get("variant")
+        if not isinstance(case_id, str) or not case_id:
+            raise ValueError("main usage run requires case_id")
+        if not isinstance(variant, str) or not variant:
+            raise ValueError("main usage run requires variant")
+        repetition = _manifest_int(entry, "repetition", 1)
+        if repetition < 1:
+            raise ValueError("main usage repetition must be at least 1")
+        identity = (case_id, repetition, arm)
+        if identity in identities:
+            raise ValueError(f"duplicate main usage arm for {identity}")
+        identities.add(identity)
+
+        transcript_value = entry.get("transcript_path")
+        session_value = entry.get("scopey_session_file")
+        if bool(transcript_value) == bool(session_value):
+            raise ValueError(
+                "main usage run requires exactly one transcript_path or scopey_session_file"
+            )
+        if session_value:
+            session_path = Path(str(session_value)).expanduser()
+            if not session_path.is_absolute():
+                session_path = path.parent / session_path
+            session = load_json(session_path)
+            transcript_value = session.get("transcript_path")
+            if not isinstance(transcript_value, str) or not transcript_value:
+                raise ValueError(f"Scopey session has no transcript_path: {session_path}")
+        transcript_path = Path(str(transcript_value)).expanduser()
+        if not transcript_path.is_absolute():
+            transcript_path = path.parent / transcript_path
+        usage = usage_between(
+            transcript_path,
+            harness=str(entry.get("harness", "auto")),
+            from_offset=_manifest_int(entry, "from_offset", 0),
+            to_offset=(
+                _manifest_int(entry, "to_offset") if entry.get("to_offset") is not None else None
+            ),
+        )
+        allow_empty = entry.get("allow_empty_usage", False)
+        if not isinstance(allow_empty, bool):
+            raise ValueError("allow_empty_usage must be boolean")
+        if usage.usage_events == 0 and not allow_empty:
+            raise ValueError(
+                f"no provider usage records in transcript range for {case_id} {arm}"
+            )
+        runs.append(
+            MainUsageRun(
+                variant=variant,
+                arm=arm,
+                case_id=case_id,
+                repetition=repetition,
+                usage=usage,
+                scopey_input_tokens=_manifest_int(entry, "scopey_input_tokens", 0),
+                scopey_generated_tokens=_manifest_int(
+                    entry, "scopey_generated_tokens", 0
+                ),
+            )
+        )
+    return runs
 
 
 class TokenCounter:
@@ -375,7 +471,110 @@ def ratio(numerator: int, denominator: int) -> float:
     return round(numerator / denominator, 6) if denominator else 1.0
 
 
-def summarize(samples: list[Sample], avoided_tokens: int = 2500) -> dict[str, Any]:
+def sum_main_usage(runs: list[MainUsageRun]) -> dict[str, Any] | None:
+    if not runs:
+        return None
+    numeric_fields = (
+        "input_tokens",
+        "uncached_input_tokens",
+        "cached_input_tokens",
+        "cache_write_input_tokens",
+        "output_tokens",
+        "reasoning_output_tokens",
+        "total_tokens",
+        "usage_events",
+    )
+    result = {field: sum(getattr(run.usage, field) for run in runs) for field in numeric_fields}
+    result.update(
+        {
+            "runs": len(runs),
+            "harnesses": sorted({run.usage.harness for run in runs}),
+            "source": "provider-reported-transcript",
+            "scopey_input_tokens": sum(run.scopey_input_tokens for run in runs),
+            "scopey_generated_tokens": sum(run.scopey_generated_tokens for run in runs),
+        }
+    )
+    result["scopey_total_tokens"] = (
+        result["scopey_input_tokens"] + result["scopey_generated_tokens"]
+    )
+    return result
+
+
+def paired_termination_summary(runs: list[MainUsageRun]) -> dict[str, Any]:
+    grouped: dict[tuple[str, int], dict[str, MainUsageRun]] = defaultdict(dict)
+    for run in runs:
+        grouped[(run.case_id, run.repetition)][run.arm] = run
+    pairs = []
+    incomplete = []
+    invalid = []
+    for (case_id, repetition), arms in sorted(grouped.items()):
+        if set(arms) != {"control", "scopey"}:
+            incomplete.append(
+                {
+                    "case_id": case_id,
+                    "repetition": repetition,
+                    "present_arms": sorted(arms),
+                }
+            )
+            continue
+        control = arms["control"]
+        treatment = arms["scopey"]
+        if control.usage.harness != treatment.usage.harness:
+            invalid.append(
+                {
+                    "case_id": case_id,
+                    "repetition": repetition,
+                    "reason": "harness-mismatch",
+                    "control_harness": control.usage.harness,
+                    "scopey_harness": treatment.usage.harness,
+                }
+            )
+            continue
+        main_avoided = control.usage.total_tokens - treatment.usage.total_tokens
+        scopey_total = treatment.scopey_input_tokens + treatment.scopey_generated_tokens
+        net = main_avoided - scopey_total
+        pairs.append(
+            {
+                "case_id": case_id,
+                "repetition": repetition,
+                "control_variant": control.variant,
+                "scopey_variant": treatment.variant,
+                "control_main_session_tokens": control.usage.total_tokens,
+                "scopey_main_session_tokens": treatment.usage.total_tokens,
+                "main_session_tokens_avoided": main_avoided,
+                "scopey_input_tokens": treatment.scopey_input_tokens,
+                "scopey_generated_tokens": treatment.scopey_generated_tokens,
+                "scopey_total_tokens": scopey_total,
+                "net_tokens_saved": net,
+                "net_reduction_rate": ratio(net, control.usage.total_tokens),
+                "status": "observed-provider-reported",
+            }
+        )
+    control_total = sum(pair["control_main_session_tokens"] for pair in pairs)
+    treatment_main = sum(pair["scopey_main_session_tokens"] for pair in pairs)
+    overhead = sum(pair["scopey_total_tokens"] for pair in pairs)
+    net = control_total - treatment_main - overhead
+    return {
+        "status": "observed-provider-reported" if pairs else "no-complete-pairs",
+        "complete_pairs": len(pairs),
+        "incomplete": incomplete,
+        "invalid": invalid,
+        "control_main_session_tokens": control_total,
+        "scopey_main_session_tokens": treatment_main,
+        "scopey_total_tokens": overhead,
+        "main_session_tokens_avoided": control_total - treatment_main,
+        "net_tokens_saved": net,
+        "net_reduction_rate": ratio(net, control_total) if control_total else None,
+        "pairs": pairs,
+    }
+
+
+def summarize(
+    samples: list[Sample],
+    avoided_tokens: int = 2500,
+    main_usage_runs: list[MainUsageRun] | None = None,
+) -> dict[str, Any]:
+    main_usage_runs = main_usage_runs or []
     variants: dict[str, Any] = {}
     for variant_name in sorted({sample.variant for sample in samples}):
         selected = [sample for sample in samples if sample.variant == variant_name]
@@ -392,6 +591,7 @@ def summarize(samples: list[Sample], avoided_tokens: int = 2500) -> dict[str, An
         scopey_generated_tokens = sum(s.scopey_generated_tokens for s in selected)
         scopey_total_tokens = scopey_input_tokens + scopey_generated_tokens
         has_scopey = any(s.token_source != "not-applicable" for s in selected)
+        observed_runs = [run for run in main_usage_runs if run.variant == variant_name]
         variants[variant_name] = {
             "samples": len(selected),
             "transition_exact_rate": ratio(sum(s.transition_exact for s in selected), len(selected)),
@@ -430,6 +630,7 @@ def summarize(samples: list[Sample], avoided_tokens: int = 2500) -> dict[str, An
                         else None
                     ),
                 },
+                "observed_main_session": sum_main_usage(observed_runs),
             },
             "scenarios": {
                 case_id: scenario_token_summary(group, repetition_count, avoided_tokens, has_scopey)
@@ -449,7 +650,10 @@ def summarize(samples: list[Sample], avoided_tokens: int = 2500) -> dict[str, An
                 for category, group in sorted(by_category.items())
             },
         }
-    return {"variants": variants}
+    return {
+        "variants": variants,
+        "paired_early_termination": paired_termination_summary(main_usage_runs),
+    }
 
 
 def scenario_token_summary(
@@ -625,6 +829,28 @@ def markdown_summary(metadata: dict[str, Any], summary: dict[str, Any]) -> str:
             "",
         ]
     )
+    observed = summary["paired_early_termination"]
+    if observed["complete_pairs"]:
+        lines.extend(
+            [
+                "## Observed paired early termination",
+                "",
+                "These counts come from provider-reported Claude/Codex transcript usage at scenario boundaries.",
+                "",
+                "| Pairs | No-Scopey main | Scopey main | Main avoided | Scopey overhead | Net saved | Reduction |",
+                "|---:|---:|---:|---:|---:|---:|---:|",
+                "| {pairs} | {control} | {treatment} | {avoided} | {overhead} | {net} | {rate:.1%} |".format(
+                    pairs=observed["complete_pairs"],
+                    control=observed["control_main_session_tokens"],
+                    treatment=observed["scopey_main_session_tokens"],
+                    avoided=observed["main_session_tokens_avoided"],
+                    overhead=observed["scopey_total_tokens"],
+                    net=observed["net_tokens_saved"],
+                    rate=observed["net_reduction_rate"],
+                ),
+                "",
+            ]
+        )
     return "\n".join(lines)
 
 
@@ -664,6 +890,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--tokenizer-bin", type=Path)
     parser.add_argument("--tokenizer-model", type=Path)
+    parser.add_argument(
+        "--main-usage-manifest",
+        type=Path,
+        help="paired Claude/Codex transcript boundaries for observed main-session usage",
+    )
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument(
         "--replay-samples",
@@ -692,6 +923,14 @@ def main() -> int:
     if manifest.get("schema_version") != 1:
         raise SystemExit("unsupported variants schema_version")
     all_variants = manifest["variants"]
+    try:
+        main_usage_runs = (
+            load_main_usage_manifest(args.main_usage_manifest)
+            if args.main_usage_manifest
+            else []
+        )
+    except (OSError, ValueError) as exc:
+        raise SystemExit(f"invalid main usage manifest: {exc}") from exc
     selected_names = args.selected_variants or ["no-scopey"]
     missing = [name for name in selected_names if name not in all_variants]
     if missing:
@@ -756,18 +995,34 @@ def main() -> int:
         "early_termination_avoided_tokens": args.early_termination_avoided_tokens,
         "selected_variants": selected_names,
         "replay_samples": str(args.replay_samples) if args.replay_samples else None,
+        "main_usage_manifest": (
+            display_path(args.main_usage_manifest) if args.main_usage_manifest else None
+        ),
         "variant_manifest": manifest,
         "inputs": {
             display_path(path): sha256_file(path)
             for path in [*case_paths, args.variants, *sorted((EVAL_ROOT / "prompts").glob("*.txt"))]
         },
     }
-    summary = summarize(samples, args.early_termination_avoided_tokens)
+    summary = summarize(samples, args.early_termination_avoided_tokens, main_usage_runs)
     (output_dir / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
     (output_dir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     with (output_dir / "samples.jsonl").open("w", encoding="utf-8") as handle:
         for sample in samples:
             handle.write(json.dumps(asdict(sample), ensure_ascii=False) + "\n")
+    if main_usage_runs:
+        (output_dir / "main_usage.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "runs": [asdict(run) for run in main_usage_runs],
+                    "paired_early_termination": summary["paired_early_termination"],
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
     rendered = markdown_summary(metadata, summary)
     (output_dir / "summary.md").write_text(rendered, encoding="utf-8")
     print(rendered)

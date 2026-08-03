@@ -164,6 +164,126 @@ class TokenAccountingTest(unittest.TestCase):
         )
         self.assertIsNone(RUN.usage_tokens({"usage": None}))
 
+    def test_observed_pair_reports_provider_main_and_scopey_overhead(self) -> None:
+        control = RUN.MainUsageRun(
+            variant="no-scopey",
+            arm="control",
+            case_id="case",
+            repetition=1,
+            usage=RUN.MainSessionUsage(
+                harness="codex",
+                input_tokens=900,
+                output_tokens=100,
+                total_tokens=1000,
+            ),
+        )
+        treatment = RUN.MainUsageRun(
+            variant="local",
+            arm="scopey",
+            case_id="case",
+            repetition=1,
+            usage=RUN.MainSessionUsage(
+                harness="codex",
+                input_tokens=450,
+                output_tokens=50,
+                total_tokens=500,
+            ),
+            scopey_input_tokens=100,
+            scopey_generated_tokens=50,
+        )
+        result = RUN.paired_termination_summary([control, treatment])
+        self.assertEqual("observed-provider-reported", result["status"])
+        self.assertEqual(500, result["main_session_tokens_avoided"])
+        self.assertEqual(150, result["scopey_total_tokens"])
+        self.assertEqual(350, result["net_tokens_saved"])
+        self.assertEqual(0.35, result["net_reduction_rate"])
+
+    def test_observed_pair_rejects_cross_harness_comparison(self) -> None:
+        control = RUN.MainUsageRun(
+            variant="no-scopey",
+            arm="control",
+            case_id="case",
+            repetition=1,
+            usage=RUN.MainSessionUsage(
+                harness="claude", total_tokens=1000, usage_events=1
+            ),
+        )
+        treatment = RUN.MainUsageRun(
+            variant="local",
+            arm="scopey",
+            case_id="case",
+            repetition=1,
+            usage=RUN.MainSessionUsage(
+                harness="codex", total_tokens=500, usage_events=1
+            ),
+        )
+        result = RUN.paired_termination_summary([control, treatment])
+        self.assertEqual("no-complete-pairs", result["status"])
+        self.assertEqual("harness-mismatch", result["invalid"][0]["reason"])
+
+    def test_main_usage_manifest_resolves_scopey_session_transcript(self) -> None:
+        def token_event(total: int) -> str:
+            return json.dumps(
+                {
+                    "payload": {
+                        "type": "token_count",
+                        "info": {
+                            "total_token_usage": {
+                                "input_tokens": total - 10,
+                                "cached_input_tokens": 20,
+                                "output_tokens": 10,
+                                "total_tokens": total,
+                            }
+                        },
+                    }
+                }
+            ) + "\n"
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            control_transcript = root / "control.jsonl"
+            treatment_transcript = root / "treatment.jsonl"
+            control_transcript.write_text(token_event(1000), encoding="utf-8")
+            treatment_transcript.write_text(token_event(500), encoding="utf-8")
+            session_file = root / "scopey-session.json"
+            session_file.write_text(
+                json.dumps({"transcript_path": str(treatment_transcript)}),
+                encoding="utf-8",
+            )
+            manifest = root / "usage.json"
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "runs": [
+                            {
+                                "variant": "no-scopey",
+                                "arm": "control",
+                                "case_id": "case",
+                                "repetition": 1,
+                                "harness": "codex",
+                                "transcript_path": str(control_transcript),
+                            },
+                            {
+                                "variant": "local",
+                                "arm": "scopey",
+                                "case_id": "case",
+                                "repetition": 1,
+                                "harness": "codex",
+                                "scopey_session_file": str(session_file),
+                                "scopey_input_tokens": 100,
+                                "scopey_generated_tokens": 50,
+                            },
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            runs = RUN.load_main_usage_manifest(manifest)
+            self.assertEqual(2, len(runs))
+            result = RUN.paired_termination_summary(runs)
+            self.assertEqual(350, result["net_tokens_saved"])
+
 
 class CaseValidationTest(unittest.TestCase):
     def test_all_checked_in_cases_validate(self) -> None:

@@ -110,6 +110,75 @@ causal claim requires the future trajectory benchmark to record the same agent
 with and without Scopey, including main-model input, output, cached, reasoning,
 and tool-result tokens.
 
+## Provider-reported main-session usage
+
+For end-to-end scenarios, do not estimate the main agent from transcript text.
+Claude and Codex already write provider usage into their JSONL transcripts, and
+Scopey's session file already stores `transcript_path`. The harness parser is
+content-blind: it reads only usage records and never emits prompts, responses,
+or tool payloads.
+
+Inspect a full transcript or an exact byte range:
+
+```sh
+python3 eval/transcript_usage.py /path/to/transcript.jsonl
+python3 eval/transcript_usage.py /path/to/transcript.jsonl \
+  --from-offset 12000 --to-offset 45000
+python3 eval/transcript_usage.py /path/to/transcript.jsonl --boundary
+```
+
+`--boundary` is the cross-platform replacement for OS-specific `stat` commands.
+Record one boundary before a scenario and another after it, then place their
+offsets in a usage manifest:
+
+```json
+{
+  "schema_version": 1,
+  "runs": [
+    {
+      "variant": "no-scopey",
+      "arm": "control",
+      "case_id": "replace-explicit-unrelated-task",
+      "repetition": 1,
+      "harness": "codex",
+      "transcript_path": "/local/control-rollout.jsonl",
+      "from_offset": 1000,
+      "to_offset": 9000
+    },
+    {
+      "variant": "local-qwen3.5-9b-q4",
+      "arm": "scopey",
+      "case_id": "replace-explicit-unrelated-task",
+      "repetition": 1,
+      "harness": "codex",
+      "scopey_session_file": "/home/user/.scopey/work/by-id/session.json",
+      "from_offset": 1200,
+      "to_offset": 6100,
+      "scopey_input_tokens": 700,
+      "scopey_generated_tokens": 120
+    }
+  ]
+}
+```
+
+Each `(case_id, repetition)` must contain exactly one `control` and one
+`scopey` arm. `transcript_path` and `scopey_session_file` are mutually
+exclusive; the latter lets the harness use Scopey's recorded path directly.
+Run the normal evaluator with `--main-usage-manifest usage.json`. Its
+`summary.json`, `summary.md`, and `main_usage.json` then report:
+
+- actual main-session input, cached input, cache-write input, output, reasoning
+  output, and total tokens;
+- actual main-session tokens avoided by Scopey;
+- separately measured Scopey analyzer input and generated tokens;
+- net tokens saved and reduction rate for every complete pair and in aggregate.
+
+Codex cached-input and reasoning counts are descriptive subsets of its reported
+input/output totals and are not added twice. Claude input is normalized as
+uncached input plus cache creation plus cache reads. Claude streaming rows are
+deduplicated by provider message ID before aggregation. Missing arms remain
+explicitly `incomplete`; they never become projected or zero-token pairs.
+
 The initial promotion gate is:
 
 - 100% output-format compliance;

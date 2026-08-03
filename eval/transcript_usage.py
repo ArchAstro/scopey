@@ -199,22 +199,40 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--harness", choices=("auto", "claude", "codex"), default="auto")
     parser.add_argument("--from-offset", type=int, default=0)
     parser.add_argument("--to-offset", type=int)
+    parser.add_argument(
+        "--boundary",
+        action="store_true",
+        help="emit the current byte offset and cumulative snapshot for a scenario boundary",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     try:
-        usage = usage_between(
-            args.transcript,
-            harness=args.harness,
-            from_offset=args.from_offset,
-            to_offset=args.to_offset,
-        )
+        if args.boundary:
+            if args.from_offset or args.to_offset is not None:
+                raise ValueError("--boundary cannot be combined with offsets")
+            offset = args.transcript.stat().st_size
+            usage = snapshot(args.transcript, args.harness, offset)
+            payload: dict[str, Any] = {
+                "schema_version": 1,
+                "transcript_path": str(args.transcript.resolve()),
+                "offset": offset,
+                "usage": asdict(usage),
+            }
+        else:
+            usage = usage_between(
+                args.transcript,
+                harness=args.harness,
+                from_offset=args.from_offset,
+                to_offset=args.to_offset,
+            )
+            payload = asdict(usage)
     except (OSError, ValueError) as exc:
         print(f"transcript usage error: {exc}", file=sys.stderr)
         return 2
-    json.dump(asdict(usage), sys.stdout, indent=2)
+    json.dump(payload, sys.stdout, indent=2)
     sys.stdout.write("\n")
     return 0
 

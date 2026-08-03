@@ -385,3 +385,27 @@ Decision: publish the break-even result, not a claim of measured end-to-end
 savings. The next agent-level benchmark must capture provider usage at every
 main-agent response and compare paired trajectories to establish causal early
 termination savings.
+
+## 2026-08-03 - Provider transcript accounting added
+
+The earlier component report correctly labeled early-termination savings as a
+projection, but incorrectly implied actual main-agent usage was unavailable.
+Scopey already records the harness transcript path, and both supported harnesses
+include provider counters:
+
+- Codex `token_count` events contain cumulative and last-call input, cached
+  input, output, reasoning output, and total tokens.
+- Claude assistant events contain input, output, cache-creation, and cache-read
+  tokens. Streaming rows repeat a message ID, so only the most complete usage
+  record for each provider message may be counted.
+
+Added `eval/transcript_usage.py` to compute content-blind cumulative snapshots
+and byte-offset deltas. Added `--main-usage-manifest` to `eval/run.py` so paired
+control/Scopey scenarios report provider-observed main usage, Scopey overhead,
+tokens avoided, net savings, and reduction. The projected sensitivity result is
+retained only when paired transcript evidence is absent.
+
+Live smoke checks succeeded against local Codex and Claude transcripts without
+printing message content. Synthetic tests cover cumulative Codex counters,
+Claude streaming deduplication, partial JSONL lines, scenario offset deltas,
+counter resets, Scopey session-path resolution, and paired savings arithmetic.
