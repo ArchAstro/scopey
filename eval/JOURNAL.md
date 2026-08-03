@@ -59,3 +59,52 @@ Scopey judgement must not enforce the older scope. The component corpus covers
 the semantic replacement; the future agent suite must also reproduce the timing
 race between a new user prompt, asynchronous summarization, and an older ready
 judgement.
+
+## 2026-08-03 — First current-Codex component baseline
+
+### Command
+
+```text
+python3 eval/run.py --variant current-codex \
+  --output-dir eval/results/20260803-current-codex-r1
+```
+
+The run evaluated 12 cases and 22 turns using `gpt-5.6-terra` with the current
+production analyzer prompt. All 22 model calls completed.
+
+### Initial result
+
+- transition exact match: 90.9%
+- format compliance: 100%
+- required-concept recall: 98.9%
+- apparent forbidden-concept rejection: 68.2%
+- median wall time: 5,697 ms per turn
+
+The low forbidden score was a scorer defect. Correct outputs retained explicit
+negative boundaries such as “sorting is out of scope,” while the naive lexical
+scorer treated any mention of “sorting” as active. A second false positive came
+from matching the acronym `PR` inside “prevents” and “provide.”
+
+### Scorer correction and replay
+
+The scorer now ignores forbidden concepts when they occur only in negative
+requirement bullets and uses word boundaries for uppercase acronyms. The runner
+can rescore a saved `samples.jsonl`, so rubric fixes do not consume more model
+calls. Replaying the exact outputs produced:
+
+- transition exact match: 90.9%
+- format compliance: 100%
+- required-concept recall: 100%
+- forbidden-concept rejection: 100%
+- errors: 0%
+- median wall time: 5,697 ms per turn
+
+The two remaining transition misses had correct final scope bodies:
+
+1. An additive streaming constraint was labeled `MODIFY` instead of `ADD`.
+2. A combined replacement of deletion behavior and schedule was labeled only
+   `MODIFY` instead of `ADD,MODIFY,SUBTRACT`.
+
+This suggests transition taxonomy accuracy and active-scope accuracy should stay
+separate metrics. The marker is diagnostically useful, but the product consumes
+the scope body rather than branching on the operation label.

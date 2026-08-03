@@ -16,7 +16,7 @@
       "user": "Before continuing, what files would this touch? Don't edit anything yet.",
       "expect": {
         "operations": ["QUERY"],
-        "must_include": [["retry"], ["backoff"], ["upload"], ["unit test", "unit tests"], ["what files", "files affected", "files would"], ["don't edit", "do not edit", "no edits", "read-only"]],
+        "must_include": [["retry"], ["backoff"], ["upload"], ["unit test", "unit tests"], ["what files", "which files", "files affected", "files would"], ["don't edit", "do not edit", "no edits", "read-only"]],
         "must_exclude": [["commit"], ["deploy"]]
       }
     }

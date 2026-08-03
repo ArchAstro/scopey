@@ -64,6 +64,19 @@ class ScoringTest(unittest.TestCase):
     def test_any_of_concepts_are_case_insensitive(self) -> None:
         self.assertTrue(RUN.matches_group("Do not edit CODE", ["no edits", "do not edit"]))
         self.assertFalse(RUN.matches_group("Implement it", ["read-only", "do not edit"]))
+        self.assertFalse(RUN.matches_group("This prevents drift", ["PR"]))
+        self.assertTrue(RUN.matches_group("Open a PR for it", ["PR"]))
+
+    def test_forbidden_concept_in_negative_boundary_is_not_active(self) -> None:
+        self.assertFalse(
+            RUN.actively_requires_group("- Sorting is out of scope.", ["sorting"])
+        )
+        self.assertFalse(
+            RUN.actively_requires_group("- Do not implement the fix.", ["implement"])
+        )
+        self.assertTrue(
+            RUN.actively_requires_group("- Add sorting to the endpoint.", ["sorting"])
+        )
 
     def test_summary_aggregates_explicit_denominators(self) -> None:
         sample = RUN.Sample(

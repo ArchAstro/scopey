@@ -120,7 +120,43 @@ def parse_operations(output: str) -> tuple[list[str], bool, str]:
 
 def matches_group(text: str, group: list[str]) -> bool:
     lowered = text.casefold()
-    return any(term.casefold() in lowered for term in group)
+    for term in group:
+        needle = term.casefold()
+        if term.isupper() and term.isalnum():
+            if re.search(rf"(?<!\w){re.escape(needle)}(?!\w)", lowered):
+                return True
+        elif needle in lowered:
+            return True
+    return False
+
+
+NEGATIVE_REQUIREMENT_MARKERS = (
+    "do not",
+    "don't",
+    "must not",
+    "no longer",
+    "out of scope",
+    "not required",
+    "without adding",
+    "remove ",
+    "drop ",
+    "exclude ",
+    "retire ",
+)
+
+
+def actively_requires_group(text: str, group: list[str]) -> bool:
+    """Return true when a concept occurs in a positive requirement bullet.
+
+    Scope output is allowed to preserve explicit negative boundaries such as
+    "sorting is out of scope". Those mentions must not count as retaining the
+    forbidden requirement.
+    """
+    matching_lines = [line.casefold() for line in text.splitlines() if matches_group(line, group)]
+    return any(
+        not any(marker in line for marker in NEGATIVE_REQUIREMENT_MARKERS)
+        for line in matching_lines
+    )
 
 
 def latest_prompt_adapter(request: dict[str, Any]) -> dict[str, Any]:
@@ -226,7 +262,9 @@ def run_variant(
                         format_valid=format_valid,
                         include_matches=sum(matches_group(scope_body, group) for group in include),
                         include_total=len(include),
-                        exclude_rejections=sum(not matches_group(scope_body, group) for group in exclude),
+                        exclude_rejections=sum(
+                            not actively_requires_group(scope_body, group) for group in exclude
+                        ),
                         exclude_total=len(exclude),
                         elapsed_ms=elapsed_ms,
                         output=output,
@@ -282,6 +320,47 @@ def summarize(samples: list[Sample]) -> dict[str, Any]:
             },
         }
     return {"variants": variants}
+
+
+def rescore_samples(raw_samples: list[dict[str, Any]], cases: list[dict[str, Any]]) -> list[Sample]:
+    expectations = {
+        (case["id"], index): (case["category"], turn["expect"])
+        for case in cases
+        for index, turn in enumerate(case["turns"], start=1)
+    }
+    rescored: list[Sample] = []
+    for raw in raw_samples:
+        key = (raw["case_id"], int(raw["turn"]))
+        if key not in expectations:
+            raise ValueError(f"recorded sample has no current case/turn: {key}")
+        category, expect = expectations[key]
+        output = str(raw.get("output", ""))
+        operations, format_valid, scope_body = parse_operations(output)
+        include = expect.get("must_include", [])
+        exclude = expect.get("must_exclude", [])
+        rescored.append(
+            Sample(
+                variant=str(raw["variant"]),
+                case_id=key[0],
+                category=category,
+                repetition=int(raw["repetition"]),
+                turn=key[1],
+                expected_operations=sorted(expect["operations"]),
+                actual_operations=sorted(operations),
+                transition_exact=set(operations) == set(expect["operations"]),
+                format_valid=format_valid,
+                include_matches=sum(matches_group(scope_body, group) for group in include),
+                include_total=len(include),
+                exclude_rejections=sum(
+                    not actively_requires_group(scope_body, group) for group in exclude
+                ),
+                exclude_total=len(exclude),
+                elapsed_ms=float(raw.get("elapsed_ms", 0.0)),
+                output=output,
+                error=raw.get("error"),
+            )
+        )
+    return rescored
 
 
 def git_metadata() -> dict[str, Any]:
@@ -363,6 +442,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--repeat", type=int, default=1)
     parser.add_argument("--summarize-prompt-chars", type=int, default=32_000)
     parser.add_argument("--output-dir", type=Path)
+    parser.add_argument(
+        "--replay-samples",
+        type=Path,
+        help="rescore an existing samples.jsonl without making model calls",
+    )
     parser.add_argument("--list", action="store_true", help="list variants and cases, then exit")
     return parser.parse_args()
 
@@ -396,18 +480,28 @@ def main() -> int:
         raise SystemExit(f"refusing to overwrite existing result directory: {output_dir}")
     output_dir.mkdir(parents=True)
 
-    samples: list[Sample] = []
-    for name in selected_names:
-        print(f"running {name} ({len(cases)} cases x {args.repeat})", file=sys.stderr)
-        samples.extend(
-            run_variant(
-                name,
-                all_variants[name],
-                cases,
-                args.repeat,
-                args.summarize_prompt_chars,
+    if args.replay_samples:
+        raw_samples = [
+            json.loads(line)
+            for line in args.replay_samples.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        samples = rescore_samples(raw_samples, cases)
+        selected_names = sorted({sample.variant for sample in samples})
+        print(f"rescoring {len(samples)} recorded samples", file=sys.stderr)
+    else:
+        samples = []
+        for name in selected_names:
+            print(f"running {name} ({len(cases)} cases x {args.repeat})", file=sys.stderr)
+            samples.extend(
+                run_variant(
+                    name,
+                    all_variants[name],
+                    cases,
+                    args.repeat,
+                    args.summarize_prompt_chars,
+                )
             )
-        )
 
     metadata = {
         "schema_version": 1,
@@ -423,6 +517,7 @@ def main() -> int:
         "repeat": args.repeat,
         "summarize_prompt_chars": args.summarize_prompt_chars,
         "selected_variants": selected_names,
+        "replay_samples": str(args.replay_samples) if args.replay_samples else None,
         "variant_manifest": manifest,
         "inputs": {
             display_path(path): sha256_file(path)
