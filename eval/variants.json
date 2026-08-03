@@ -41,6 +41,13 @@
       "prompt": "local",
       "command": ["python3", "eval/adapters/llama_diffusion.py", "--canvas", "448", "--block-length", "32", "--steps", "224", "--seed", "42"],
       "timeout_secs": 120
+    },
+    "local-qwen3-4b-q4": {
+      "adapter": "command",
+      "description": "Warm Qwen3 4B Instruct Q4_K_M through a local llama.cpp OpenAI-compatible server.",
+      "prompt": "local_json",
+      "command": ["python3", "eval/adapters/openai_local.py", "--model-id", "Qwen3-4B-Instruct-2507-Q4_K_M"],
+      "timeout_secs": 30
     }
   }
 }

@@ -247,3 +247,52 @@ replaced work, and omitted explicit requirements. It is slower and much less
 accurate than the preliminary Codex cloud reference. LLaDA-MoE Q4 is therefore
 eliminated as Scopey's default candidate; the adapter remains as a reproducible
 negative baseline for later runtime or quantization improvements.
+
+## 2026-08-03 — Dream 7B local diffusion spike
+
+Dream used the same pinned llama.cpp Metal build with
+`Dream-org_Dream-v0-Instruct-7B-Q4_K_M.gguf` (4,683,073,888 bytes, SHA-256
+`9067645ad6c85ae3daa8fa75a1831b9c77d59086d08a04d2bbbd27cb38475a7d`).
+The upstream Dream example uses epsilon `0.001`, random remasking, and 256
+steps. On the first add case:
+
+- 256 steps: complete, correct output in 59.3 seconds;
+- 32 steps: complete, correct output in 9.5 seconds;
+- 24 steps: no valid Scopey marker in 7.4 seconds;
+- 16 steps: valid output in 5.1 seconds, but it dropped the explicit
+  integration-test requirement.
+
+Dream-through-llama.cpp is eliminated: its acceptable-quality setting is nearly
+twice as slow as the cloud reference, and matching cloud latency loses required
+scope. A separate `diffuse-cpp` runtime advertises adaptive early exit and an
+inter-step cache, but currently has no integrated tokenizer, is CPU-only, has no
+release artifacts, and has a very small maintainer/user base. It may be worth a
+future research spike but increases rather than reduces Scopey's packaging risk.
+
+## 2026-08-03 — Qwen3 4B local autoregressive control
+
+To distinguish diffusion-model limitations from local inference limitations, a
+warm llama.cpp server ran `Qwen3-4B-Instruct-2507-Q4_K_M.gguf` (2,497,280,736
+bytes, SHA-256
+`2fde00ce69dd4899c70d020845e2638353015bba0fdf161b3eb965f2bca4464e`).
+The local adapter uses the server's OpenAI-compatible endpoint and strict JSON
+schema, then deterministically renders Scopey's marker and bullets.
+
+The full 22-turn corpus produced:
+
+- transition exact match: 54.5%
+- format compliance: 100%
+- required-concept recall: 95.7%
+- forbidden-concept rejection: 95.5%
+- errors: 0%
+- median wall time: 645 ms per turn
+
+It is about 7.7× faster than the Codex cloud reference and showed that a warm
+local server is viable. Four substantive misses remain: an admin follow-up lost
+the commit/message requirements, a daily cleanup replacement retained hourly,
+and a parser-removal case weakened or later omitted the removal requirement.
+The model is therefore the fast local baseline, not yet the recommended default.
+
+The ad-hoc server bound to `127.0.0.1`, but llama.cpp warned that CORS allowed
+all origins because no API key was configured. Product integration must use a
+random per-install or per-process key, keep loopback binding, and disable the UI.

@@ -1,0 +1,30 @@
+Update the active coding-task scope from the latest request. Never answer or
+perform it.
+
+Transitions: ADD=new requirement; SUBTRACT=remove; MODIFY=change;
+REPLACE=unrelated new task; QUERY=read-only question;
+ADMIN=commit/push/continue; MACHINE_EVENT=machine context.
+
+Rules: retain every explicit goal, constraint, and deliverable; preserve
+unaffected prior requirements; remove replaced or explicitly cancelled
+requirements; queries never permit implementation; do not invent any detail,
+test, criterion, technology, or action absent from the requests. Explicit
+negative boundaries such as “do not edit” are active constraints and must be
+retained. Requests to investigate, explain, answer, assess, or report apply
+QUERY even when they replace an earlier task. Include the latest query itself
+as an active read-only obligation alongside preserved related work. When an
+unrelated new request retires the prior task, use REPLACE; narrowing the same
+task uses MODIFY and SUBTRACT instead. Include every applicable transition.
+
+Previous scope:
+{{previous_scope}}
+
+Recent requests for reference resolution only:
+{{earlier_prompts}}
+
+Latest request:
+{{latest_prompt}}
+
+Return the applied transitions, complete implementation requirements, active
+read-only queries, and active negative boundaries in their separate response
+schema fields. Use empty arrays when a field has none.

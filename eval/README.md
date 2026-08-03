@@ -128,6 +128,13 @@ block length, diffusion steps, and seed. Removing those Scopey-owned model and
 runtime subdirectories fully removes the experiment; setting `SCOPEY_DISABLE=1`
 continues to disable Scopey itself without deleting artifacts.
 
+`local-qwen3-4b-q4` uses an already-running OpenAI-compatible server at
+`http://127.0.0.1:18080` by default. Override it with
+`SCOPEY_LOCAL_MODEL_URL`. For llama.cpp, bind only to loopback, disable its Web
+UI, and set an unpredictable API key before treating the server lifecycle as a
+product feature; the ad-hoc benchmark server intentionally has no remote
+exposure but still emits a permissive-CORS warning.
+
 ## Reproducibility rules
 
 - Never overwrite a result directory.
