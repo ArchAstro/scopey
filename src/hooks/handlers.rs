@@ -24,6 +24,21 @@ fn hooks_disabled() -> bool {
     false
 }
 
+fn judge_window_for_scope_epoch(
+    count: u64,
+    epoch_start: u64,
+    interval: u64,
+    meaningful_delta: u64,
+) -> Option<(u64, u64)> {
+    let interval = interval.max(1);
+    let epoch_tools = count.saturating_sub(epoch_start);
+    if meaningful_delta > 0 && epoch_tools > 0 && epoch_tools.is_multiple_of(interval) {
+        Some((count.saturating_sub(interval), count))
+    } else {
+        None
+    }
+}
+
 #[derive(Debug, Default, Deserialize)]
 pub struct HookEvent {
     /// Claude/Codex snake_case; Grok camelCase (`sessionId`); env fallbacks applied later.
@@ -442,6 +457,7 @@ pub fn user_prompt(cfg: &Config) -> Result<()> {
     if let Some(ref tp) = ev.transcript_path {
         store.set_transcript(Some(Path::new(tp)));
     }
+    let invalidated_judgements = store.begin_scope_epoch();
     store.append(SessionMessage::user_prompt(&prompt, hash_prompt(&prompt)));
     eventlog::info(
         &sid,
@@ -451,6 +467,8 @@ pub fn user_prompt(cfg: &Config) -> Result<()> {
             "harness": harness,
             "chars": prompt.len(),
             "cwd": cwd.display().to_string(),
+            "scope_epoch_start_tool_count": store.data.scope_epoch_start_tool_count,
+            "invalidated_judgements": invalidated_judgements,
         }),
     );
 
@@ -716,9 +734,9 @@ pub fn post_tool(cfg: &Config) -> Result<()> {
     }
 
     // 3) Every N *meaningful* tools: trajectory mark + background judge
-    let schedule_judge = if delta > 0 && count > 0 && count % n == 0 {
-        let from = count.saturating_sub(n);
-        let to = count;
+    let window =
+        judge_window_for_scope_epoch(count, store.data.scope_epoch_start_tool_count, n, delta);
+    let schedule_judge = if let Some((from, to)) = window {
         let off = transcript_len(store.data.transcript_path.as_ref().map(Path::new));
         store.append(SessionMessage::trajectory_mark(count, off));
         let tp = store.data.transcript_path.as_ref().map(PathBuf::from);
@@ -736,6 +754,7 @@ pub fn post_tool(cfg: &Config) -> Result<()> {
                 "delta": delta,
                 "hook_event": hook_name,
                 "harness": harness,
+                "scope_epoch_start_tool_count": store.data.scope_epoch_start_tool_count,
             }),
         );
         None
@@ -1016,5 +1035,12 @@ mod tests {
     fn harness_unknown_without_signals() {
         let ev = HookEvent::default();
         assert_eq!(harness_from_event(&ev), "unknown");
+    }
+
+    #[test]
+    fn judge_windows_restart_at_user_prompt_boundary() {
+        assert_eq!(judge_window_for_scope_epoch(45, 45, 15, 1), None);
+        assert_eq!(judge_window_for_scope_epoch(59, 45, 15, 1), None);
+        assert_eq!(judge_window_for_scope_epoch(60, 45, 15, 1), Some((45, 60)));
     }
 }

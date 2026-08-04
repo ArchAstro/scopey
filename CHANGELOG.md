@@ -7,6 +7,15 @@ and the project intends to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- New user prompts now start a fresh judgement epoch: pending verdicts from the
+  previous prompt are invalidated, judge windows restart at the current tool
+  count, and completed verdicts must still match the active prompt before they
+  can notify or inject. Scope extraction also removes unsupported planning-only,
+  no-tool, no-edit, and no-implementation boundaries instead of turning phrases
+  such as “figure out how to construct and evaluate” into a false prohibition.
+
 ## [0.1.3] - 2026-08-03
 
 ### Fixed
