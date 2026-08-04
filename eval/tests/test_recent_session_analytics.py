@@ -96,6 +96,9 @@ class RecentSessionAnalyticsTests(unittest.TestCase):
             result = ANALYTICS.analyze(args)
             self.assertEqual(1, result["summary"]["sessions"])
             self.assertEqual(1, result["summary"]["intervened_sessions"])
+            self.assertEqual(0, result["summary"]["non_intervened_sessions"])
+            self.assertEqual(0, result["summary"]["non_intervention_prevalence_all"]["rate"])
+            self.assertEqual(0, result["summary"]["non_intervention_prevalence_analyzed"]["rate"])
             self.assertEqual({"off_track": 1}, result["summary"]["verdicts"])
             row = result["sessions"][0]
             self.assertEqual(1000, row["main_usage"]["total_tokens"])

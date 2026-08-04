@@ -12,6 +12,7 @@ sys.path.insert(0, str(EVAL_ROOT))
 
 from run_seeded_drift import (  # noqa: E402
     ArmResult,
+    append_scopey_correction,
     append_transport_policy,
     continued_drift,
     file_snapshot,
@@ -19,6 +20,7 @@ from run_seeded_drift import (  # noqa: E402
     parse_codex_stream,
     render_report,
     rewrite_transcript,
+    write_codex_hooks,
 )
 from scopey_codex import parse_events, prompt_kind  # noqa: E402
 from transcript_usage import Usage, snapshot  # noqa: E402
@@ -112,6 +114,32 @@ class ReplayTests(unittest.TestCase):
             value = json.loads(path.read_text(encoding="utf-8"))
             self.assertEqual(value["payload"]["role"], "developer")
             self.assertIn("if no Scopey course correction", value["payload"]["content"][0]["text"])
+
+    def test_scopey_correction_is_developer_context(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "transcript.jsonl"
+            path.write_text("", encoding="utf-8")
+            append_scopey_correction(path, "return to the requested analysis")
+            value = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(value["payload"]["role"], "developer")
+            self.assertIn("return to", value["payload"]["content"][0]["text"])
+
+    def test_full_scopey_hook_file_has_complete_lifecycle(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            binary = root / "scopey"
+            write_codex_hooks(root, binary)
+            hooks = json.loads((root / "hooks.json").read_text(encoding="utf-8"))["hooks"]
+            self.assertEqual(
+                set(hooks),
+                {"UserPromptSubmit", "SessionStart", "PostToolUse", "Stop"},
+            )
+            commands = [
+                group["hooks"][0]["command"]
+                for groups in hooks.values()
+                for group in groups
+            ]
+            self.assertTrue(all(str(binary) in command for command in commands))
 
     def test_mutations_compare_against_branch_checkpoint(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

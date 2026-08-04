@@ -11,6 +11,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 from typing import Any
 
 
@@ -56,6 +57,7 @@ def append_usage(path: Path, payload: dict[str, Any]) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", required=True)
+    parser.add_argument("--reasoning-effort", default="medium")
     parser.add_argument("--prompt-file", type=Path, required=True)
     parser.add_argument("--timeout", type=float, default=180)
     args = parser.parse_args()
@@ -73,12 +75,14 @@ def main() -> int:
         env["SCOPEY_INTERNAL"] = "1"
         env["SCOPEY_DISABLE"] = "1"
         with tempfile.TemporaryDirectory(prefix="scopey-eval-analyzer-") as temp_dir:
+            started = time.perf_counter()
             proc = subprocess.run(
                 [
                     "codex", "exec", "--json", "--ephemeral", "--ignore-user-config",
                     "--ignore-rules", "--skip-git-repo-check",
                     "--dangerously-bypass-hook-trust", "-m", args.model,
-                    "-c", 'model_reasoning_effort="low"', "-s", "read-only", guarded,
+                    "-c", f'model_reasoning_effort="{args.reasoning_effort}"',
+                    "-s", "read-only", guarded,
                 ],
                 cwd=temp_dir,
                 env=env,
@@ -87,6 +91,7 @@ def main() -> int:
                 timeout=args.timeout,
                 check=False,
             )
+            elapsed_ms = round((time.perf_counter() - started) * 1000, 3)
         if proc.returncode:
             raise RuntimeError(proc.stderr.strip() or f"Codex exited {proc.returncode}")
         completion, usage = parse_events(proc.stdout)
@@ -97,6 +102,8 @@ def main() -> int:
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "kind": prompt_kind(prompt),
                 "model": args.model,
+                "reasoning_effort": args.reasoning_effort,
+                "elapsed_ms": elapsed_ms,
                 "usage": usage,
             },
         )

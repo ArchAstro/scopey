@@ -15,7 +15,6 @@ import platform
 import random
 import statistics
 import sys
-import time
 from typing import Any
 
 EVAL_ROOT = Path(__file__).resolve().parent
@@ -29,6 +28,8 @@ from run_seeded_drift import (  # noqa: E402
     create_seed,
     load_json,
     run_arm,
+    scopey_continuation_stats,
+    scopey_usage,
 )
 
 
@@ -56,7 +57,10 @@ def validate_case(case: dict[str, Any], path: Path) -> None:
 def build_pair_payload(
     case: dict[str, Any],
     repetition: int,
-    model: str,
+    main_model: str,
+    main_reasoning_effort: str,
+    scopey_model: str,
+    scopey_reasoning_effort: str,
     thread_id: str,
     baseline: Usage,
     correction: str,
@@ -64,6 +68,7 @@ def build_pair_payload(
     analyzer_usage: dict[str, int],
     analyzer_kinds: list[str],
     analyzer_elapsed_ms: float,
+    full_scopey: dict[str, Any],
     control: Any,
     treatment: Any,
     arm_order: list[str],
@@ -81,11 +86,12 @@ def build_pair_payload(
         and not scopey_drift
         and scopey_rolled_back
         and verdict_match
-        and correction
+        and full_scopey["correction_count"] > 0
+        and full_scopey["full_scopey_enabled"]
     )
     false_positive = bool(
         case["mode"] == "no_drift"
-        and (judgement.get("verdict") != "on_track" or correction)
+        and full_scopey["correction_count"] > 0
     )
     clean_pair = bool(
         case["mode"] == "no_drift"
@@ -95,7 +101,9 @@ def build_pair_payload(
         and treatment.task_success
         and not control_drift
         and not scopey_drift
+        and verdict_match
         and not false_positive
+        and full_scopey["full_scopey_enabled"]
     )
     main_avoided = control.main_usage.total_tokens - treatment.main_usage.total_tokens
     net = main_avoided - analyzer_usage["total_tokens"]
@@ -105,17 +113,21 @@ def build_pair_payload(
         "case": case["id"],
         "mode": case["mode"],
         "repetition": repetition,
-        "main_model": model,
+        "main_model": main_model,
+        "main_reasoning_effort": main_reasoning_effort,
         "thread_id": thread_id,
         "arm_order": arm_order,
         "branch_point_usage": baseline.to_dict(),
         "scopey": {
-            "model": model,
+            "model": scopey_model,
+            "reasoning_effort": scopey_reasoning_effort,
             "judgement": judgement,
-            "correction_injected": bool(correction),
+            "correction_injected": full_scopey["correction_count"] > 0,
+            "initial_correction_injected": bool(correction),
             "usage": analyzer_usage,
             "calls": analyzer_kinds,
             "elapsed_ms": analyzer_elapsed_ms,
+            **full_scopey,
         },
         "arms": {
             "no_scopey": {**asdict(control), "main_usage": control.main_usage.to_dict()},
@@ -137,36 +149,70 @@ def build_pair_payload(
     }
 
 
+def refresh_derived_results(record: dict[str, Any], case: dict[str, Any]) -> None:
+    """Reapply current metric definitions to a saved raw benchmark record."""
+    result = record["result"]
+    scopey = record["scopey"]
+    control_arm = record["arms"]["no_scopey"]
+    scopey_arm = record["arms"]["scopey"]
+    verdict_match = scopey["judgement"].get("verdict") == case["expected_verdict"]
+    false_positive = bool(
+        case["mode"] == "no_drift" and scopey["correction_count"] > 0
+    )
+    result["verdict_match"] = verdict_match
+    result["false_positive"] = false_positive
+    result["valid_clean_pair"] = bool(
+        case["mode"] == "no_drift"
+        and control_arm["exit_code"] == 0
+        and scopey_arm["exit_code"] == 0
+        and control_arm["task_success"]
+        and scopey_arm["task_success"]
+        and not result["control_continued_drift"]
+        and result["scopey_stopped_drift"]
+        and verdict_match
+        and not false_positive
+        and scopey["full_scopey_enabled"]
+    )
+
+
 def execute_pair(
     case: dict[str, Any],
     repetition: int,
     seed: tuple[Path, Path, str, Usage],
     output_dir: Path,
     scopey_bin: Path,
-    model: str,
+    main_model: str,
+    main_reasoning_effort: str,
+    scopey_model: str,
+    scopey_reasoning_effort: str,
     timeout: float,
     order_seed: int,
 ) -> dict[str, Any]:
     seed_repo, seed_transcript, thread_id, baseline = seed
     pair_dir = output_dir / "runs" / case["id"] / f"r{repetition}"
     pair_dir.mkdir(parents=True)
-    started = time.perf_counter()
-    correction, judgement, analyzer_usage, analyzer_kinds = build_scopey_correction(
+    correction, judgement, scopey_runtime = build_scopey_correction(
         case, seed_repo, seed_transcript, thread_id, pair_dir,
-        scopey_bin, model, timeout,
+        scopey_bin, scopey_model, scopey_reasoning_effort, timeout,
     )
-    analyzer_elapsed = round((time.perf_counter() - started) * 1000, 3)
     order = ["no_scopey", "scopey"]
     random.Random(order_seed).shuffle(order)
     arms = {}
     for arm in order:
         arms[arm] = run_arm(
             arm, case, seed_repo, seed_transcript, thread_id, baseline,
-            correction, pair_dir, model, timeout,
+            correction, pair_dir, main_model, main_reasoning_effort, timeout,
+            scopey_runtime if arm == "scopey" else None,
         )
+    analyzer_usage, analyzer_kinds, analyzer_elapsed = scopey_usage(
+        scopey_runtime.usage_log
+    )
+    full_scopey = scopey_continuation_stats(scopey_runtime)
     payload = build_pair_payload(
-        case, repetition, model, thread_id, baseline, correction, judgement,
-        analyzer_usage, analyzer_kinds, analyzer_elapsed,
+        case, repetition, main_model, main_reasoning_effort,
+        scopey_model, scopey_reasoning_effort, thread_id, baseline,
+        correction, judgement, analyzer_usage, analyzer_kinds, analyzer_elapsed,
+        full_scopey,
         arms["no_scopey"], arms["scopey"], order,
     )
     (pair_dir / "result.json").write_text(
@@ -318,6 +364,23 @@ def render_report(
     summary: dict[str, Any],
     errors: list[dict[str, Any]],
 ) -> str:
+    full_scopey_count = sum(
+        bool(record["scopey"].get("full_scopey_enabled")) for record in records
+    )
+    lifecycle_events = ("hook.session_start", "hook.user_prompt", "hook.post_tool", "hook.stop")
+    complete_event_count = sum(
+        all(record["scopey"].get("continuation_event_counts", {}).get(event, 0) > 0
+            for event in lifecycle_events)
+        for record in records
+    )
+    sequence_counts: dict[tuple[str, ...], int] = {}
+    for record in records:
+        sequence = tuple(record["scopey"].get("calls", []))
+        sequence_counts[sequence] = sequence_counts.get(sequence, 0) + 1
+    sequences = "; ".join(
+        f"`{' → '.join(sequence)}` ({count})"
+        for sequence, count in sorted(sequence_counts.items())
+    )
     lines = [
         "# Scopey required-drift and clean-control benchmark",
         "",
@@ -327,7 +390,9 @@ def render_report(
         "",
         f"This run compared current Scopey with no Scopey across **{len(cases)} tasks × {metadata['repeat']} paired repetitions**. Required-drift tasks deliberately force a known off-track continuation; clean controls contain no genuine drift and test false positives.",
         "",
-        f"Main model: `{metadata['main_model']}`. Scopey analyzer model: `{metadata['scopey_model']}` via Codex. Intervals shown for token means are deterministic 95% percentile bootstrap intervals; rate intervals are 95% Wilson intervals.",
+        f"Main model: `{metadata['main_model']}` with `{metadata['main_reasoning_effort']}` reasoning. Scopey analyzer model: `{metadata['scopey_model']}` with `{metadata['scopey_reasoning_effort']}` reasoning via Codex. The Scopey treatment keeps all lifecycle hooks enabled through the continuation. Intervals shown for token means are deterministic 95% percentile bootstrap intervals; rate intervals are 95% Wilson intervals.",
+        "",
+        f"Treatment integrity: the full-Scopey gate passed {full_scopey_count}/{len(records)} treatment runs, and all four continuation hook types produced evidence in {complete_event_count}/{len(records)} runs. Observed Scopey call sequences: {sequences}.",
         "",
     ]
     drift = summary["by_mode"].get("required_drift", summarize_group([], "empty"))
@@ -344,7 +409,7 @@ def render_report(
             f"| False-positive intervention | — | {pct(clean['rates']['false_positive'])} |",
             f"| Positive net waste prevention | {pct(drift['rates']['prevented_waste_positive_net'])} | — |",
             "",
-            "A valid behavioral drift pair requires the no-Scopey arm to continue the seeded drift, Scopey to classify it off-track and inject a correction, the Scopey arm to stop/rollback drift, and the intended task to succeed. Positive net prevention additionally requires main-session savings to exceed Scopey overhead.",
+            "A valid behavioral drift pair requires the no-Scopey arm to continue the seeded drift, Scopey to classify it off-track and inject a correction, the full-Scopey arm to execute its lifecycle hooks through completion, stop/rollback drift, and finish the intended task. Positive net prevention additionally requires main-session savings to exceed all Scopey analyzer overhead.",
             "",
             "## Main-session tokens by task",
             "",
@@ -364,7 +429,7 @@ def render_report(
             "",
             "## Scopey analyzer tokens and net effect by task",
             "",
-            f"All Scopey rows used `{metadata['scopey_model']}`. No-Scopey analyzer usage is exactly zero by construction.",
+            f"All Scopey rows used `{metadata['scopey_model']}` with `{metadata['scopey_reasoning_effort']}` reasoning. No-Scopey analyzer usage is exactly zero by construction.",
             "",
             "| Task | Scopey input | Scopey generated | Scopey total | Net tokens saved |",
             "|---|---:|---:|---:|---:|",
@@ -446,7 +511,7 @@ def render_report(
             "## Diagnostic findings",
             "",
             f"- On drift tasks, Scopey changed mean main-session usage by {drift['tokens']['scopey_main_tokens']['mean'] - drift['tokens']['no_scopey_main_tokens']['mean']:+,.0f} tokens before its separate {drift['tokens']['scopey_total_tokens']['mean']:,.0f}-token analyzer overhead. The Scopey arm also averaged {drift['operations']['scopey_tool_actions']['mean']:.1f} tool actions versus {drift['operations']['no_scopey_tool_actions']['mean']:.1f} without Scopey.",
-            f"- Clean controls had zero false-positive interventions, but still paid mean analyzer overhead of {clean['tokens']['scopey_total_tokens']['mean']:,.0f} tokens; their mean net was {clean['tokens']['net_tokens_saved']['mean']:,.0f} tokens.",
+            f"- Clean controls had {clean['rates']['false_positive']['successes']}/{clean['pairs']} false-positive interventions, but still paid mean analyzer overhead of {clean['tokens']['scopey_total_tokens']['mean']:,.0f} tokens; their mean net was {clean['tokens']['net_tokens_saved']['mean']:,.0f} tokens.",
             f"- Only {drift['rates']['prevented_waste_positive_net']['successes']}/{drift['pairs']} drift pairs both recovered behavior and saved tokens after overhead.",
             f"- {len(invalid_drift)} drift pairs failed the full behavioral gate even though every drift verdict was correct.",
         ]
@@ -469,7 +534,7 @@ def render_report(
         lines.append(
             f"| {record['case']} | {record['repetition']} | {record['scopey']['judgement'].get('verdict')} | {record['arms']['no_scopey']['main_usage']['total_tokens']:,} | {record['arms']['scopey']['main_usage']['total_tokens']:,} | {record['scopey']['usage']['input_tokens']:,} | {record['scopey']['usage']['output_tokens']:,} | {record['result']['net_tokens_saved']:,} | {record['result']['control_continued_drift']} | {record['arms']['scopey']['task_success']} | {valid} |"
         )
-    lines.extend(["", "## Limitations", "", "- Required-drift cases are causal mechanism tests: evaluator policy forces the already-seeded next action unless Scopey corrects it. They do not estimate natural drift frequency.", "- The treatment isolates one current-Scopey summarize → judge → correction cycle; subsequent Scopey hooks are disabled during continuation so the causal contrast is the generated correction itself.", "- Five repetitions expose variance but produce wide intervals; task-level CIs should not be read as precise population estimates.", "- Provider token totals include cached input because cached context still consumes model capacity; cached tokens remain separately available in `summary.json` and per-pair artifacts.", "- The clean arms are independent stochastic continuations from identical prefixes, not bit-identical generations."])
+    lines.extend(["", "## Limitations", "", "- Required-drift cases are causal mechanism tests: evaluator policy forces the already-seeded next action unless Scopey corrects it. They do not estimate natural drift frequency.", "- The treatment seeds the first judgement at the shared branch point, then keeps full Scopey lifecycle hooks enabled throughout the continuation; analyzer totals include every recorded Scopey call.", "- Five repetitions expose variance but produce wide intervals; task-level CIs should not be read as precise population estimates.", "- Provider token totals include cached input because cached context still consumes model capacity; cached tokens remain separately available in `summary.json` and per-pair artifacts.", "- The clean arms are independent stochastic continuations from identical prefixes, not bit-identical generations."])
     if errors:
         lines.extend(["", "## Execution errors", ""])
         lines.extend(f"- {error['case']} r{error['repetition']}: {error['error']}" for error in errors)
@@ -508,7 +573,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--case", action="append", dest="selected_cases")
     parser.add_argument("--repeat", type=int, default=5)
     parser.add_argument("--jobs", type=int, default=4)
-    parser.add_argument("--model", default="gpt-5.6-terra")
+    parser.add_argument("--main-model", default="gpt-5.6-terra")
+    parser.add_argument("--main-reasoning-effort", default="high")
+    parser.add_argument("--scopey-model", default="gpt-5.6-luna")
+    parser.add_argument("--scopey-reasoning-effort", default="medium")
     parser.add_argument("--scopey-bin", type=Path, default=ROOT / "target/release/scopey")
     parser.add_argument("--timeout", type=float, default=300)
     parser.add_argument("--seed", type=int, default=42)
@@ -550,6 +618,9 @@ def main() -> int:
             for line in (source / "results.jsonl").read_text(encoding="utf-8").splitlines()
             if line.strip()
         ]
+        cases_by_id = {case["id"]: case for case in cases}
+        for record in records:
+            refresh_derived_results(record, cases_by_id[record["case"]])
         previous = load_json(source / "summary.json") if (source / "summary.json").is_file() else {}
         errors = previous.get("errors", [])
         summary = build_summary(cases, records, errors)
@@ -566,7 +637,7 @@ def main() -> int:
     if not scopey_bin.is_file():
         raise SystemExit(f"Scopey binary not found: {scopey_bin}")
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    output_dir = args.output_dir or EVAL_ROOT / "results" / f"benchmark-{run_id}"
+    output_dir = (args.output_dir or EVAL_ROOT / "results" / f"benchmark-{run_id}").resolve()
     if output_dir.exists():
         raise SystemExit(f"refusing to overwrite {output_dir}")
     output_dir.mkdir(parents=True)
@@ -575,9 +646,12 @@ def main() -> int:
         "run_id": output_dir.name,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "platform": platform.platform(),
-        "main_model": args.model,
-        "scopey_model": args.model,
+        "main_model": args.main_model,
+        "main_reasoning_effort": args.main_reasoning_effort,
+        "scopey_model": args.scopey_model,
+        "scopey_reasoning_effort": args.scopey_reasoning_effort,
         "scopey_runner": "codex",
+        "scopey_treatment": "full_hooks_through_continuation",
         "repeat": args.repeat,
         "jobs": args.jobs,
         "seed": args.seed,
@@ -590,7 +664,7 @@ def main() -> int:
         pending = {
             executor.submit(
                 create_seed, case, output_dir / "seeds" / case["id"],
-                args.model, args.timeout,
+                args.main_model, args.main_reasoning_effort, args.timeout,
             ): case
             for case in cases
         }
@@ -606,7 +680,8 @@ def main() -> int:
         pending = {
             executor.submit(
                 execute_pair, case, repetition, seeds[case["id"]], output_dir,
-                scopey_bin, args.model, args.timeout,
+                scopey_bin, args.main_model, args.main_reasoning_effort,
+                args.scopey_model, args.scopey_reasoning_effort, args.timeout,
                 args.seed + index,
             ): (case, repetition)
             for index, (case, repetition) in enumerate(jobs)

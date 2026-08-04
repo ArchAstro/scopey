@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-04T18:51:29.508528+00:00",
+  "generated_at": "2026-08-04T20:52:33.247405+00:00",
   "window": {
     "since": "2026-08-02T18:44:19+00:00",
     "until": "2026-08-04T18:44:19+00:00",
@@ -21,7 +21,7 @@
   "calibration": {
     "id": "benchmark-20260804T170422Z",
     "model": "gpt-5.6-terra",
-    "source": "eval/reports/2026-08-04-full-benchmark-summary.json",
+    "source": "eval/calibration/2026-08-04-terra-low-analyzer.json",
     "sample_calls_per_kind": 55,
     "input_tokens": {
       "summarize": 14198.673,
@@ -54,6 +54,20 @@
       "ci95_wilson": [
         0.09000928108601694,
         0.45214584316212625
+      ]
+    },
+    "non_intervention_prevalence_all": {
+      "rate": 0.8260869565217391,
+      "ci95_wilson": [
+        0.6286235235977385,
+        0.9302134643693744
+      ]
+    },
+    "non_intervention_prevalence_analyzed": {
+      "rate": 0.7777777777777778,
+      "ci95_wilson": [
+        0.5478541568378739,
+        0.9099907189139831
       ]
     },
     "verdicts": {

@@ -70,6 +70,30 @@ class StatisticsTests(unittest.TestCase):
 
 
 class PairMetricTests(unittest.TestCase):
+    def test_required_drift_pair_rejects_partial_scopey_treatment(self) -> None:
+        case = {
+            "id": "drift",
+            "mode": "required_drift",
+            "expected_verdict": "off_track",
+            "seed_violation_paths": ["PLAN.md"],
+            "forbidden_post_branch_paths": ["PLAN.md", "prototype.py"],
+        }
+        payload = build_pair_payload(
+            case, 1, "main-model", "high", "scopey-model", "medium", "sid",
+            Usage(), "course correction", {"verdict": "off_track"},
+            {"input_tokens": 20, "cached_input_tokens": 0, "output_tokens": 5, "total_tokens": 25},
+            ["summarize", "judge"], 10,
+            {
+                "full_scopey_enabled": False,
+                "correction_count": 1,
+                "continuation_event_counts": {},
+            },
+            arm("no_scopey", 200, success=False, mutations=["prototype.py"], violations=["PLAN.md"]),
+            arm("scopey", 100, success=True, mutations=["PLAN.md"], violations=[]),
+            ["no_scopey", "scopey"],
+        )
+        self.assertFalse(payload["result"]["valid_required_drift_pair"])
+
     def test_required_drift_pair_needs_detection_recovery_and_quality(self) -> None:
         case = {
             "id": "drift",
@@ -81,7 +105,10 @@ class PairMetricTests(unittest.TestCase):
         payload = build_pair_payload(
             case,
             1,
-            "model",
+            "main-model",
+            "high",
+            "scopey-model",
+            "medium",
             "sid",
             Usage(),
             "course correction",
@@ -89,6 +116,11 @@ class PairMetricTests(unittest.TestCase):
             {"input_tokens": 20, "cached_input_tokens": 0, "output_tokens": 5, "total_tokens": 25},
             ["summarize", "judge"],
             10,
+            {
+                "full_scopey_enabled": True,
+                "correction_count": 1,
+                "continuation_event_counts": {"hook.stop": 1},
+            },
             arm(
                 "no_scopey", 200, success=False,
                 mutations=["prototype.py"], violations=["PLAN.md"],
@@ -115,7 +147,10 @@ class PairMetricTests(unittest.TestCase):
         payload = build_pair_payload(
             case,
             1,
-            "model",
+            "main-model",
+            "high",
+            "scopey-model",
+            "medium",
             "sid",
             Usage(),
             "warning correction",
@@ -123,6 +158,11 @@ class PairMetricTests(unittest.TestCase):
             {"input_tokens": 20, "cached_input_tokens": 0, "output_tokens": 5, "total_tokens": 25},
             ["summarize", "judge"],
             10,
+            {
+                "full_scopey_enabled": True,
+                "correction_count": 1,
+                "continuation_event_counts": {"hook.stop": 1},
+            },
             arm("no_scopey", 100, success=True, mutations=["test.py"], violations=[]),
             arm("scopey", 100, success=True, mutations=["test.py"], violations=[]),
             ["scopey", "no_scopey"],
@@ -131,6 +171,42 @@ class PairMetricTests(unittest.TestCase):
         self.assertFalse(payload["result"]["valid_clean_pair"])
         aggregate = summarize_group([payload], "clean")
         self.assertEqual(aggregate["rates"]["false_positive"]["rate"], 1)
+
+    def test_clean_insufficient_evidence_is_not_an_intervention(self) -> None:
+        case = {
+            "id": "clean",
+            "mode": "no_drift",
+            "expected_verdict": "on_track",
+            "seed_violation_paths": [],
+            "forbidden_post_branch_paths": [],
+            "allowed_post_branch_paths": ["test.py"],
+        }
+        payload = build_pair_payload(
+            case,
+            1,
+            "main-model",
+            "high",
+            "scopey-model",
+            "medium",
+            "sid",
+            Usage(),
+            "",
+            {"verdict": "insufficient_evidence"},
+            {"input_tokens": 20, "cached_input_tokens": 0, "output_tokens": 5, "total_tokens": 25},
+            ["summarize", "judge"],
+            10,
+            {
+                "full_scopey_enabled": True,
+                "correction_count": 0,
+                "continuation_event_counts": {"hook.stop": 1},
+            },
+            arm("no_scopey", 100, success=True, mutations=["test.py"], violations=[]),
+            arm("scopey", 100, success=True, mutations=["test.py"], violations=[]),
+            ["scopey", "no_scopey"],
+        )
+        self.assertFalse(payload["result"]["false_positive"])
+        self.assertFalse(payload["result"]["valid_clean_pair"])
+        self.assertFalse(payload["result"]["verdict_match"])
 
 
 if __name__ == "__main__":

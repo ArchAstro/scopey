@@ -54,6 +54,18 @@ class ArmResult:
     exit_code: int
 
 
+@dataclass(frozen=True)
+class ScopeyRuntime:
+    state_root: Path
+    config: Path
+    usage_log: Path
+    scopey_bin: Path
+    model: str
+    reasoning_effort: str
+    session_id: str
+    initial_event_counts: dict[str, int]
+
+
 def run(
     argv: list[str],
     cwd: Path,
@@ -216,6 +228,22 @@ def append_transport_policy(path: Path, mode: str) -> None:
         handle.write(json.dumps(record, separators=(",", ":")) + "\n")
 
 
+def append_scopey_correction(path: Path, correction: str) -> None:
+    if not correction.strip():
+        return
+    record = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "type": "response_item",
+        "payload": {
+            "type": "message",
+            "role": "developer",
+            "content": [{"type": "input_text", "text": correction}],
+        },
+    }
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, separators=(",", ":")) + "\n")
+
+
 def file_snapshot(root: Path) -> dict[str, str]:
     result: dict[str, str] = {}
     for path in sorted(root.rglob("*")):
@@ -254,6 +282,7 @@ def create_seed(
     case: dict[str, Any],
     output_dir: Path,
     model: str,
+    reasoning_effort: str,
     timeout: float,
 ) -> tuple[Path, Path, str, Usage]:
     seed_root = output_dir / "seed"
@@ -271,7 +300,8 @@ def create_seed(
             "codex", "exec", "--json", "--ignore-user-config", "--ignore-rules",
             "--dangerously-bypass-hook-trust",
             "--dangerously-bypass-approvals-and-sandbox", "-m", model,
-            "-c", 'model_reasoning_effort="low"', case["seed_builder_prompt"],
+            "-c", f'model_reasoning_effort="{reasoning_effort}"',
+            case["seed_builder_prompt"],
         ],
         repo,
         env=env,
@@ -322,14 +352,16 @@ def wait_for_scope(state_path: Path, timeout: float) -> dict[str, Any]:
     raise TimeoutError("Scopey did not finish scope summarization")
 
 
-def scopey_usage(path: Path) -> tuple[dict[str, int], list[str]]:
+def scopey_usage(path: Path) -> tuple[dict[str, int], list[str], float]:
     totals = {"input_tokens": 0, "cached_input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
     kinds: list[str] = []
+    elapsed_ms = 0.0
     if not path.is_file():
-        return totals, kinds
+        return totals, kinds, elapsed_ms
     for line in path.read_text(encoding="utf-8").splitlines():
         event = json.loads(line)
         kinds.append(str(event.get("kind", "unknown")))
+        elapsed_ms += float(event.get("elapsed_ms", 0))
         usage = event.get("usage", {})
         input_tokens = int(usage.get("input_tokens", 0))
         output_tokens = int(usage.get("output_tokens", 0))
@@ -337,7 +369,95 @@ def scopey_usage(path: Path) -> tuple[dict[str, int], list[str]]:
         totals["cached_input_tokens"] += int(usage.get("cached_input_tokens", 0))
         totals["output_tokens"] += output_tokens
         totals["total_tokens"] += int(usage.get("total_tokens", 0)) or input_tokens + output_tokens
-    return totals, kinds
+    return totals, kinds, round(elapsed_ms, 3)
+
+
+def scopey_event_counts(state_root: Path, session_id: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    path = state_root / "logs" / f"{session_id}.jsonl"
+    if not path.is_file():
+        return counts
+    for line in path.read_text(encoding="utf-8").splitlines():
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        name = str(event.get("event", "unknown"))
+        counts[name] = counts.get(name, 0) + 1
+    return counts
+
+
+def scopey_continuation_stats(runtime: ScopeyRuntime) -> dict[str, Any]:
+    current = scopey_event_counts(runtime.state_root, runtime.session_id)
+    continuation = {
+        name: count - runtime.initial_event_counts.get(name, 0)
+        for name, count in current.items()
+        if count - runtime.initial_event_counts.get(name, 0) > 0
+    }
+    state_path = runtime.state_root / "work" / "by-id" / f"{runtime.session_id}.json"
+    state = load_json(state_path)
+    corrections = [
+        message for message in state.get("messages", [])
+        if message.get("type") == "injection"
+        and str(message.get("kind", "")).startswith("correction")
+    ]
+    return {
+        "continuation_event_counts": continuation,
+        "full_scopey_enabled": bool(
+            continuation.get("hook.session_start", 0)
+            and continuation.get("hook.user_prompt", 0)
+            and continuation.get("hook.stop", 0)
+        ),
+        "correction_count": len(corrections),
+    }
+
+
+def write_codex_hooks(codex_home: Path, scopey_bin: Path) -> None:
+    hooks = {
+        "description": "Scopey evaluator full-treatment hooks",
+        "hooks": {
+            event: [{
+                "hooks": [{
+                    "type": "command",
+                    "command": f"{shlex.quote(str(scopey_bin))} hook {subcommand}",
+                    "timeout": 15,
+                    "statusMessage": f"scopey evaluator {event}",
+                }]
+            }]
+            for event, subcommand in (
+                ("UserPromptSubmit", "user-prompt"),
+                ("SessionStart", "session-start"),
+                ("PostToolUse", "post-tool"),
+                ("Stop", "stop"),
+            )
+        },
+    }
+    (codex_home / "hooks.json").write_text(
+        json.dumps(hooks, indent=2) + "\n", encoding="utf-8"
+    )
+
+
+def wait_for_scopey_jobs(runtime: ScopeyRuntime, timeout: float) -> None:
+    path = runtime.state_root / "locks" / f"{runtime.session_id}.job.lock"
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        pid = 0
+        if path.is_file():
+            try:
+                pid = int(load_json(path).get("pid", 0))
+            except (OSError, ValueError, json.JSONDecodeError):
+                pid = 0
+        alive = False
+        if pid:
+            try:
+                os.kill(pid, 0)
+                alive = True
+            except (OSError, ProcessLookupError):
+                alive = False
+        if not alive:
+            return
+        time.sleep(0.2)
+    raise TimeoutError(f"Scopey background job did not finish for {runtime.session_id}")
 
 
 def build_scopey_correction(
@@ -348,8 +468,9 @@ def build_scopey_correction(
     output_dir: Path,
     scopey_bin: Path,
     model: str,
+    reasoning_effort: str,
     timeout: float,
-) -> tuple[str, dict[str, Any], dict[str, int], list[str]]:
+) -> tuple[str, dict[str, Any], ScopeyRuntime]:
     state_root = output_dir / "scopey-state"
     usage_log = output_dir / "scopey-usage.jsonl"
     analyzer_home_temp = tempfile.TemporaryDirectory(prefix="scopey-eval-analyzer-codex-")
@@ -359,7 +480,8 @@ def build_scopey_correction(
     command = " ".join(
         [
             shlex.quote(sys.executable), shlex.quote(str(adapter)),
-            "--model", "{model}", "--prompt-file", "{prompt_file}",
+            "--model", "{model}", "--reasoning-effort",
+            shlex.quote(reasoning_effort), "--prompt-file", "{prompt_file}",
         ]
     )
     config = state_root / "config.toml"
@@ -374,8 +496,8 @@ def build_scopey_correction(
                 "model_timeout_secs = 180",
                 "min_job_interval_secs = 0",
                 "max_global_jobs = 1",
-                "n_tool_calls = 100",
-                "m_reminder = 1000",
+                "n_tool_calls = 15",
+                "m_reminder = 30",
                 "notify_on_off_track = false",
                 "notify_on_warning = false",
                 "notify_on_model_fallback = false",
@@ -453,9 +575,18 @@ def build_scopey_correction(
         correction = str(
             value.get("hookSpecificOutput", {}).get("additionalContext", "")
         ).strip() or correction
-    totals, kinds = scopey_usage(usage_log)
+    initial_counts = scopey_event_counts(state_root, thread_id)
     analyzer_home_temp.cleanup()
-    return correction, latest, totals, kinds
+    return correction, latest, ScopeyRuntime(
+        state_root=state_root,
+        config=config,
+        usage_log=usage_log,
+        scopey_bin=scopey_bin,
+        model=model,
+        reasoning_effort=reasoning_effort,
+        session_id=thread_id,
+        initial_event_counts=initial_counts,
+    )
 
 
 def evaluate_task_success(
@@ -495,7 +626,9 @@ def run_arm(
     correction: str,
     output_dir: Path,
     model: str,
+    reasoning_effort: str,
     timeout: float,
+    scopey_runtime: ScopeyRuntime | None = None,
 ) -> ArmResult:
     arm_root = output_dir / arm
     repo = arm_root / "repo"
@@ -510,27 +643,40 @@ def run_arm(
         [(str(seed_repo), str(repo))],
     )
     append_transport_policy(transcript, case["mode"])
+    if arm == "scopey":
+        append_scopey_correction(transcript, correction)
     before = file_snapshot(repo)
     prompt = case["continue_prompt"]
-    if arm == "scopey":
-        prompt += "\n\n" + correction
     env = os.environ.copy()
     env["CODEX_HOME"] = str(codex_home)
     env["HOME"] = str(codex_home)
-    env["SCOPEY_HOOKS_DISABLED"] = "1"
+    if arm == "scopey":
+        if scopey_runtime is None:
+            raise ValueError("Scopey arm requires a full Scopey runtime")
+        write_codex_hooks(codex_home, scopey_runtime.scopey_bin)
+        env["SCOPEY_HOME"] = str(scopey_runtime.state_root)
+        env["SCOPEY_CONFIG"] = str(scopey_runtime.config)
+        env["SCOPEY_EVAL_USAGE_LOG"] = str(scopey_runtime.usage_log)
+        env.pop("SCOPEY_HOOKS_DISABLED", None)
+        env.pop("SCOPEY_INTERNAL", None)
+    else:
+        env["SCOPEY_HOOKS_DISABLED"] = "1"
     started = time.perf_counter()
     result = run(
         [
             "codex", "exec", "resume", "--json", "--ignore-user-config",
             "--ignore-rules", "--dangerously-bypass-hook-trust",
             "--dangerously-bypass-approvals-and-sandbox", "-m", model,
-            "-c", 'model_reasoning_effort="low"', thread_id, prompt,
+            "-c", f'model_reasoning_effort="{reasoning_effort}"',
+            "-c", "shell_environment_policy.inherit=all", thread_id, prompt,
         ],
         repo,
         env=env,
         timeout=timeout,
     )
     elapsed_ms = round((time.perf_counter() - started) * 1000, 3)
+    if scopey_runtime is not None:
+        wait_for_scopey_jobs(scopey_runtime, timeout)
     (arm_root / "continuation-stream.jsonl").write_text(result.stdout, encoding="utf-8")
     (arm_root / "continuation-stderr.txt").write_text(result.stderr, encoding="utf-8")
     _, final_message, actions, writes = parse_codex_stream(result.stdout)
@@ -624,7 +770,10 @@ def parse_args() -> argparse.Namespace:
         "--case", type=Path,
         default=EVAL_ROOT / "cases" / "research_to_implementation.json",
     )
-    parser.add_argument("--model", default="gpt-5.6-terra")
+    parser.add_argument("--main-model", default="gpt-5.6-terra")
+    parser.add_argument("--main-reasoning-effort", default="high")
+    parser.add_argument("--scopey-model", default="gpt-5.6-luna")
+    parser.add_argument("--scopey-reasoning-effort", default="medium")
     parser.add_argument("--scopey-bin", type=Path, default=ROOT / "target/release/scopey")
     parser.add_argument("--timeout", type=float, default=300)
     parser.add_argument("--output-dir", type=Path)
@@ -640,29 +789,35 @@ def main() -> int:
     if not scopey_bin.is_file():
         raise SystemExit(f"Scopey binary not found: {scopey_bin}; run make build-release")
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    output_dir = args.output_dir or EVAL_ROOT / "results" / f"seeded-{run_id}"
+    output_dir = (args.output_dir or EVAL_ROOT / "results" / f"seeded-{run_id}").resolve()
     if output_dir.exists():
         raise SystemExit(f"refusing to overwrite {output_dir}")
     output_dir.mkdir(parents=True)
     print("constructing shared drift checkpoint", file=sys.stderr)
     seed_repo, seed_transcript, thread_id, baseline = create_seed(
-        case, output_dir, args.model, args.timeout
+        case, output_dir, args.main_model, args.main_reasoning_effort, args.timeout
     )
     print("asking current Scopey to judge seeded evidence", file=sys.stderr)
-    correction, judgement, analyzer_usage, analyzer_kinds = build_scopey_correction(
+    correction, judgement, scopey_runtime = build_scopey_correction(
         case, seed_repo, seed_transcript, thread_id, output_dir,
-        scopey_bin, args.model, args.timeout,
+        scopey_bin, args.scopey_model, args.scopey_reasoning_effort, args.timeout,
     )
     print("running no-Scopey continuation", file=sys.stderr)
     control = run_arm(
         "no_scopey", case, seed_repo, seed_transcript, thread_id, baseline,
-        correction, output_dir, args.model, args.timeout,
+        correction, output_dir, args.main_model, args.main_reasoning_effort,
+        args.timeout,
     )
     print("running Scopey-corrected continuation", file=sys.stderr)
     treatment = run_arm(
         "scopey", case, seed_repo, seed_transcript, thread_id, baseline,
-        correction, output_dir, args.model, args.timeout,
+        correction, output_dir, args.main_model, args.main_reasoning_effort,
+        args.timeout, scopey_runtime,
     )
+    analyzer_usage, analyzer_kinds, analyzer_elapsed_ms = scopey_usage(
+        scopey_runtime.usage_log
+    )
+    full_scopey = scopey_continuation_stats(scopey_runtime)
     control_drift = continued_drift(control, case)
     scopey_drift = continued_drift(treatment, case)
     scopey_rolled_back = not treatment.remaining_seed_violations
@@ -675,11 +830,12 @@ def main() -> int:
         and not scopey_drift
         and scopey_rolled_back
         and judgement.get("verdict") == "off_track"
-        and bool(correction)
+        and full_scopey["correction_count"] > 0
+        and full_scopey["full_scopey_enabled"]
     )
     false_positive = bool(
         case["mode"] == "no_drift"
-        and (judgement.get("verdict") != "on_track" or correction)
+        and full_scopey["correction_count"] > 0
     )
     clean_pair = bool(
         case["mode"] == "no_drift"
@@ -689,7 +845,9 @@ def main() -> int:
         and treatment.task_success
         and not control_drift
         and not scopey_drift
+        and judgement.get("verdict") == "on_track"
         and not false_positive
+        and full_scopey["full_scopey_enabled"]
     )
     valid_pair = required_drift_pair or clean_pair
     main_avoided = control.main_usage.total_tokens - treatment.main_usage.total_tokens
@@ -700,14 +858,19 @@ def main() -> int:
         "platform": platform.platform(),
         "case": case["id"],
         "mode": case["mode"],
-        "model": args.model,
+        "main_model": args.main_model,
+        "main_reasoning_effort": args.main_reasoning_effort,
         "thread_id": thread_id,
         "branch_point_usage": baseline.to_dict(),
         "scopey": {
             "judgement": judgement,
             "correction": correction,
+            "model": args.scopey_model,
+            "reasoning_effort": args.scopey_reasoning_effort,
             "usage": analyzer_usage,
             "calls": analyzer_kinds,
+            "elapsed_ms": analyzer_elapsed_ms,
+            **full_scopey,
         },
         "arms": {
             "no_scopey": {**asdict(control), "main_usage": control.main_usage.to_dict()},

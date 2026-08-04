@@ -36,7 +36,7 @@ DEFAULT_EXCLUDES = ("/eval/results/", "/private/var/folders/", "/var/folders/")
 CALIBRATION = {
     "id": "benchmark-20260804T170422Z",
     "model": "gpt-5.6-terra",
-    "source": "eval/reports/2026-08-04-full-benchmark-summary.json",
+    "source": "eval/calibration/2026-08-04-terra-low-analyzer.json",
     "sample_calls_per_kind": 55,
     "input_tokens": {"summarize": 14198.673, "judge": 14098.600},
     "input_min": {"summarize": 14039, "judge": 13894},
@@ -376,6 +376,10 @@ def summarize_sessions(sessions: list[dict[str, Any]]) -> dict[str, Any]:
     measured = [session for session in sessions if session["main_usage"]["total_tokens"] > 0]
     analyzed = [session for session in sessions if session["judge_calls"] > 0]
     intervened = [session for session in sessions if session["interventions"] > 0]
+    non_intervened = [session for session in sessions if session["interventions"] == 0]
+    analyzed_non_intervened = [
+        session for session in analyzed if session["interventions"] == 0
+    ]
     ratios = [session["overhead_ratio"] for session in measured]
     total_main = sum(session["main_usage"]["total_tokens"] for session in measured)
     total_overhead = sum(session["scopey_usage"]["total_tokens"] for session in measured)
@@ -401,7 +405,7 @@ def summarize_sessions(sessions: list[dict[str, Any]]) -> dict[str, Any]:
         "main_usage_measured_sessions": len(measured),
         "analyzed_sessions": len(analyzed),
         "intervened_sessions": len(intervened),
-        "non_intervened_sessions": len(sessions) - len(intervened),
+        "non_intervened_sessions": len(non_intervened),
         "intervention_prevalence_all": {
             "rate": len(intervened) / len(sessions) if sessions else 0.0,
             "ci95_wilson": wilson(len(intervened), len(sessions)),
@@ -409,6 +413,14 @@ def summarize_sessions(sessions: list[dict[str, Any]]) -> dict[str, Any]:
         "intervention_prevalence_analyzed": {
             "rate": len(intervened) / len(analyzed) if analyzed else 0.0,
             "ci95_wilson": wilson(len(intervened), len(analyzed)),
+        },
+        "non_intervention_prevalence_all": {
+            "rate": len(non_intervened) / len(sessions) if sessions else 0.0,
+            "ci95_wilson": wilson(len(non_intervened), len(sessions)),
+        },
+        "non_intervention_prevalence_analyzed": {
+            "rate": len(analyzed_non_intervened) / len(analyzed) if analyzed else 0.0,
+            "ci95_wilson": wilson(len(analyzed_non_intervened), len(analyzed)),
         },
         "verdicts": dict(sorted(by_verdict.items())),
         "judgement_events": judgement_events,
@@ -431,15 +443,8 @@ def summarize_sessions(sessions: list[dict[str, Any]]) -> dict[str, Any]:
         "unmeasured_scopey_jobs": unmeasured_jobs,
         "by_intervention": {
             "intervened": group_metrics(intervened),
-            "no_intervention": group_metrics(
-                [session for session in sessions if session["interventions"] == 0]
-            ),
-            "analyzed_no_intervention": group_metrics(
-                [
-                    session for session in sessions
-                    if session["judge_calls"] > 0 and session["interventions"] == 0
-                ]
-            ),
+            "no_intervention": group_metrics(non_intervened),
+            "analyzed_no_intervention": group_metrics(analyzed_non_intervened),
         },
     }
 
@@ -448,6 +453,8 @@ def render_markdown(payload: dict[str, Any]) -> str:
     summary = payload["summary"]
     all_rate = summary["intervention_prevalence_all"]
     analyzed_rate = summary["intervention_prevalence_analyzed"]
+    non_all_rate = summary["non_intervention_prevalence_all"]
+    non_analyzed_rate = summary["non_intervention_prevalence_analyzed"]
     judgement_rate = summary["intervention_rate_per_judgement"]
     ratio = summary["overhead_ratio_per_session"]
     grouped = summary["by_intervention"]
@@ -463,6 +470,8 @@ def render_markdown(payload: dict[str, Any]) -> str:
         "",
         f"- Intervention prevalence among all observed sessions: **{pct(all_rate['rate'])}** (95% Wilson CI {pct(all_rate['ci95_wilson'][0])}–{pct(all_rate['ci95_wilson'][1])}).",
         f"- Intervention prevalence among analyzed sessions: **{pct(analyzed_rate['rate'])}** (95% Wilson CI {pct(analyzed_rate['ci95_wilson'][0])}–{pct(analyzed_rate['ci95_wilson'][1])}).",
+        f"- Non-intervention prevalence among all observed sessions: **{pct(non_all_rate['rate'])}** (95% Wilson CI {pct(non_all_rate['ci95_wilson'][0])}–{pct(non_all_rate['ci95_wilson'][1])}).",
+        f"- Non-intervention prevalence among analyzed sessions: **{pct(non_analyzed_rate['rate'])}** (95% Wilson CI {pct(non_analyzed_rate['ci95_wilson'][0])}–{pct(non_analyzed_rate['ci95_wilson'][1])}).",
         f"- Correction events per completed judgement: **{summary['intervention_events']}/{summary['judgement_events']} = {pct(judgement_rate['rate'])}** (95% Wilson CI {pct(judgement_rate['ci95_wilson'][0])}–{pct(judgement_rate['ci95_wilson'][1])}).",
         f"- Scopey overhead / main-session tokens, weighted: **{pct(summary['weighted_overhead_ratio'])}** (sensitivity {pct(summary['weighted_overhead_ratio_low'])}–{pct(summary['weighted_overhead_ratio_high'])}).",
         f"- Per-session overhead ratio: mean **{pct(ratio['mean'])}**, median **{pct(ratio['median'])}**, SD {pct(ratio['stddev'])}, range {pct(ratio['min'])}–{pct(ratio['max'])}.",

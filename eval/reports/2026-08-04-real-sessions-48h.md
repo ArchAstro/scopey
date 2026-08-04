@@ -8,6 +8,8 @@ Observed **23 real sessions**; 18 reached at least one judge call and 4 received
 
 - Intervention prevalence among all observed sessions: **17.4%** (95% Wilson CI 7.0%–37.1%).
 - Intervention prevalence among analyzed sessions: **22.2%** (95% Wilson CI 9.0%–45.2%).
+- Non-intervention prevalence among all observed sessions: **82.6%** (95% Wilson CI 62.9%–93.0%).
+- Non-intervention prevalence among analyzed sessions: **77.8%** (95% Wilson CI 54.8%–91.0%).
 - Correction events per completed judgement: **19/165 = 11.5%** (95% Wilson CI 7.5%–17.3%).
 - Scopey overhead / main-session tokens, weighted: **0.6%** (sensitivity 0.4%–0.8%).
 - Per-session overhead ratio: mean **14.5%**, median **1.1%**, SD 34.5%, range 0.2%–110.8%.
