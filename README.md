@@ -252,12 +252,12 @@ implementation authorization or an inferred no-edit prohibition.
 Machine-generated task notifications are treated as context, not new user
 goals. Each transition is written to the structured
 session log as `job.summarize.transition`, including the operation and
-before/after scope hashes. Scopey removes planning-only, no-tool, no-edit, and
-similar permission boundaries that the user did not impose. Judge windows are
-bound to one user-prompt epoch; a new prompt invalidates pending verdicts and
-restarts the tool window so old work is never judged against a newer scope. If
-the summarizer model is unavailable, the fallback preserves only the latest
-request instead of replaying the full prompt history.
+before/after scope hashes. The scope-analysis prompt directs the model not to
+invent planning-only, no-tool, no-edit, or similar permission boundaries. Judge
+windows are bound to one user-prompt epoch; a new prompt invalidates pending
+verdicts and restarts the tool window so old work is never judged against a
+newer scope. If the summarizer model is unavailable, the fallback preserves
+only the latest request instead of replaying the full prompt history.
 
 ### Development checks
 
