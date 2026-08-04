@@ -1,4 +1,4 @@
-.PHONY: all build build-release install uninstall test test-all e2e-local clean fmt fmt-check lint check \
+.PHONY: all build build-release install uninstall test test-all e2e-local eval-test eval-seeded clean fmt fmt-check lint check \
 	install-pre-commit \
 	setup setup-hooks doctor verify-models release-check help
 
@@ -39,6 +39,13 @@ test-all:
 # ~21 cheap fast-model calls with both CLIs available.
 e2e-local:
 	cargo test --test e2e_local -- --ignored --nocapture
+
+# Focused causal evaluation: identical seeded Codex drift, no Scopey vs Scopey.
+eval-test:
+	python3 -m unittest discover -s eval/tests -p 'test_*.py' -v
+
+eval-seeded: build-release eval-test
+	python3 eval/run_seeded_drift.py
 
 # Clean build artifacts and local scratch (not ~/.scopey)
 clean:
@@ -94,6 +101,8 @@ help:
 	@echo "  make test             cargo test"
 	@echo "  make test-all         all targets + features"
 	@echo "  make e2e-local        real-auth e2e vs local claude/codex (spends model calls)"
+	@echo "  make eval-test        focused seeded-drift evaluator tests"
+	@echo "  make eval-seeded      run no-Scopey vs current-Scopey causal pair"
 	@echo "  make check            cargo check"
 	@echo "  make fmt              format all Rust targets"
 	@echo "  make fmt-check        verify formatting without changes"
