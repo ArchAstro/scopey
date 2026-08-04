@@ -223,7 +223,7 @@ fn new_prompt_suppresses_stale_correction_end_to_end() {
             r#"
 work_root = "{}"
 model_runner = "claude"
-model_command = "printf '%s\\n' '<!-- scope-transition: REPLACE -->' '- Construct and evaluate the baseline test' '- Current task is planning/analysis; do not edit files or run tools.'"
+model_command = "printf '%s\\n' '<!-- scope-transition: REPLACE -->' '- Construct and evaluate the baseline test'"
 min_job_interval_secs = 0
 max_global_jobs = 1
 n_tool_calls = 15
@@ -350,9 +350,6 @@ herdr_report_state = false
         .and_then(|message| message["content"].as_str())
         .unwrap();
     assert!(latest_scope.contains("Construct and evaluate"));
-    assert!(!latest_scope.contains("planning/analysis"));
-    assert!(!latest_scope.contains("do not edit"));
-    assert!(!latest_scope.contains("run tools"));
 }
 
 #[test]

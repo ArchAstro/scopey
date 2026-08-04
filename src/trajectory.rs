@@ -118,107 +118,12 @@ fn recent_prompt_context(prompts: &[String], max_chars: usize) -> String {
     clip(&numbered, max_chars)
 }
 
-fn latest_prompt_scope(latest_prompt: &str) -> String {
-    format!(
-        "- Respond only to the latest user request:\n{}",
-        clip(latest_prompt, 1500)
-    )
-}
-
 fn fallback_scope(latest_prompt: &str) -> String {
     format!(
-        "- {}\n{}",
+        "- {}\n- Respond only to the latest user request:\n{}",
         crate::session::FALLBACK_SCOPE_MARKER,
-        latest_prompt_scope(latest_prompt)
+        clip(latest_prompt, 1500)
     )
-}
-
-fn sensitive_permission_boundary(text: &str) -> bool {
-    let lower = text.to_lowercase();
-    [
-        "planning only",
-        "planning-only",
-        "analysis only",
-        "analysis-only",
-        "planning/analysis",
-        "research only",
-        "research-only",
-        "request is read-only",
-        "request is read only",
-        "task is read-only",
-        "task is read only",
-        "work is read-only",
-        "work is read only",
-        "read-only request",
-        "read only request",
-        "read-only task",
-        "read only task",
-        "no implementation",
-        "no-implementation",
-        "without implementation",
-        "do not implement",
-        "don't implement",
-        "don’t implement",
-        "rather than implement",
-        "no edits",
-        "no-edit",
-        "without editing",
-        "do not edit",
-        "don't edit",
-        "don’t edit",
-        "no tools",
-        "no-tools",
-        "no tool use",
-        "do not run tools",
-        "do not use tools",
-        "don't run tools",
-        "don't use tools",
-        "don’t run tools",
-        "don’t use tools",
-    ]
-    .iter()
-    .any(|phrase| lower.contains(phrase))
-}
-
-fn user_explicitly_restricted_actions(prompts: &[String]) -> bool {
-    prompts.iter().any(|prompt| {
-        sensitive_permission_boundary(prompt) || {
-            let lower = prompt.to_lowercase();
-            lower.contains("only explain")
-                || lower.contains("only investigate")
-                || lower.contains("just explain")
-                || lower.contains("just investigate")
-        }
-    })
-}
-
-fn remove_unsubstantiated_permission_boundaries(
-    scope: &str,
-    prompts: &[String],
-    transition: &str,
-) -> (String, usize) {
-    let relevant_prompts = if transition
-        .split(',')
-        .any(|operation| operation.trim() == "REPLACE")
-    {
-        &prompts[prompts.len().saturating_sub(1)..]
-    } else {
-        prompts
-    };
-    if user_explicitly_restricted_actions(relevant_prompts) {
-        return (scope.to_string(), 0);
-    }
-    let mut removed = 0;
-    let retained = scope
-        .lines()
-        .filter(|line| {
-            let remove = sensitive_permission_boundary(line);
-            removed += usize::from(remove);
-            !remove
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
-    (retained, removed)
 }
 
 fn extract_scope_transition(output: &str) -> (String, String) {
@@ -291,7 +196,7 @@ pub fn summarize_scope(
         cfg.summarize_prompt_chars,
     );
 
-    let (transition, raw_out) = match model::complete(cfg, &sys, &harness) {
+    let (transition, out) = match model::complete(cfg, &sys, &harness) {
         Ok(t) => {
             crate::model_health::record_success(cfg, "summarize");
             extract_scope_transition(&t)
@@ -308,13 +213,6 @@ pub fn summarize_scope(
             ("FALLBACK_LATEST".into(), fallback_scope(latest_prompt))
         }
     };
-    let (mut out, removed_permission_boundaries) =
-        remove_unsubstantiated_permission_boundaries(&raw_out, &prompts, &transition);
-    let permission_fallback = removed_permission_boundaries > 0 && out.trim().is_empty();
-    if permission_fallback {
-        out = latest_prompt_scope(latest_prompt);
-    }
-
     let hash = hash_prompt(&joined);
     let previous_scope_hash = previous_scope.as_deref().map(hash_prompt);
     let scope_hash = hash_prompt(&out);
@@ -331,8 +229,6 @@ pub fn summarize_scope(
             "previous_scope_hash": previous_scope_hash,
             "scope_hash": scope_hash,
             "fallback": transition == "FALLBACK_LATEST",
-            "removed_permission_boundaries": removed_permission_boundaries,
-            "permission_fallback": permission_fallback,
         }),
     );
     eventlog::info(
@@ -1074,65 +970,6 @@ mod tests {
         assert!(prompt.contains("quote the user's exact supporting words"));
         assert!(!prompt.contains("old mascot task"));
         assert!(prompt.contains("add analytics"));
-    }
-
-    #[test]
-    fn invented_planning_only_boundary_is_removed() {
-        let prompts =
-            vec!["Let's figure out how to construct that test and evaluate it".to_string()];
-        let scope = "- Construct the baseline test\n- Current task is planning/analysis; do not edit files or run tools.";
-        let (sanitized, removed) =
-            remove_unsubstantiated_permission_boundaries(scope, &prompts, "REPLACE");
-        assert_eq!(removed, 1);
-        assert_eq!(sanitized, "- Construct the baseline test");
-    }
-
-    #[test]
-    fn explicit_no_edit_boundary_is_preserved() {
-        let prompts = vec!["Investigate only; do not edit files".to_string()];
-        let scope = "- Investigate the failure\n- Do not edit files.";
-        let (sanitized, removed) =
-            remove_unsubstantiated_permission_boundaries(scope, &prompts, "REPLACE");
-        assert_eq!(removed, 0);
-        assert_eq!(sanitized, scope);
-    }
-
-    #[test]
-    fn permission_filter_can_detect_empty_scope_for_safe_fallback() {
-        let prompts = vec!["Construct and evaluate the test".to_string()];
-        let (sanitized, removed) = remove_unsubstantiated_permission_boundaries(
-            "- Planning only; do not edit files.",
-            &prompts,
-            "REPLACE",
-        );
-        assert_eq!(removed, 1);
-        assert!(sanitized.is_empty());
-        let fallback = latest_prompt_scope(prompts.last().unwrap());
-        assert!(fallback.contains("Construct and evaluate"));
-        assert!(!fallback.contains(crate::session::FALLBACK_SCOPE_MARKER));
-    }
-
-    #[test]
-    fn replace_does_not_reuse_old_permission_boundary() {
-        let prompts = vec![
-            "Only investigate the old failure; do not edit files".to_string(),
-            "Instead, implement the new benchmark".to_string(),
-        ];
-        let scope = "- Implement the new benchmark\n- Do not edit files.";
-        let (sanitized, removed) =
-            remove_unsubstantiated_permission_boundaries(scope, &prompts, "REPLACE");
-        assert_eq!(removed, 1);
-        assert_eq!(sanitized, "- Implement the new benchmark");
-    }
-
-    #[test]
-    fn semantic_constraints_are_not_permission_boundaries() {
-        let prompts = vec!["Refactor the query while preserving its join semantics".to_string()];
-        let scope = "- Refactor the query\n- Do not modify the join semantics.";
-        let (sanitized, removed) =
-            remove_unsubstantiated_permission_boundaries(scope, &prompts, "REPLACE");
-        assert_eq!(removed, 0);
-        assert_eq!(sanitized, scope);
     }
 
     #[test]
