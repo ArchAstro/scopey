@@ -677,3 +677,120 @@ fn walkdir_json(root: &std::path::Path) -> Vec<PathBuf> {
     }
     out
 }
+
+/// Regression: `drain_pending_jobs` used to re-open the session store while it
+/// already held the store's flock, deadlocking against itself for the full
+/// 30s `JOB_LOCK_WAIT` — long past the 15s harness hook timeout — whenever a
+/// deferred judge could not be spawned (busy guard or global job cap). The
+/// harness then killed the hook ("hook timed out after 15s") and the deferred
+/// judge window was silently dropped. Every hook that drains (user-prompt,
+/// post-tool, stop) was exposed; `stop` exercises it deterministically because
+/// no scope-epoch reset clears the pending window first. The hook must return
+/// promptly and keep the deferred judge queued.
+#[test]
+fn drain_restores_pending_judge_without_self_deadlock() {
+    let home = tempfile::tempdir().unwrap();
+    let cwd = home.path().join("proj");
+    fs::create_dir_all(&cwd).unwrap();
+    let sid = "cli-drain-deadlock";
+    let config = home.path().join("config.toml");
+    fs::write(
+        &config,
+        format!(
+            r#"
+work_root = "{}"
+model_runner = "claude"
+model_command = "printf '%s\\n' '- Investigate the drain deadlock'"
+min_job_interval_secs = 0
+max_global_jobs = 1
+n_tool_calls = 15
+m_reminder = 9999
+notify_on_off_track = false
+notify_on_warning = false
+notify_on_model_fallback = false
+herdr_report_state = false
+"#,
+            home.path().join("work").display()
+        ),
+    )
+    .unwrap();
+
+    // First prompt creates the session store; wait for its summarize to finish
+    // so the per-session job guard is free again.
+    let first = format!(
+        r#"{{"session_id":"{sid}","cwd":"{}","prompt":"start the work","hook_event_name":"UserPromptSubmit"}}"#,
+        cwd.display()
+    );
+    let first_out = run_hook_with_config(home.path(), Some(&config), "user-prompt", &first);
+    assert!(
+        first_out.status.success(),
+        "first hook stderr={}",
+        String::from_utf8_lossy(&first_out.stderr)
+    );
+    let store_path = home.path().join("work/by-id").join(format!("{sid}.json"));
+    assert!(wait_for(Duration::from_secs(10), || {
+        fs::read_to_string(&store_path)
+            .ok()
+            .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+            .and_then(|store| store["messages"].as_array().cloned())
+            .is_some_and(|messages| {
+                messages
+                    .iter()
+                    .any(|message| message["type"] == "scope_requirements")
+            })
+    }));
+
+    // Queue a deferred judge window, exactly what a throttled PostToolBatch
+    // hook leaves behind.
+    let mut store: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&store_path).unwrap()).unwrap();
+    store["pending_judge"] = serde_json::json!({ "from_count": 15, "to_count": 30 });
+    fs::write(&store_path, serde_json::to_string_pretty(&store).unwrap()).unwrap();
+
+    // Occupy the single global job slot with a live foreign job so every spawn
+    // attempt is refused and drain takes its restore path.
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let locks = home.path().join("locks");
+    fs::create_dir_all(&locks).unwrap();
+    fs::write(
+        locks.join("other-session.job.lock"),
+        serde_json::json!({
+            "pid": std::process::id(),
+            "kind": "summarize",
+            "session_id": "other-session",
+            "started_unix": now,
+            "last_acquire_unix": now,
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    let stop = format!(
+        r#"{{"session_id":"{sid}","cwd":"{}","hook_event_name":"Stop"}}"#,
+        cwd.display()
+    );
+    let started = Instant::now();
+    let stop_out = run_hook_with_config(home.path(), Some(&config), "stop", &stop);
+    let elapsed = started.elapsed();
+    assert!(
+        stop_out.status.success(),
+        "stop hook stderr={}",
+        String::from_utf8_lossy(&stop_out.stderr)
+    );
+    assert!(
+        elapsed < Duration::from_secs(10),
+        "stop hook took {elapsed:?}; it must stay far below the 15s harness hook timeout"
+    );
+
+    let store: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&store_path).unwrap()).unwrap();
+    assert_eq!(
+        store["pending_judge"]["from_count"], 15,
+        "deferred judge window was lost instead of restored: {}",
+        store["pending_judge"]
+    );
+    assert_eq!(store["pending_judge"]["to_count"], 30);
+}

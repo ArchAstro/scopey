@@ -576,7 +576,21 @@ pub fn drain_pending_jobs(cfg: &Config, session_id: &str, cwd: &Path) -> Result<
         return Ok(());
     }
 
-    let mut store = SessionStore::open_or_create(cfg, cwd, session_id, "")?;
+    // Drain runs on hook critical paths (user-prompt, post-tool, stop): wait
+    // only the short hook budget for the store and skip when busy — deferred
+    // work is retried on the next hook event.
+    let mut store = match SessionStore::open_or_create_hook(cfg, cwd, session_id, "") {
+        Ok(s) => s,
+        Err(e) => {
+            eventlog::info(
+                session_id,
+                "drain.skip",
+                format!("skip drain (session lock): {e:#}"),
+                json!({}),
+            );
+            return Ok(());
+        }
+    };
     let tp = store.data.transcript_path.as_ref().map(PathBuf::from);
 
     if store.data.summarize_pending {
@@ -623,10 +637,12 @@ pub fn drain_pending_jobs(cfg: &Config, session_id: &str, cwd: &Path) -> Result<
         ) {
             Ok(true) => {}
             Ok(false) | Err(_) => {
-                if let Ok(mut s2) = SessionStore::open_or_create(cfg, cwd, session_id, "") {
-                    s2.set_pending_judge(pj.from_count, pj.to_count);
-                    let _ = s2.persist();
-                }
+                // Restore on the store we already hold. Re-opening it here
+                // deadlocks against our own flock: flock ownership belongs to
+                // the open file description, so a second open in the same
+                // process queues behind the first.
+                store.set_pending_judge(pj.from_count, pj.to_count);
+                let _ = store.persist();
             }
         }
     }
