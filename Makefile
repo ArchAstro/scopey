@@ -1,4 +1,4 @@
-.PHONY: all build build-release install uninstall test test-all e2e-local eval-test eval-seeded eval-benchmark clean fmt fmt-check lint check \
+.PHONY: all build build-release install uninstall test test-all e2e-local eval-test eval-seeded eval-benchmark eval-recent clean fmt fmt-check lint check \
 	install-pre-commit \
 	setup setup-hooks doctor verify-models release-check help
 
@@ -49,6 +49,9 @@ eval-seeded: build-release eval-test
 
 eval-benchmark: build-release eval-test
 	python3 eval/run_benchmark.py --repeat 5
+
+eval-recent: eval-test
+	python3 eval/recent_session_analytics.py --hours 48
 
 # Clean build artifacts and local scratch (not ~/.scopey)
 clean:
@@ -107,6 +110,7 @@ help:
 	@echo "  make eval-test        focused seeded-drift evaluator tests"
 	@echo "  make eval-seeded      run no-Scopey vs current-Scopey causal pair"
 	@echo "  make eval-benchmark   run 11-task x 5-repeat Scopey/no-Scopey benchmark"
+	@echo "  make eval-recent      analyze real Scopey sessions from the last 48 hours"
 	@echo "  make check            cargo check"
 	@echo "  make fmt              format all Rust targets"
 	@echo "  make fmt-check        verify formatting without changes"

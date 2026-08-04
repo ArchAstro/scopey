@@ -1,0 +1,5126 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-04T18:51:29.508528+00:00",
+  "window": {
+    "since": "2026-08-02T18:44:19+00:00",
+    "until": "2026-08-04T18:44:19+00:00",
+    "hours": 48.0
+  },
+  "cohort": {
+    "scopey_home": "~/.scopey",
+    "exclude_cwd_patterns": [
+      "/eval/results/",
+      "/private/var/folders/",
+      "/var/folders/"
+    ],
+    "excluded": {
+      "missing_transcript": 1,
+      "no_activity_in_window": 25
+    }
+  },
+  "calibration": {
+    "id": "benchmark-20260804T170422Z",
+    "model": "gpt-5.6-terra",
+    "source": "eval/reports/2026-08-04-full-benchmark-summary.json",
+    "sample_calls_per_kind": 55,
+    "input_tokens": {
+      "summarize": 14198.673,
+      "judge": 14098.6
+    },
+    "input_min": {
+      "summarize": 14039,
+      "judge": 13894
+    },
+    "input_max": {
+      "summarize": 14277,
+      "judge": 14141
+    }
+  },
+  "summary": {
+    "sessions": 23,
+    "main_usage_measured_sessions": 23,
+    "analyzed_sessions": 18,
+    "intervened_sessions": 4,
+    "non_intervened_sessions": 19,
+    "intervention_prevalence_all": {
+      "rate": 0.17391304347826086,
+      "ci95_wilson": [
+        0.06978653563062565,
+        0.3713764764022614
+      ]
+    },
+    "intervention_prevalence_analyzed": {
+      "rate": 0.2222222222222222,
+      "ci95_wilson": [
+        0.09000928108601694,
+        0.45214584316212625
+      ]
+    },
+    "verdicts": {
+      "insufficient_evidence": 1,
+      "off_track": 12,
+      "on_track": 145,
+      "warning": 7
+    },
+    "judgement_events": 165,
+    "intervention_events": 19,
+    "intervention_rate_per_judgement": {
+      "rate": 0.11515151515151516,
+      "ci95_wilson": [
+        0.07496989055327956,
+        0.17284518468324056
+      ]
+    },
+    "main_token_components": {
+      "input_tokens": 824112071,
+      "uncached_input_tokens": 9433510,
+      "cached_input_tokens": 809968327,
+      "cache_write_input_tokens": 4710234,
+      "output_tokens": 2182422,
+      "total_tokens": 826294493
+    },
+    "main_tokens": {
+      "n": 23,
+      "mean": 35925847.52173913,
+      "median": 13568983,
+      "stddev": 57913659.14046949,
+      "min": 22453,
+      "max": 246466377
+    },
+    "scopey_tokens": {
+      "n": 23,
+      "mean": 227269.86956521738,
+      "median": 114702,
+      "stddev": 254529.22719303222,
+      "min": 23580,
+      "max": 957135
+    },
+    "overhead_ratio_per_session": {
+      "n": 23,
+      "mean": 0.14526501757130025,
+      "median": 0.010989330211879313,
+      "stddev": 0.34473784152678877,
+      "min": 0.001590023928241775,
+      "max": 1.1075345202681703
+    },
+    "weighted_overhead_ratio": 0.006326082340234113,
+    "weighted_overhead_ratio_low": 0.004434026888764464,
+    "weighted_overhead_ratio_high": 0.008378660463854744,
+    "total_main_tokens": 826294493,
+    "total_scopey_tokens": 5227207,
+    "provider_reported_scopey_calls": 12,
+    "estimated_scopey_calls": 304,
+    "unmeasured_scopey_jobs": 120,
+    "by_intervention": {
+      "intervened": {
+        "sessions": 4,
+        "main_tokens": 304758278,
+        "scopey_tokens": 2288033,
+        "weighted_overhead_ratio": 0.007507697625197895,
+        "weighted_overhead_ratio_low": 0.007387956825244957,
+        "weighted_overhead_ratio_high": 0.007565225184793832,
+        "overhead_ratio_per_session": {
+          "n": 4,
+          "mean": 0.011024931484427057,
+          "median": 0.007284104199461868,
+          "stddev": 0.008132179250358198,
+          "min": 0.0063452649514322106,
+          "max": 0.023186252587352286
+        },
+        "judge_calls": 118,
+        "interventions": 19
+      },
+      "no_intervention": {
+        "sessions": 19,
+        "main_tokens": 521536215,
+        "scopey_tokens": 2939174,
+        "weighted_overhead_ratio": 0.005635608641290615,
+        "weighted_overhead_ratio_low": 0.0027079059121522366,
+        "weighted_overhead_ratio_high": 0.008853989171202618,
+        "overhead_ratio_per_session": {
+          "n": 19,
+          "mean": 0.17352608832643146,
+          "median": 0.011040948885148316,
+          "stddev": 0.37469371730782824,
+          "min": 0.001590023928241775,
+          "max": 1.1075345202681703
+        },
+        "judge_calls": 102,
+        "interventions": 0
+      },
+      "analyzed_no_intervention": {
+        "sessions": 14,
+        "main_tokens": 520085448,
+        "scopey_tokens": 2791418,
+        "weighted_overhead_ratio": 0.0053672295787826,
+        "weighted_overhead_ratio_low": 0.0026133647946250554,
+        "weighted_overhead_ratio_high": 0.00839365342135087,
+        "overhead_ratio_per_session": {
+          "n": 14,
+          "mean": 0.011023792872676063,
+          "median": 0.009786110615339901,
+          "stddev": 0.008470844721641899,
+          "min": 0.001590023928241775,
+          "max": 0.03377806565081106
+        },
+        "judge_calls": 102,
+        "interventions": 0
+      }
+    }
+  },
+  "sessions": [
+    {
+      "session": "154dc8f8d1ba",
+      "harness": "claude",
+      "main_usage": {
+        "input_tokens": 22412,
+        "cached_input_tokens": 18822,
+        "output_tokens": 41,
+        "reasoning_output_tokens": 0,
+        "total_tokens": 22453,
+        "usage_events": 1,
+        "harness": "claude",
+        "uncached_input_tokens": 10,
+        "cache_write_input_tokens": 3580,
+        "source": "provider-reported-transcript"
+      },
+      "summarize_calls": 1,
+      "judge_calls": 0,
+      "interventions": 0,
+      "verdicts": {},
+      "scopey_models": [
+        "haiku"
+      ],
+      "scopey_usage": {
+        "total_tokens": 23580,
+        "low_tokens": 0,
+        "high_tokens": 49659,
+        "provider_reported_calls": 0,
+        "estimated_calls": 1,
+        "unmeasured_jobs": 1,
+        "calls": [
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          }
+        ]
+      },
+      "overhead_ratio": 1.0501937380305526,
+      "overhead_ratio_low": 0.0,
+      "overhead_ratio_high": 2.2116866343027657
+    },
+    {
+      "session": "171f58fb659c",
+      "harness": "codex",
+      "main_usage": {
+        "input_tokens": 10365551,
+        "cached_input_tokens": 9858816,
+        "output_tokens": 23230,
+        "reasoning_output_tokens": 7771,
+        "total_tokens": 10388781,
+        "usage_events": 100,
+        "harness": "codex",
+        "uncached_input_tokens": 506735,
+        "cache_write_input_tokens": 0,
+        "source": "provider-reported-transcript"
+      },
+      "summarize_calls": 3,
+      "judge_calls": 5,
+      "interventions": 0,
+      "verdicts": {
+        "on_track": 5
+      },
+      "scopey_models": [
+        "gpt-5.6-terra"
+      ],
+      "scopey_usage": {
+        "total_tokens": 114702,
+        "low_tokens": 112876,
+        "high_tokens": 115681,
+        "provider_reported_calls": 0,
+        "estimated_calls": 8,
+        "unmeasured_jobs": 0,
+        "calls": [
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 144,
+            "total_tokens": 14343,
+            "low_tokens": 14154,
+            "high_tokens": 14468,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 186,
+            "total_tokens": 14385,
+            "low_tokens": 14188,
+            "high_tokens": 14524,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 213,
+            "total_tokens": 14412,
+            "low_tokens": 14210,
+            "high_tokens": 14561,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 212,
+            "total_tokens": 14311,
+            "low_tokens": 14064,
+            "high_tokens": 14424,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 193,
+            "total_tokens": 14292,
+            "low_tokens": 14048,
+            "high_tokens": 14398,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 232,
+            "total_tokens": 14331,
+            "low_tokens": 14080,
+            "high_tokens": 14450,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 195,
+            "total_tokens": 14294,
+            "low_tokens": 14050,
+            "high_tokens": 14401,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 235,
+            "total_tokens": 14334,
+            "low_tokens": 14082,
+            "high_tokens": 14455,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          }
+        ]
+      },
+      "overhead_ratio": 0.011040948885148316,
+      "overhead_ratio_low": 0.010865182353925836,
+      "overhead_ratio_high": 0.011135185157912175
+    },
+    {
+      "session": "1f41ac3b4a9a",
+      "harness": "codex",
+      "main_usage": {
+        "input_tokens": 141781774,
+        "cached_input_tokens": 138598400,
+        "output_tokens": 421823,
+        "reasoning_output_tokens": 128844,
+        "total_tokens": 142203597,
+        "usage_events": 988,
+        "harness": "codex",
+        "uncached_input_tokens": 3183374,
+        "cache_write_input_tokens": 0,
+        "source": "provider-reported-transcript"
+      },
+      "summarize_calls": 19,
+      "judge_calls": 48,
+      "interventions": 14,
+      "verdicts": {
+        "off_track": 10,
+        "on_track": 34,
+        "warning": 4
+      },
+      "scopey_models": [
+        "gpt-5.6-terra"
+      ],
+      "scopey_usage": {
+        "total_tokens": 957135,
+        "low_tokens": 942141,
+        "high_tokens": 964157,
+        "provider_reported_calls": 0,
+        "estimated_calls": 67,
+        "unmeasured_jobs": 0,
+        "calls": [
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 125,
+            "total_tokens": 14324,
+            "low_tokens": 14139,
+            "high_tokens": 14443,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 220,
+            "total_tokens": 14419,
+            "low_tokens": 14215,
+            "high_tokens": 14570,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 266,
+            "total_tokens": 14465,
+            "low_tokens": 14252,
+            "high_tokens": 14632,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 252,
+            "total_tokens": 14451,
+            "low_tokens": 14240,
+            "high_tokens": 14612,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 149,
+            "total_tokens": 14348,
+            "low_tokens": 14159,
+            "high_tokens": 14476,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 122,
+            "total_tokens": 14321,
+            "low_tokens": 14137,
+            "high_tokens": 14439,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 126,
+            "total_tokens": 14325,
+            "low_tokens": 14140,
+            "high_tokens": 14445,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 131,
+            "total_tokens": 14330,
+            "low_tokens": 14144,
+            "high_tokens": 14452,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 57,
+            "total_tokens": 14256,
+            "low_tokens": 14084,
+            "high_tokens": 14352,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 87,
+            "total_tokens": 14286,
+            "low_tokens": 14109,
+            "high_tokens": 14393,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 148,
+            "total_tokens": 14347,
+            "low_tokens": 14157,
+            "high_tokens": 14474,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 133,
+            "total_tokens": 14332,
+            "low_tokens": 14145,
+            "high_tokens": 14454,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 89,
+            "total_tokens": 14288,
+            "low_tokens": 14111,
+            "high_tokens": 14396,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 82,
+            "total_tokens": 14281,
+            "low_tokens": 14105,
+            "high_tokens": 14387,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 180,
+            "total_tokens": 14379,
+            "low_tokens": 14183,
+            "high_tokens": 14517,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 123,
+            "total_tokens": 14322,
+            "low_tokens": 14138,
+            "high_tokens": 14441,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 281,
+            "total_tokens": 14480,
+            "low_tokens": 14264,
+            "high_tokens": 14652,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 270,
+            "total_tokens": 14469,
+            "low_tokens": 14255,
+            "high_tokens": 14637,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 135,
+            "total_tokens": 14334,
+            "low_tokens": 14147,
+            "high_tokens": 14457,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 228,
+            "total_tokens": 14327,
+            "low_tokens": 14077,
+            "high_tokens": 14445,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 259,
+            "total_tokens": 14358,
+            "low_tokens": 14102,
+            "high_tokens": 14487,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 279,
+            "total_tokens": 14378,
+            "low_tokens": 14117,
+            "high_tokens": 14513,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 237,
+            "total_tokens": 14336,
+            "low_tokens": 14084,
+            "high_tokens": 14457,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 246,
+            "total_tokens": 14345,
+            "low_tokens": 14091,
+            "high_tokens": 14469,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 253,
+            "total_tokens": 14352,
+            "low_tokens": 14096,
+            "high_tokens": 14478,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 257,
+            "total_tokens": 14356,
+            "low_tokens": 14100,
+            "high_tokens": 14483,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 237,
+            "total_tokens": 14336,
+            "low_tokens": 14084,
+            "high_tokens": 14457,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 215,
+            "total_tokens": 14314,
+            "low_tokens": 14066,
+            "high_tokens": 14427,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 213,
+            "total_tokens": 14312,
+            "low_tokens": 14065,
+            "high_tokens": 14425,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 204,
+            "total_tokens": 14303,
+            "low_tokens": 14057,
+            "high_tokens": 14413,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 199,
+            "total_tokens": 14298,
+            "low_tokens": 14053,
+            "high_tokens": 14406,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 192,
+            "total_tokens": 14291,
+            "low_tokens": 14048,
+            "high_tokens": 14397,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 203,
+            "total_tokens": 14302,
+            "low_tokens": 14056,
+            "high_tokens": 14411,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 236,
+            "total_tokens": 14335,
+            "low_tokens": 14083,
+            "high_tokens": 14455,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 199,
+            "total_tokens": 14298,
+            "low_tokens": 14053,
+            "high_tokens": 14406,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 198,
+            "total_tokens": 14297,
+            "low_tokens": 14053,
+            "high_tokens": 14405,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 233,
+            "total_tokens": 14332,
+            "low_tokens": 14080,
+            "high_tokens": 14451,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 230,
+            "total_tokens": 14329,
+            "low_tokens": 14078,
+            "high_tokens": 14447,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 218,
+            "total_tokens": 14317,
+            "low_tokens": 14068,
+            "high_tokens": 14431,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 229,
+            "total_tokens": 14328,
+            "low_tokens": 14077,
+            "high_tokens": 14446,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 243,
+            "total_tokens": 14342,
+            "low_tokens": 14089,
+            "high_tokens": 14465,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 221,
+            "total_tokens": 14320,
+            "low_tokens": 14071,
+            "high_tokens": 14436,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 241,
+            "total_tokens": 14340,
+            "low_tokens": 14087,
+            "high_tokens": 14462,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 221,
+            "total_tokens": 14320,
+            "low_tokens": 14071,
+            "high_tokens": 14435,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 233,
+            "total_tokens": 14332,
+            "low_tokens": 14081,
+            "high_tokens": 14452,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 195,
+            "total_tokens": 14294,
+            "low_tokens": 14050,
+            "high_tokens": 14401,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 176,
+            "total_tokens": 14275,
+            "low_tokens": 14035,
+            "high_tokens": 14375,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 235,
+            "total_tokens": 14334,
+            "low_tokens": 14082,
+            "high_tokens": 14455,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 217,
+            "total_tokens": 14316,
+            "low_tokens": 14067,
+            "high_tokens": 14430,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 191,
+            "total_tokens": 14290,
+            "low_tokens": 14047,
+            "high_tokens": 14395,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 209,
+            "total_tokens": 14308,
+            "low_tokens": 14061,
+            "high_tokens": 14419,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 238,
+            "total_tokens": 14337,
+            "low_tokens": 14085,
+            "high_tokens": 14458,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 241,
+            "total_tokens": 14340,
+            "low_tokens": 14087,
+            "high_tokens": 14462,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 0,
+            "total_tokens": 14099,
+            "low_tokens": 13894,
+            "high_tokens": 14141,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 0,
+            "total_tokens": 14099,
+            "low_tokens": 13894,
+            "high_tokens": 14141,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 0,
+            "total_tokens": 14099,
+            "low_tokens": 13894,
+            "high_tokens": 14141,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 0,
+            "total_tokens": 14099,
+            "low_tokens": 13894,
+            "high_tokens": 14141,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 0,
+            "total_tokens": 14099,
+            "low_tokens": 13894,
+            "high_tokens": 14141,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 0,
+            "total_tokens": 14099,
+            "low_tokens": 13894,
+            "high_tokens": 14141,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 0,
+            "total_tokens": 14099,
+            "low_tokens": 13894,
+            "high_tokens": 14141,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 0,
+            "total_tokens": 14099,
+            "low_tokens": 13894,
+            "high_tokens": 14141,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 0,
+            "total_tokens": 14099,
+            "low_tokens": 13894,
+            "high_tokens": 14141,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 0,
+            "total_tokens": 14099,
+            "low_tokens": 13894,
+            "high_tokens": 14141,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 0,
+            "total_tokens": 14099,
+            "low_tokens": 13894,
+            "high_tokens": 14141,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 0,
+            "total_tokens": 14099,
+            "low_tokens": 13894,
+            "high_tokens": 14141,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 0,
+            "total_tokens": 14099,
+            "low_tokens": 13894,
+            "high_tokens": 14141,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 0,
+            "total_tokens": 14099,
+            "low_tokens": 13894,
+            "high_tokens": 14141,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          }
+        ]
+      },
+      "overhead_ratio": 0.006730736916591498,
+      "overhead_ratio_low": 0.0066252965457688105,
+      "overhead_ratio_high": 0.006780116820814314
+    },
+    {
+      "session": "3395c071f08c",
+      "harness": "claude",
+      "main_usage": {
+        "input_tokens": 29446152,
+        "cached_input_tokens": 28771286,
+        "output_tokens": 218322,
+        "reasoning_output_tokens": 0,
+        "total_tokens": 29664474,
+        "usage_events": 131,
+        "harness": "claude",
+        "uncached_input_tokens": 246,
+        "cache_write_input_tokens": 674620,
+        "source": "provider-reported-transcript"
+      },
+      "summarize_calls": 14,
+      "judge_calls": 5,
+      "interventions": 0,
+      "verdicts": {},
+      "scopey_models": [
+        "claude-haiku-4-5-20251001",
+        "haiku"
+      ],
+      "scopey_usage": {
+        "total_tokens": 337305,
+        "low_tokens": 195825,
+        "high_tokens": 493779,
+        "provider_reported_calls": 8,
+        "estimated_calls": 6,
+        "unmeasured_jobs": 11,
+        "calls": [
+          {
+            "kind": "summarize",
+            "model": "claude-haiku-4-5-20251001",
+            "input_tokens": 23205,
+            "generated_tokens": 2461,
+            "total_tokens": 25666,
+            "low_tokens": 25666,
+            "high_tokens": 25666,
+            "source": "provider-reported",
+            "method": "matched-claude-transcript"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "claude-haiku-4-5-20251001",
+            "input_tokens": 23287,
+            "generated_tokens": 716,
+            "total_tokens": 24003,
+            "low_tokens": 24003,
+            "high_tokens": 24003,
+            "source": "provider-reported",
+            "method": "matched-claude-transcript"
+          },
+          {
+            "kind": "summarize",
+            "model": "claude-haiku-4-5-20251001",
+            "input_tokens": 23066,
+            "generated_tokens": 1969,
+            "total_tokens": 25035,
+            "low_tokens": 25035,
+            "high_tokens": 25035,
+            "source": "provider-reported",
+            "method": "matched-claude-transcript"
+          },
+          {
+            "kind": "summarize",
+            "model": "claude-haiku-4-5-20251001",
+            "input_tokens": 23082,
+            "generated_tokens": 788,
+            "total_tokens": 23870,
+            "low_tokens": 23870,
+            "high_tokens": 23870,
+            "source": "provider-reported",
+            "method": "matched-claude-transcript"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "claude-haiku-4-5-20251001",
+            "input_tokens": 22993,
+            "generated_tokens": 1064,
+            "total_tokens": 24057,
+            "low_tokens": 24057,
+            "high_tokens": 24057,
+            "source": "provider-reported",
+            "method": "matched-claude-transcript"
+          },
+          {
+            "kind": "summarize",
+            "model": "claude-haiku-4-5-20251001",
+            "input_tokens": 23033,
+            "generated_tokens": 1871,
+            "total_tokens": 24904,
+            "low_tokens": 24904,
+            "high_tokens": 24904,
+            "source": "provider-reported",
+            "method": "matched-claude-transcript"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "claude-haiku-4-5-20251001",
+            "input_tokens": 23016,
+            "generated_tokens": 1999,
+            "total_tokens": 25015,
+            "low_tokens": 25015,
+            "high_tokens": 25015,
+            "source": "provider-reported",
+            "method": "matched-claude-transcript"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "claude-haiku-4-5-20251001",
+            "input_tokens": 22883,
+            "generated_tokens": 392,
+            "total_tokens": 23275,
+            "low_tokens": 23275,
+            "high_tokens": 23275,
+            "source": "provider-reported",
+            "method": "matched-claude-transcript"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          }
+        ]
+      },
+      "overhead_ratio": 0.011370671868309548,
+      "overhead_ratio_low": 0.006601330601715709,
+      "overhead_ratio_high": 0.016645466223335025
+    },
+    {
+      "session": "49b302d90b89",
+      "harness": "codex",
+      "main_usage": {
+        "input_tokens": 89394494,
+        "cached_input_tokens": 87688960,
+        "output_tokens": 189883,
+        "reasoning_output_tokens": 67618,
+        "total_tokens": 89584377,
+        "usage_events": 665,
+        "harness": "codex",
+        "uncached_input_tokens": 1705534,
+        "cache_write_input_tokens": 0,
+        "source": "provider-reported-transcript"
+      },
+      "summarize_calls": 9,
+      "judge_calls": 40,
+      "interventions": 2,
+      "verdicts": {
+        "off_track": 1,
+        "on_track": 38,
+        "warning": 1
+      },
+      "scopey_models": [
+        "gpt-5.6-terra"
+      ],
+      "scopey_usage": {
+        "total_tokens": 702115,
+        "low_tokens": 690406,
+        "high_tokens": 707939,
+        "provider_reported_calls": 0,
+        "estimated_calls": 49,
+        "unmeasured_jobs": 0,
+        "calls": [
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 170,
+            "total_tokens": 14369,
+            "low_tokens": 14175,
+            "high_tokens": 14503,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 134,
+            "total_tokens": 14333,
+            "low_tokens": 14146,
+            "high_tokens": 14455,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 215,
+            "total_tokens": 14414,
+            "low_tokens": 14211,
+            "high_tokens": 14563,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 200,
+            "total_tokens": 14399,
+            "low_tokens": 14199,
+            "high_tokens": 14543,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 116,
+            "total_tokens": 14315,
+            "low_tokens": 14132,
+            "high_tokens": 14432,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 131,
+            "total_tokens": 14330,
+            "low_tokens": 14144,
+            "high_tokens": 14451,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 144,
+            "total_tokens": 14343,
+            "low_tokens": 14154,
+            "high_tokens": 14469,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 138,
+            "total_tokens": 14337,
+            "low_tokens": 14150,
+            "high_tokens": 14461,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 206,
+            "total_tokens": 14405,
+            "low_tokens": 14204,
+            "high_tokens": 14552,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 221,
+            "total_tokens": 14320,
+            "low_tokens": 14071,
+            "high_tokens": 14435,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 240,
+            "total_tokens": 14339,
+            "low_tokens": 14086,
+            "high_tokens": 14460,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 224,
+            "total_tokens": 14323,
+            "low_tokens": 14073,
+            "high_tokens": 14439,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 239,
+            "total_tokens": 14338,
+            "low_tokens": 14086,
+            "high_tokens": 14460,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 214,
+            "total_tokens": 14313,
+            "low_tokens": 14065,
+            "high_tokens": 14426,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 255,
+            "total_tokens": 14354,
+            "low_tokens": 14098,
+            "high_tokens": 14481,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 221,
+            "total_tokens": 14320,
+            "low_tokens": 14071,
+            "high_tokens": 14435,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 262,
+            "total_tokens": 14361,
+            "low_tokens": 14104,
+            "high_tokens": 14490,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 221,
+            "total_tokens": 14320,
+            "low_tokens": 14071,
+            "high_tokens": 14436,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 204,
+            "total_tokens": 14303,
+            "low_tokens": 14057,
+            "high_tokens": 14412,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 229,
+            "total_tokens": 14328,
+            "low_tokens": 14077,
+            "high_tokens": 14446,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 202,
+            "total_tokens": 14301,
+            "low_tokens": 14056,
+            "high_tokens": 14410,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 233,
+            "total_tokens": 14332,
+            "low_tokens": 14081,
+            "high_tokens": 14452,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 208,
+            "total_tokens": 14307,
+            "low_tokens": 14060,
+            "high_tokens": 14418,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 209,
+            "total_tokens": 14308,
+            "low_tokens": 14061,
+            "high_tokens": 14420,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 193,
+            "total_tokens": 14292,
+            "low_tokens": 14049,
+            "high_tokens": 14398,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 231,
+            "total_tokens": 14330,
+            "low_tokens": 14079,
+            "high_tokens": 14449,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 271,
+            "total_tokens": 14370,
+            "low_tokens": 14111,
+            "high_tokens": 14502,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 237,
+            "total_tokens": 14336,
+            "low_tokens": 14083,
+            "high_tokens": 14456,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 230,
+            "total_tokens": 14329,
+            "low_tokens": 14078,
+            "high_tokens": 14447,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 225,
+            "total_tokens": 14324,
+            "low_tokens": 14074,
+            "high_tokens": 14440,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 212,
+            "total_tokens": 14311,
+            "low_tokens": 14064,
+            "high_tokens": 14423,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 227,
+            "total_tokens": 14326,
+            "low_tokens": 14076,
+            "high_tokens": 14443,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 221,
+            "total_tokens": 14320,
+            "low_tokens": 14071,
+            "high_tokens": 14436,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 269,
+            "total_tokens": 14368,
+            "low_tokens": 14109,
+            "high_tokens": 14499,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 240,
+            "total_tokens": 14339,
+            "low_tokens": 14086,
+            "high_tokens": 14460,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 283,
+            "total_tokens": 14382,
+            "low_tokens": 14121,
+            "high_tokens": 14519,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 281,
+            "total_tokens": 14380,
+            "low_tokens": 14119,
+            "high_tokens": 14515,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 230,
+            "total_tokens": 14329,
+            "low_tokens": 14078,
+            "high_tokens": 14447,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 262,
+            "total_tokens": 14361,
+            "low_tokens": 14103,
+            "high_tokens": 14490,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 240,
+            "total_tokens": 14339,
+            "low_tokens": 14086,
+            "high_tokens": 14461,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 271,
+            "total_tokens": 14370,
+            "low_tokens": 14111,
+            "high_tokens": 14503,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 212,
+            "total_tokens": 14311,
+            "low_tokens": 14064,
+            "high_tokens": 14424,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 210,
+            "total_tokens": 14309,
+            "low_tokens": 14062,
+            "high_tokens": 14421,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 235,
+            "total_tokens": 14334,
+            "low_tokens": 14082,
+            "high_tokens": 14455,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 249,
+            "total_tokens": 14348,
+            "low_tokens": 14093,
+            "high_tokens": 14473,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 258,
+            "total_tokens": 14357,
+            "low_tokens": 14100,
+            "high_tokens": 14485,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 241,
+            "total_tokens": 14340,
+            "low_tokens": 14087,
+            "high_tokens": 14462,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 0,
+            "total_tokens": 14099,
+            "low_tokens": 13894,
+            "high_tokens": 14141,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 0,
+            "total_tokens": 14099,
+            "low_tokens": 13894,
+            "high_tokens": 14141,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          }
+        ]
+      },
+      "overhead_ratio": 0.007837471482332237,
+      "overhead_ratio_low": 0.007706767888780428,
+      "overhead_ratio_high": 0.007902482817958315
+    },
+    {
+      "session": "5ae9119b9d0a",
+      "harness": "claude",
+      "main_usage": {
+        "input_tokens": 22487,
+        "cached_input_tokens": 17536,
+        "output_tokens": 36,
+        "reasoning_output_tokens": 0,
+        "total_tokens": 22523,
+        "usage_events": 1,
+        "harness": "claude",
+        "uncached_input_tokens": 10,
+        "cache_write_input_tokens": 4941,
+        "source": "provider-reported-transcript"
+      },
+      "summarize_calls": 1,
+      "judge_calls": 0,
+      "interventions": 0,
+      "verdicts": {},
+      "scopey_models": [
+        "claude-haiku-4-5-20251001"
+      ],
+      "scopey_usage": {
+        "total_tokens": 24945,
+        "low_tokens": 24945,
+        "high_tokens": 24945,
+        "provider_reported_calls": 1,
+        "estimated_calls": 0,
+        "unmeasured_jobs": 0,
+        "calls": [
+          {
+            "kind": "summarize",
+            "model": "claude-haiku-4-5-20251001",
+            "input_tokens": 23362,
+            "generated_tokens": 1583,
+            "total_tokens": 24945,
+            "low_tokens": 24945,
+            "high_tokens": 24945,
+            "source": "provider-reported",
+            "method": "matched-claude-transcript"
+          }
+        ]
+      },
+      "overhead_ratio": 1.1075345202681703,
+      "overhead_ratio_low": 1.1075345202681703,
+      "overhead_ratio_high": 1.1075345202681703
+    },
+    {
+      "session": "5e1d8d614de1",
+      "harness": "claude",
+      "main_usage": {
+        "input_tokens": 13459807,
+        "cached_input_tokens": 13226171,
+        "output_tokens": 109176,
+        "reasoning_output_tokens": 0,
+        "total_tokens": 13568983,
+        "usage_events": 74,
+        "harness": "claude",
+        "uncached_input_tokens": 137,
+        "cache_write_input_tokens": 233499,
+        "source": "provider-reported-transcript"
+      },
+      "summarize_calls": 5,
+      "judge_calls": 3,
+      "interventions": 0,
+      "verdicts": {},
+      "scopey_models": [
+        "haiku"
+      ],
+      "scopey_usage": {
+        "total_tokens": 117900,
+        "low_tokens": 0,
+        "high_tokens": 248295,
+        "provider_reported_calls": 0,
+        "estimated_calls": 5,
+        "unmeasured_jobs": 8,
+        "calls": [
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          }
+        ]
+      },
+      "overhead_ratio": 0.008688934166989523,
+      "overhead_ratio_low": 0.0,
+      "overhead_ratio_high": 0.018298718481701982
+    },
+    {
+      "session": "68a71a5f1db7",
+      "harness": "claude",
+      "main_usage": {
+        "input_tokens": 4385412,
+        "cached_input_tokens": 4267042,
+        "output_tokens": 53050,
+        "reasoning_output_tokens": 0,
+        "total_tokens": 4438462,
+        "usage_events": 45,
+        "harness": "claude",
+        "uncached_input_tokens": 3021,
+        "cache_write_input_tokens": 115349,
+        "source": "provider-reported-transcript"
+      },
+      "summarize_calls": 2,
+      "judge_calls": 1,
+      "interventions": 0,
+      "verdicts": {},
+      "scopey_models": [
+        "haiku"
+      ],
+      "scopey_usage": {
+        "total_tokens": 47160,
+        "low_tokens": 0,
+        "high_tokens": 99318,
+        "provider_reported_calls": 0,
+        "estimated_calls": 2,
+        "unmeasured_jobs": 3,
+        "calls": [
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          }
+        ]
+      },
+      "overhead_ratio": 0.010625302188010171,
+      "overhead_ratio_low": 0.0,
+      "overhead_ratio_high": 0.022376670116810733
+    },
+    {
+      "session": "8305cbe89a11",
+      "harness": "claude",
+      "main_usage": {
+        "input_tokens": 30487634,
+        "cached_input_tokens": 30150986,
+        "output_tokens": 155656,
+        "reasoning_output_tokens": 0,
+        "total_tokens": 30643290,
+        "usage_events": 130,
+        "harness": "claude",
+        "uncached_input_tokens": 253,
+        "cache_write_input_tokens": 336395,
+        "source": "provider-reported-transcript"
+      },
+      "summarize_calls": 3,
+      "judge_calls": 10,
+      "interventions": 0,
+      "verdicts": {},
+      "scopey_models": [
+        "haiku"
+      ],
+      "scopey_usage": {
+        "total_tokens": 70740,
+        "low_tokens": 0,
+        "high_tokens": 148977,
+        "provider_reported_calls": 0,
+        "estimated_calls": 3,
+        "unmeasured_jobs": 13,
+        "calls": [
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          }
+        ]
+      },
+      "overhead_ratio": 0.002308498858967167,
+      "overhead_ratio_low": 0.0,
+      "overhead_ratio_high": 0.004861651604641669
+    },
+    {
+      "session": "85595dcbb0eb",
+      "harness": "claude",
+      "main_usage": {
+        "input_tokens": 19273196,
+        "cached_input_tokens": 18996481,
+        "output_tokens": 142439,
+        "reasoning_output_tokens": 0,
+        "total_tokens": 19415635,
+        "usage_events": 121,
+        "harness": "claude",
+        "uncached_input_tokens": 225,
+        "cache_write_input_tokens": 276490,
+        "source": "provider-reported-transcript"
+      },
+      "summarize_calls": 19,
+      "judge_calls": 4,
+      "interventions": 0,
+      "verdicts": {},
+      "scopey_models": [
+        "claude-haiku-4-5-20251001",
+        "haiku"
+      ],
+      "scopey_usage": {
+        "total_tokens": 440627,
+        "low_tokens": 63347,
+        "high_tokens": 857891,
+        "provider_reported_calls": 3,
+        "estimated_calls": 16,
+        "unmeasured_jobs": 20,
+        "calls": [
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "claude-haiku-4-5-20251001",
+            "input_tokens": 23592,
+            "generated_tokens": 1919,
+            "total_tokens": 25511,
+            "low_tokens": 25511,
+            "high_tokens": 25511,
+            "source": "provider-reported",
+            "method": "matched-claude-transcript"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "claude-haiku-4-5-20251001",
+            "input_tokens": 17199,
+            "generated_tokens": 1656,
+            "total_tokens": 18855,
+            "low_tokens": 18855,
+            "high_tokens": 18855,
+            "source": "provider-reported",
+            "method": "matched-claude-transcript"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "claude-haiku-4-5-20251001",
+            "input_tokens": 17074,
+            "generated_tokens": 1907,
+            "total_tokens": 18981,
+            "low_tokens": 18981,
+            "high_tokens": 18981,
+            "source": "provider-reported",
+            "method": "matched-claude-transcript"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          }
+        ]
+      },
+      "overhead_ratio": 0.022694441876353773,
+      "overhead_ratio_low": 0.003262679793887761,
+      "overhead_ratio_high": 0.04418557518206332
+    },
+    {
+      "session": "8c163f01b09e",
+      "harness": "codex",
+      "main_usage": {
+        "input_tokens": 63000759,
+        "cached_input_tokens": 61990912,
+        "output_tokens": 126471,
+        "reasoning_output_tokens": 28547,
+        "total_tokens": 63127230,
+        "usage_events": 543,
+        "harness": "codex",
+        "uncached_input_tokens": 1009847,
+        "cache_write_input_tokens": 0,
+        "source": "provider-reported-transcript"
+      },
+      "summarize_calls": 5,
+      "judge_calls": 23,
+      "interventions": 1,
+      "verdicts": {
+        "on_track": 22,
+        "warning": 1
+      },
+      "scopey_models": [
+        "gpt-5.6-terra"
+      ],
+      "scopey_usage": {
+        "total_tokens": 400559,
+        "low_tokens": 393991,
+        "high_tokens": 403672,
+        "provider_reported_calls": 0,
+        "estimated_calls": 28,
+        "unmeasured_jobs": 0,
+        "calls": [
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 194,
+            "total_tokens": 14393,
+            "low_tokens": 14194,
+            "high_tokens": 14535,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 146,
+            "total_tokens": 14345,
+            "low_tokens": 14156,
+            "high_tokens": 14471,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 74,
+            "total_tokens": 14273,
+            "low_tokens": 14098,
+            "high_tokens": 14375,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 74,
+            "total_tokens": 14273,
+            "low_tokens": 14098,
+            "high_tokens": 14376,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 84,
+            "total_tokens": 14283,
+            "low_tokens": 14106,
+            "high_tokens": 14389,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 168,
+            "total_tokens": 14267,
+            "low_tokens": 14028,
+            "high_tokens": 14364,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 239,
+            "total_tokens": 14338,
+            "low_tokens": 14085,
+            "high_tokens": 14460,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 266,
+            "total_tokens": 14365,
+            "low_tokens": 14107,
+            "high_tokens": 14496,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 214,
+            "total_tokens": 14313,
+            "low_tokens": 14065,
+            "high_tokens": 14426,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 232,
+            "total_tokens": 14331,
+            "low_tokens": 14080,
+            "high_tokens": 14450,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 198,
+            "total_tokens": 14297,
+            "low_tokens": 14053,
+            "high_tokens": 14405,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 218,
+            "total_tokens": 14317,
+            "low_tokens": 14069,
+            "high_tokens": 14432,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 210,
+            "total_tokens": 14309,
+            "low_tokens": 14062,
+            "high_tokens": 14420,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 239,
+            "total_tokens": 14338,
+            "low_tokens": 14085,
+            "high_tokens": 14459,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 246,
+            "total_tokens": 14345,
+            "low_tokens": 14091,
+            "high_tokens": 14468,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 181,
+            "total_tokens": 14280,
+            "low_tokens": 14039,
+            "high_tokens": 14382,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 233,
+            "total_tokens": 14332,
+            "low_tokens": 14081,
+            "high_tokens": 14452,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 246,
+            "total_tokens": 14345,
+            "low_tokens": 14091,
+            "high_tokens": 14468,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 220,
+            "total_tokens": 14319,
+            "low_tokens": 14070,
+            "high_tokens": 14434,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 206,
+            "total_tokens": 14305,
+            "low_tokens": 14059,
+            "high_tokens": 14415,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 254,
+            "total_tokens": 14353,
+            "low_tokens": 14097,
+            "high_tokens": 14479,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 184,
+            "total_tokens": 14283,
+            "low_tokens": 14042,
+            "high_tokens": 14387,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 215,
+            "total_tokens": 14314,
+            "low_tokens": 14066,
+            "high_tokens": 14428,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 262,
+            "total_tokens": 14361,
+            "low_tokens": 14104,
+            "high_tokens": 14491,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 192,
+            "total_tokens": 14291,
+            "low_tokens": 14048,
+            "high_tokens": 14397,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 174,
+            "total_tokens": 14273,
+            "low_tokens": 14034,
+            "high_tokens": 14373,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 118,
+            "total_tokens": 14217,
+            "low_tokens": 13989,
+            "high_tokens": 14299,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 0,
+            "total_tokens": 14099,
+            "low_tokens": 13894,
+            "high_tokens": 14141,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          }
+        ]
+      },
+      "overhead_ratio": 0.0063452649514322106,
+      "overhead_ratio_low": 0.006241221102208983,
+      "overhead_ratio_high": 0.006394578060846326
+    },
+    {
+      "session": "8d297d26306e",
+      "harness": "claude",
+      "main_usage": {
+        "input_tokens": 246118016,
+        "cached_input_tokens": 244227622,
+        "output_tokens": 348361,
+        "reasoning_output_tokens": 0,
+        "total_tokens": 246466377,
+        "usage_events": 348,
+        "harness": "claude",
+        "uncached_input_tokens": 675,
+        "cache_write_input_tokens": 1889719,
+        "source": "provider-reported-transcript"
+      },
+      "summarize_calls": 24,
+      "judge_calls": 19,
+      "interventions": 0,
+      "verdicts": {},
+      "scopey_models": [
+        "haiku"
+      ],
+      "scopey_usage": {
+        "total_tokens": 565920,
+        "low_tokens": 0,
+        "high_tokens": 1191816,
+        "provider_reported_calls": 0,
+        "estimated_calls": 24,
+        "unmeasured_jobs": 43,
+        "calls": [
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          }
+        ]
+      },
+      "overhead_ratio": 0.002296134697512919,
+      "overhead_ratio_low": 0.0,
+      "overhead_ratio_high": 0.004835612932306787
+    },
+    {
+      "session": "9a5d63771dd6",
+      "harness": "claude",
+      "main_usage": {
+        "input_tokens": 624605,
+        "cached_input_tokens": 436740,
+        "output_tokens": 1424,
+        "reasoning_output_tokens": 0,
+        "total_tokens": 626029,
+        "usage_events": 3,
+        "harness": "claude",
+        "uncached_input_tokens": 6,
+        "cache_write_input_tokens": 187859,
+        "source": "provider-reported-transcript"
+      },
+      "summarize_calls": 2,
+      "judge_calls": 0,
+      "interventions": 0,
+      "verdicts": {},
+      "scopey_models": [
+        "haiku"
+      ],
+      "scopey_usage": {
+        "total_tokens": 47160,
+        "low_tokens": 0,
+        "high_tokens": 99318,
+        "provider_reported_calls": 0,
+        "estimated_calls": 2,
+        "unmeasured_jobs": 2,
+        "calls": [
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          }
+        ]
+      },
+      "overhead_ratio": 0.07533197343893014,
+      "overhead_ratio_low": 0.0,
+      "overhead_ratio_high": 0.1586476025871006
+    },
+    {
+      "session": "a0c9118da36c",
+      "harness": "codex",
+      "main_usage": {
+        "input_tokens": 14211894,
+        "cached_input_tokens": 13592576,
+        "output_tokens": 46287,
+        "reasoning_output_tokens": 15829,
+        "total_tokens": 14258181,
+        "usage_events": 135,
+        "harness": "codex",
+        "uncached_input_tokens": 619318,
+        "cache_write_input_tokens": 0,
+        "source": "provider-reported-transcript"
+      },
+      "summarize_calls": 5,
+      "judge_calls": 9,
+      "interventions": 0,
+      "verdicts": {
+        "on_track": 9
+      },
+      "scopey_models": [
+        "gpt-5.6-terra"
+      ],
+      "scopey_usage": {
+        "total_tokens": 200266,
+        "low_tokens": 197148,
+        "high_tokens": 201825,
+        "provider_reported_calls": 0,
+        "estimated_calls": 14,
+        "unmeasured_jobs": 0,
+        "calls": [
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 87,
+            "total_tokens": 14286,
+            "low_tokens": 14109,
+            "high_tokens": 14393,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 121,
+            "total_tokens": 14320,
+            "low_tokens": 14136,
+            "high_tokens": 14438,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 58,
+            "total_tokens": 14257,
+            "low_tokens": 14086,
+            "high_tokens": 14355,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 123,
+            "total_tokens": 14322,
+            "low_tokens": 14138,
+            "high_tokens": 14441,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 148,
+            "total_tokens": 14347,
+            "low_tokens": 14158,
+            "high_tokens": 14474,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 270,
+            "total_tokens": 14369,
+            "low_tokens": 14110,
+            "high_tokens": 14501,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 206,
+            "total_tokens": 14305,
+            "low_tokens": 14059,
+            "high_tokens": 14415,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 205,
+            "total_tokens": 14304,
+            "low_tokens": 14058,
+            "high_tokens": 14415,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 172,
+            "total_tokens": 14271,
+            "low_tokens": 14032,
+            "high_tokens": 14370,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 162,
+            "total_tokens": 14261,
+            "low_tokens": 14023,
+            "high_tokens": 14356,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 189,
+            "total_tokens": 14288,
+            "low_tokens": 14046,
+            "high_tokens": 14393,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 190,
+            "total_tokens": 14289,
+            "low_tokens": 14046,
+            "high_tokens": 14394,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 232,
+            "total_tokens": 14331,
+            "low_tokens": 14080,
+            "high_tokens": 14450,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 217,
+            "total_tokens": 14316,
+            "low_tokens": 14067,
+            "high_tokens": 14430,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          }
+        ]
+      },
+      "overhead_ratio": 0.01404569068102025,
+      "overhead_ratio_low": 0.013827009209660054,
+      "overhead_ratio_high": 0.01415503141670035
+    },
+    {
+      "session": "b0d18eac7bb0",
+      "harness": "codex",
+      "main_usage": {
+        "input_tokens": 4769593,
+        "cached_input_tokens": 4527616,
+        "output_tokens": 15965,
+        "reasoning_output_tokens": 4896,
+        "total_tokens": 4785558,
+        "usage_events": 58,
+        "harness": "codex",
+        "uncached_input_tokens": 241977,
+        "cache_write_input_tokens": 0,
+        "source": "provider-reported-transcript"
+      },
+      "summarize_calls": 1,
+      "judge_calls": 2,
+      "interventions": 0,
+      "verdicts": {
+        "insufficient_evidence": 1,
+        "on_track": 2
+      },
+      "scopey_models": [
+        "gpt-5.6-terra"
+      ],
+      "scopey_usage": {
+        "total_tokens": 42816,
+        "low_tokens": 42162,
+        "high_tokens": 43117,
+        "provider_reported_calls": 0,
+        "estimated_calls": 3,
+        "unmeasured_jobs": 0,
+        "calls": [
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 46,
+            "total_tokens": 14245,
+            "low_tokens": 14076,
+            "high_tokens": 14338,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 158,
+            "total_tokens": 14257,
+            "low_tokens": 14020,
+            "high_tokens": 14351,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 215,
+            "total_tokens": 14314,
+            "low_tokens": 14066,
+            "high_tokens": 14428,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          }
+        ]
+      },
+      "overhead_ratio": 0.008946919042669633,
+      "overhead_ratio_low": 0.008810257863346342,
+      "overhead_ratio_high": 0.009009816619086009
+    },
+    {
+      "session": "c0175027554b",
+      "harness": "codex",
+      "main_usage": {
+        "input_tokens": 15598457,
+        "cached_input_tokens": 15197952,
+        "output_tokens": 30157,
+        "reasoning_output_tokens": 10304,
+        "total_tokens": 15628614,
+        "usage_events": 111,
+        "harness": "codex",
+        "uncached_input_tokens": 400505,
+        "cache_write_input_tokens": 0,
+        "source": "provider-reported-transcript"
+      },
+      "summarize_calls": 7,
+      "judge_calls": 5,
+      "interventions": 0,
+      "verdicts": {
+        "on_track": 5
+      },
+      "scopey_models": [
+        "gpt-5.6-terra"
+      ],
+      "scopey_usage": {
+        "total_tokens": 171748,
+        "low_tokens": 169232,
+        "high_tokens": 173123,
+        "provider_reported_calls": 0,
+        "estimated_calls": 12,
+        "unmeasured_jobs": 0,
+        "calls": [
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 98,
+            "total_tokens": 14297,
+            "low_tokens": 14117,
+            "high_tokens": 14407,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 120,
+            "total_tokens": 14319,
+            "low_tokens": 14135,
+            "high_tokens": 14437,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 137,
+            "total_tokens": 14336,
+            "low_tokens": 14149,
+            "high_tokens": 14460,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 131,
+            "total_tokens": 14330,
+            "low_tokens": 14144,
+            "high_tokens": 14452,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 146,
+            "total_tokens": 14345,
+            "low_tokens": 14156,
+            "high_tokens": 14472,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 155,
+            "total_tokens": 14354,
+            "low_tokens": 14163,
+            "high_tokens": 14483,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 79,
+            "total_tokens": 14278,
+            "low_tokens": 14102,
+            "high_tokens": 14382,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 202,
+            "total_tokens": 14301,
+            "low_tokens": 14056,
+            "high_tokens": 14411,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 196,
+            "total_tokens": 14295,
+            "low_tokens": 14051,
+            "high_tokens": 14402,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 226,
+            "total_tokens": 14325,
+            "low_tokens": 14075,
+            "high_tokens": 14442,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 181,
+            "total_tokens": 14280,
+            "low_tokens": 14039,
+            "high_tokens": 14383,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 189,
+            "total_tokens": 14288,
+            "low_tokens": 14045,
+            "high_tokens": 14392,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          }
+        ]
+      },
+      "overhead_ratio": 0.010989330211879313,
+      "overhead_ratio_low": 0.010828343447473973,
+      "overhead_ratio_high": 0.011077309862538035
+    },
+    {
+      "session": "c07f67cbceb1",
+      "harness": "claude",
+      "main_usage": {
+        "input_tokens": 59229762,
+        "cached_input_tokens": 58247031,
+        "output_tokens": 90100,
+        "reasoning_output_tokens": 0,
+        "total_tokens": 59319862,
+        "usage_events": 203,
+        "harness": "claude",
+        "uncached_input_tokens": 394,
+        "cache_write_input_tokens": 982337,
+        "source": "provider-reported-transcript"
+      },
+      "summarize_calls": 4,
+      "judge_calls": 14,
+      "interventions": 0,
+      "verdicts": {},
+      "scopey_models": [
+        "haiku"
+      ],
+      "scopey_usage": {
+        "total_tokens": 94320,
+        "low_tokens": 0,
+        "high_tokens": 198636,
+        "provider_reported_calls": 0,
+        "estimated_calls": 4,
+        "unmeasured_jobs": 18,
+        "calls": [
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          },
+          {
+            "kind": "judge",
+            "model": "haiku",
+            "input_tokens": 0,
+            "generated_tokens": 0,
+            "total_tokens": 0,
+            "low_tokens": 0,
+            "high_tokens": 0,
+            "source": "unmeasured",
+            "method": "no-matched-claude-calibration"
+          }
+        ]
+      },
+      "overhead_ratio": 0.001590023928241775,
+      "overhead_ratio_low": 0.0,
+      "overhead_ratio_high": 0.003348558025977876
+    },
+    {
+      "session": "ca0eecb79692",
+      "harness": "codex",
+      "main_usage": {
+        "input_tokens": 749009,
+        "cached_input_tokens": 672256,
+        "output_tokens": 3704,
+        "reasoning_output_tokens": 861,
+        "total_tokens": 752713,
+        "usage_events": 14,
+        "harness": "codex",
+        "uncached_input_tokens": 76753,
+        "cache_write_input_tokens": 0,
+        "source": "provider-reported-transcript"
+      },
+      "summarize_calls": 2,
+      "judge_calls": 0,
+      "interventions": 0,
+      "verdicts": {},
+      "scopey_models": [
+        "gpt-5.6-terra"
+      ],
+      "scopey_usage": {
+        "total_tokens": 28491,
+        "low_tokens": 28153,
+        "high_tokens": 28678,
+        "provider_reported_calls": 0,
+        "estimated_calls": 2,
+        "unmeasured_jobs": 0,
+        "calls": [
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 48,
+            "total_tokens": 14247,
+            "low_tokens": 14078,
+            "high_tokens": 14341,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 45,
+            "total_tokens": 14244,
+            "low_tokens": 14075,
+            "high_tokens": 14337,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          }
+        ]
+      },
+      "overhead_ratio": 0.03785108002651741,
+      "overhead_ratio_low": 0.0374020376956423,
+      "overhead_ratio_high": 0.03809951468886548
+    },
+    {
+      "session": "d9e94a6b526c",
+      "harness": "codex",
+      "main_usage": {
+        "input_tokens": 61669793,
+        "cached_input_tokens": 60539904,
+        "output_tokens": 147992,
+        "reasoning_output_tokens": 35004,
+        "total_tokens": 61817785,
+        "usage_events": 513,
+        "harness": "codex",
+        "uncached_input_tokens": 1129889,
+        "cache_write_input_tokens": 0,
+        "source": "provider-reported-transcript"
+      },
+      "summarize_calls": 14,
+      "judge_calls": 20,
+      "interventions": 0,
+      "verdicts": {
+        "on_track": 20
+      },
+      "scopey_models": [
+        "gpt-5.6-terra"
+      ],
+      "scopey_usage": {
+        "total_tokens": 488027,
+        "low_tokens": 480238,
+        "high_tokens": 492375,
+        "provider_reported_calls": 0,
+        "estimated_calls": 34,
+        "unmeasured_jobs": 0,
+        "calls": [
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 58,
+            "total_tokens": 14257,
+            "low_tokens": 14086,
+            "high_tokens": 14355,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 67,
+            "total_tokens": 14266,
+            "low_tokens": 14092,
+            "high_tokens": 14366,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 119,
+            "total_tokens": 14318,
+            "low_tokens": 14135,
+            "high_tokens": 14436,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 344,
+            "total_tokens": 14543,
+            "low_tokens": 14314,
+            "high_tokens": 14735,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 365,
+            "total_tokens": 14564,
+            "low_tokens": 14331,
+            "high_tokens": 14764,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 258,
+            "total_tokens": 14457,
+            "low_tokens": 14245,
+            "high_tokens": 14620,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 66,
+            "total_tokens": 14265,
+            "low_tokens": 14092,
+            "high_tokens": 14365,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 84,
+            "total_tokens": 14283,
+            "low_tokens": 14106,
+            "high_tokens": 14389,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 106,
+            "total_tokens": 14305,
+            "low_tokens": 14124,
+            "high_tokens": 14418,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 136,
+            "total_tokens": 14335,
+            "low_tokens": 14148,
+            "high_tokens": 14459,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 190,
+            "total_tokens": 14389,
+            "low_tokens": 14191,
+            "high_tokens": 14530,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 210,
+            "total_tokens": 14409,
+            "low_tokens": 14207,
+            "high_tokens": 14557,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 201,
+            "total_tokens": 14400,
+            "low_tokens": 14200,
+            "high_tokens": 14544,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 234,
+            "total_tokens": 14433,
+            "low_tokens": 14227,
+            "high_tokens": 14589,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 246,
+            "total_tokens": 14345,
+            "low_tokens": 14091,
+            "high_tokens": 14469,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 275,
+            "total_tokens": 14374,
+            "low_tokens": 14114,
+            "high_tokens": 14508,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 245,
+            "total_tokens": 14344,
+            "low_tokens": 14090,
+            "high_tokens": 14468,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 273,
+            "total_tokens": 14372,
+            "low_tokens": 14112,
+            "high_tokens": 14504,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 243,
+            "total_tokens": 14342,
+            "low_tokens": 14088,
+            "high_tokens": 14465,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 233,
+            "total_tokens": 14332,
+            "low_tokens": 14081,
+            "high_tokens": 14452,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 229,
+            "total_tokens": 14328,
+            "low_tokens": 14077,
+            "high_tokens": 14446,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 217,
+            "total_tokens": 14316,
+            "low_tokens": 14068,
+            "high_tokens": 14430,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 239,
+            "total_tokens": 14338,
+            "low_tokens": 14085,
+            "high_tokens": 14459,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 223,
+            "total_tokens": 14322,
+            "low_tokens": 14072,
+            "high_tokens": 14438,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 244,
+            "total_tokens": 14343,
+            "low_tokens": 14089,
+            "high_tokens": 14466,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 219,
+            "total_tokens": 14318,
+            "low_tokens": 14069,
+            "high_tokens": 14433,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 238,
+            "total_tokens": 14337,
+            "low_tokens": 14085,
+            "high_tokens": 14459,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 260,
+            "total_tokens": 14359,
+            "low_tokens": 14102,
+            "high_tokens": 14487,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 264,
+            "total_tokens": 14363,
+            "low_tokens": 14105,
+            "high_tokens": 14492,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 249,
+            "total_tokens": 14348,
+            "low_tokens": 14094,
+            "high_tokens": 14473,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 264,
+            "total_tokens": 14363,
+            "low_tokens": 14106,
+            "high_tokens": 14493,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 252,
+            "total_tokens": 14351,
+            "low_tokens": 14096,
+            "high_tokens": 14477,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 254,
+            "total_tokens": 14353,
+            "low_tokens": 14097,
+            "high_tokens": 14480,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 156,
+            "total_tokens": 14255,
+            "low_tokens": 14019,
+            "high_tokens": 14349,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          }
+        ]
+      },
+      "overhead_ratio": 0.007894605088163543,
+      "overhead_ratio_low": 0.007768605749947204,
+      "overhead_ratio_high": 0.007964940833774617
+    },
+    {
+      "session": "e746acaf5e14",
+      "harness": "codex",
+      "main_usage": {
+        "input_tokens": 841257,
+        "cached_input_tokens": 752384,
+        "output_tokens": 4795,
+        "reasoning_output_tokens": 1572,
+        "total_tokens": 846052,
+        "usage_events": 17,
+        "harness": "codex",
+        "uncached_input_tokens": 88873,
+        "cache_write_input_tokens": 0,
+        "source": "provider-reported-transcript"
+      },
+      "summarize_calls": 1,
+      "judge_calls": 1,
+      "interventions": 0,
+      "verdicts": {
+        "on_track": 1
+      },
+      "scopey_models": [
+        "gpt-5.6-terra"
+      ],
+      "scopey_usage": {
+        "total_tokens": 28578,
+        "low_tokens": 28158,
+        "high_tokens": 28792,
+        "provider_reported_calls": 0,
+        "estimated_calls": 2,
+        "unmeasured_jobs": 0,
+        "calls": [
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 53,
+            "total_tokens": 14252,
+            "low_tokens": 14082,
+            "high_tokens": 14348,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 227,
+            "total_tokens": 14326,
+            "low_tokens": 14076,
+            "high_tokens": 14444,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          }
+        ]
+      },
+      "overhead_ratio": 0.03377806565081106,
+      "overhead_ratio_low": 0.03328164226312331,
+      "overhead_ratio_high": 0.03403100518644244
+    },
+    {
+      "session": "eb568e4c2569",
+      "harness": "codex",
+      "main_usage": {
+        "input_tokens": 9805329,
+        "cached_input_tokens": 9491200,
+        "output_tokens": 37745,
+        "reasoning_output_tokens": 16289,
+        "total_tokens": 9843074,
+        "usage_events": 99,
+        "harness": "codex",
+        "uncached_input_tokens": 314129,
+        "cache_write_input_tokens": 0,
+        "source": "provider-reported-transcript"
+      },
+      "summarize_calls": 9,
+      "judge_calls": 7,
+      "interventions": 2,
+      "verdicts": {
+        "off_track": 1,
+        "on_track": 5,
+        "warning": 1
+      },
+      "scopey_models": [
+        "gpt-5.6-terra"
+      ],
+      "scopey_usage": {
+        "total_tokens": 228224,
+        "low_tokens": 225003,
+        "high_tokens": 229797,
+        "provider_reported_calls": 0,
+        "estimated_calls": 16,
+        "unmeasured_jobs": 0,
+        "calls": [
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 100,
+            "total_tokens": 14299,
+            "low_tokens": 14119,
+            "high_tokens": 14410,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 61,
+            "total_tokens": 14260,
+            "low_tokens": 14088,
+            "high_tokens": 14358,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 61,
+            "total_tokens": 14260,
+            "low_tokens": 14088,
+            "high_tokens": 14358,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 84,
+            "total_tokens": 14283,
+            "low_tokens": 14107,
+            "high_tokens": 14389,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 53,
+            "total_tokens": 14252,
+            "low_tokens": 14081,
+            "high_tokens": 14347,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 52,
+            "total_tokens": 14251,
+            "low_tokens": 14081,
+            "high_tokens": 14347,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 63,
+            "total_tokens": 14262,
+            "low_tokens": 14090,
+            "high_tokens": 14361,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 97,
+            "total_tokens": 14296,
+            "low_tokens": 14116,
+            "high_tokens": 14406,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 96,
+            "total_tokens": 14295,
+            "low_tokens": 14116,
+            "high_tokens": 14405,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 244,
+            "total_tokens": 14343,
+            "low_tokens": 14089,
+            "high_tokens": 14466,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 216,
+            "total_tokens": 14315,
+            "low_tokens": 14067,
+            "high_tokens": 14429,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 215,
+            "total_tokens": 14314,
+            "low_tokens": 14066,
+            "high_tokens": 14427,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 179,
+            "total_tokens": 14278,
+            "low_tokens": 14037,
+            "high_tokens": 14379,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 219,
+            "total_tokens": 14318,
+            "low_tokens": 14070,
+            "high_tokens": 14433,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 0,
+            "total_tokens": 14099,
+            "low_tokens": 13894,
+            "high_tokens": 14141,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 0,
+            "total_tokens": 14099,
+            "low_tokens": 13894,
+            "high_tokens": 14141,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          }
+        ]
+      },
+      "overhead_ratio": 0.023186252587352286,
+      "overhead_ratio_low": 0.02285901741671352,
+      "overhead_ratio_high": 0.02334606038723269
+    },
+    {
+      "session": "f5c1ba881ec5",
+      "harness": "codex",
+      "main_usage": {
+        "input_tokens": 8827685,
+        "cached_input_tokens": 8676096,
+        "output_tokens": 15709,
+        "reasoning_output_tokens": 3261,
+        "total_tokens": 8843394,
+        "usage_events": 134,
+        "harness": "codex",
+        "uncached_input_tokens": 151589,
+        "cache_write_input_tokens": 0,
+        "source": "provider-reported-transcript"
+      },
+      "summarize_calls": 1,
+      "judge_calls": 4,
+      "interventions": 0,
+      "verdicts": {
+        "on_track": 4
+      },
+      "scopey_models": [
+        "gpt-5.6-terra"
+      ],
+      "scopey_usage": {
+        "total_tokens": 71309,
+        "low_tokens": 70187,
+        "high_tokens": 71792,
+        "provider_reported_calls": 0,
+        "estimated_calls": 5,
+        "unmeasured_jobs": 0,
+        "calls": [
+          {
+            "kind": "summarize",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14199,
+            "generated_tokens": 98,
+            "total_tokens": 14297,
+            "low_tokens": 14118,
+            "high_tokens": 14408,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 198,
+            "total_tokens": 14297,
+            "low_tokens": 14052,
+            "high_tokens": 14404,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 156,
+            "total_tokens": 14255,
+            "low_tokens": 14019,
+            "high_tokens": 14349,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 125,
+            "total_tokens": 14224,
+            "low_tokens": 13994,
+            "high_tokens": 14307,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          },
+          {
+            "kind": "judge",
+            "model": "gpt-5.6-terra",
+            "input_tokens": 14099,
+            "generated_tokens": 137,
+            "total_tokens": 14236,
+            "low_tokens": 14004,
+            "high_tokens": 14324,
+            "source": "estimated",
+            "method": "benchmark-calibrated-input+chars/4-output"
+          }
+        ]
+      },
+      "overhead_ratio": 0.008063533073387887,
+      "overhead_ratio_low": 0.007936658708183759,
+      "overhead_ratio_high": 0.008118150112954371
+    },
+    {
+      "session": "fa192aac9fef",
+      "harness": "claude",
+      "main_usage": {
+        "input_tokens": 26993,
+        "cached_input_tokens": 21538,
+        "output_tokens": 56,
+        "reasoning_output_tokens": 0,
+        "total_tokens": 27049,
+        "usage_events": 1,
+        "harness": "claude",
+        "uncached_input_tokens": 10,
+        "cache_write_input_tokens": 5445,
+        "source": "provider-reported-transcript"
+      },
+      "summarize_calls": 1,
+      "judge_calls": 0,
+      "interventions": 0,
+      "verdicts": {},
+      "scopey_models": [
+        "haiku"
+      ],
+      "scopey_usage": {
+        "total_tokens": 23580,
+        "low_tokens": 0,
+        "high_tokens": 49659,
+        "provider_reported_calls": 0,
+        "estimated_calls": 1,
+        "unmeasured_jobs": 1,
+        "calls": [
+          {
+            "kind": "summarize",
+            "model": "haiku",
+            "input_tokens": 23030,
+            "generated_tokens": 526,
+            "total_tokens": 23580,
+            "low_tokens": 0,
+            "high_tokens": 49659,
+            "source": "estimated",
+            "method": "same-window-matched-claude-median"
+          }
+        ]
+      },
+      "overhead_ratio": 0.8717512662205626,
+      "overhead_ratio_low": 0.0,
+      "overhead_ratio_high": 1.8358904210876557
+    }
+  ],
+  "unmatched_claude_analyzer_transcripts": 156
+}

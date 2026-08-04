@@ -79,3 +79,25 @@ Full-corpus runs additionally produce `results.jsonl` and `summary.json` with
 per-task and per-condition means, sample standard deviations, deterministic
 bootstrap 95% confidence intervals for token means, and Wilson intervals for
 behavioral rates.
+
+## Recent real-session analytics
+
+`recent_session_analytics.py` analyzes existing Scopey sessions without model
+calls or transcript-content output. Use explicit timestamps when publishing a
+result so the cohort remains reproducible after sessions continue growing:
+
+```bash
+python3 eval/recent_session_analytics.py \
+  --since 2026-08-02T18:44:19Z \
+  --until 2026-08-04T18:44:19Z \
+  --json-out eval/reports/recent-sessions.json \
+  --markdown-out eval/reports/recent-sessions.md
+```
+
+The cohort excludes evaluation/temp working directories and requires a real
+Claude or Codex transcript. Main-session tokens come from provider transcript
+counters inside the same fixed window. Scopey corrections are counted from
+persisted injection records; reminders are not interventions. Historical
+Claude analyzer calls use matched provider usage. Historical Codex analyzer
+input is explicitly estimated from the checked benchmark calibration because
+production launched those calls with `--ephemeral` and retained no transcript.
