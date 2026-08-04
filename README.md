@@ -229,6 +229,7 @@ delivery = "system"   # or "herdr" / "terminal"
 ```
 UserPromptSubmit  →  scopey hook user-prompt
                      · append user_prompt to session JSON
+                     · end the previous prompt's judgement epoch
                      · background: scopey summarize → scope_requirements
 
 PostToolUse / PostToolBatch  →  scopey hook post-tool
@@ -246,12 +247,17 @@ Scope extraction is intentionally **current-state**, not an ever-growing union
 of the conversation. Each new prompt is an authoritative mutation that may add,
 subtract, modify, or replace requirements. Additions and modifications preserve
 unaffected active requirements; explicit removals, contradictions, and
-replacements win. Questions add a read-only obligation without becoming new
-implementation authorization. Machine-generated task notifications are treated
-as context, not new user goals. Each transition is written to the structured
+replacements win. Questions add an answering obligation without becoming new
+implementation authorization or an inferred no-edit prohibition.
+Machine-generated task notifications are treated as context, not new user
+goals. Each transition is written to the structured
 session log as `job.summarize.transition`, including the operation and
-before/after scope hashes. If the summarizer model is unavailable, the fallback
-preserves only the latest request instead of replaying the full prompt history.
+before/after scope hashes. Scopey removes planning-only, no-tool, no-edit, and
+similar permission boundaries that the user did not impose. Judge windows are
+bound to one user-prompt epoch; a new prompt invalidates pending verdicts and
+restarts the tool window so old work is never judged against a newer scope. If
+the summarizer model is unavailable, the fallback preserves only the latest
+request instead of replaying the full prompt history.
 
 ### Development checks
 

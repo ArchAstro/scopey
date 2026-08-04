@@ -779,6 +779,7 @@ mod tests {
             last_judged_to_count: 30,
             last_reminder_at_count: 0,
             last_injection_at_count: 0,
+            scope_epoch_start_tool_count: 0,
             transcript_path: None,
             messages,
             pending_judgement_id: None,

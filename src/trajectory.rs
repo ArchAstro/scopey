@@ -57,15 +57,19 @@ Scope lifecycle rules:
   silence about an existing requirement as cancellation.
 - For SUBTRACT, remove the named requirement and anything that depends only on it.
 - For REPLACE, discard the old task instead of unioning unrelated topics.
-- For QUERY, add the read-only answering/reporting obligation. Never convert the
-  query itself into authorization to implement a change; preserve unaffected
-  existing scope unless the user also subtracts or replaces it.
+- For QUERY, add the answering/reporting obligation. State the requested output
+  positively; do not add a no-edit/no-tools boundary merely because it is a query.
+  Preserve unaffected existing scope unless the user also subtracts or replaces it.
 - For ADMIN, preserve the directly relevant unfinished task plus the requested administrative action; do not resurrect older tasks.
 - For MACHINE_EVENT, treat the event as state/context. Preserve only the explicit user request it resolves or updates.
 - Earlier prompts and previous scope are context, not automatically active requirements.
 - Output only requirements active NOW. Retire requirements only when the latest
   mutation removes/replaces them or available context clearly establishes completion.
-- Do not invent implementation, commit, push, no-tools, or no-edit requirements unless the user explicitly requested them or they are inherent to a read-only status/assessment request.
+- Framing such as "let's figure out how to", "design", "construct", "evaluate",
+  or "research" does not mean planning-only. Preserve the operative action verbs.
+- Never invent planning-only, research-only, no-implementation, no-tools, no-edit,
+  or read-only boundaries. Include one only when a user explicitly imposed it,
+  and quote the user's exact supporting words in that bullet.
 - Preserve explicit constraints and concrete semantics from the active request.
 
 Output rules:
@@ -114,12 +118,107 @@ fn recent_prompt_context(prompts: &[String], max_chars: usize) -> String {
     clip(&numbered, max_chars)
 }
 
-fn fallback_scope(latest_prompt: &str) -> String {
+fn latest_prompt_scope(latest_prompt: &str) -> String {
     format!(
-        "- {}\n- Respond only to the latest user request:\n{}",
-        crate::session::FALLBACK_SCOPE_MARKER,
+        "- Respond only to the latest user request:\n{}",
         clip(latest_prompt, 1500)
     )
+}
+
+fn fallback_scope(latest_prompt: &str) -> String {
+    format!(
+        "- {}\n{}",
+        crate::session::FALLBACK_SCOPE_MARKER,
+        latest_prompt_scope(latest_prompt)
+    )
+}
+
+fn sensitive_permission_boundary(text: &str) -> bool {
+    let lower = text.to_lowercase();
+    [
+        "planning only",
+        "planning-only",
+        "analysis only",
+        "analysis-only",
+        "planning/analysis",
+        "research only",
+        "research-only",
+        "request is read-only",
+        "request is read only",
+        "task is read-only",
+        "task is read only",
+        "work is read-only",
+        "work is read only",
+        "read-only request",
+        "read only request",
+        "read-only task",
+        "read only task",
+        "no implementation",
+        "no-implementation",
+        "without implementation",
+        "do not implement",
+        "don't implement",
+        "don’t implement",
+        "rather than implement",
+        "no edits",
+        "no-edit",
+        "without editing",
+        "do not edit",
+        "don't edit",
+        "don’t edit",
+        "no tools",
+        "no-tools",
+        "no tool use",
+        "do not run tools",
+        "do not use tools",
+        "don't run tools",
+        "don't use tools",
+        "don’t run tools",
+        "don’t use tools",
+    ]
+    .iter()
+    .any(|phrase| lower.contains(phrase))
+}
+
+fn user_explicitly_restricted_actions(prompts: &[String]) -> bool {
+    prompts.iter().any(|prompt| {
+        sensitive_permission_boundary(prompt) || {
+            let lower = prompt.to_lowercase();
+            lower.contains("only explain")
+                || lower.contains("only investigate")
+                || lower.contains("just explain")
+                || lower.contains("just investigate")
+        }
+    })
+}
+
+fn remove_unsubstantiated_permission_boundaries(
+    scope: &str,
+    prompts: &[String],
+    transition: &str,
+) -> (String, usize) {
+    let relevant_prompts = if transition
+        .split(',')
+        .any(|operation| operation.trim() == "REPLACE")
+    {
+        &prompts[prompts.len().saturating_sub(1)..]
+    } else {
+        prompts
+    };
+    if user_explicitly_restricted_actions(relevant_prompts) {
+        return (scope.to_string(), 0);
+    }
+    let mut removed = 0;
+    let retained = scope
+        .lines()
+        .filter(|line| {
+            let remove = sensitive_permission_boundary(line);
+            removed += usize::from(remove);
+            !remove
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    (retained, removed)
 }
 
 fn extract_scope_transition(output: &str) -> (String, String) {
@@ -163,6 +262,7 @@ pub fn summarize_scope(
         let mut store = SessionStore::open_or_create(cfg, cwd, session_id, "")?;
         if let Some(p) = extra_prompt {
             if !p.trim().is_empty() {
+                store.begin_scope_epoch();
                 store.append(SessionMessage::user_prompt(p, hash_prompt(p)));
                 store.persist()?;
             }
@@ -191,7 +291,7 @@ pub fn summarize_scope(
         cfg.summarize_prompt_chars,
     );
 
-    let (transition, out) = match model::complete(cfg, &sys, &harness) {
+    let (transition, raw_out) = match model::complete(cfg, &sys, &harness) {
         Ok(t) => {
             crate::model_health::record_success(cfg, "summarize");
             extract_scope_transition(&t)
@@ -208,6 +308,12 @@ pub fn summarize_scope(
             ("FALLBACK_LATEST".into(), fallback_scope(latest_prompt))
         }
     };
+    let (mut out, removed_permission_boundaries) =
+        remove_unsubstantiated_permission_boundaries(&raw_out, &prompts, &transition);
+    let permission_fallback = removed_permission_boundaries > 0 && out.trim().is_empty();
+    if permission_fallback {
+        out = latest_prompt_scope(latest_prompt);
+    }
 
     let hash = hash_prompt(&joined);
     let previous_scope_hash = previous_scope.as_deref().map(hash_prompt);
@@ -225,6 +331,8 @@ pub fn summarize_scope(
             "previous_scope_hash": previous_scope_hash,
             "scope_hash": scope_hash,
             "fallback": transition == "FALLBACK_LATEST",
+            "removed_permission_boundaries": removed_permission_boundaries,
+            "permission_fallback": permission_fallback,
         }),
     );
     eventlog::info(
@@ -255,13 +363,23 @@ pub fn judge_window(
             "transcript": transcript_path.map(|p| p.display().to_string()),
         }),
     );
-    let (pending_id, scope, journal, evidence_source, last_user, harness, store_cwd) = {
+    let (
+        pending_id,
+        judged_prompt_hash,
+        scope,
+        journal,
+        evidence_source,
+        last_user,
+        harness,
+        store_cwd,
+    ) = {
         let mut store = SessionStore::open_or_create(cfg, cwd, session_id, "")?;
         if let Some(tp) = transcript_path {
             store.set_transcript(Some(tp));
         }
 
-        let pending = SessionMessage::judgement(
+        let judged_prompt_hash = store.latest_user_prompt_hash().map(str::to_owned);
+        let mut pending = SessionMessage::judgement(
             from_count,
             to_count,
             JudgementVerdict::Unknown,
@@ -269,6 +387,7 @@ pub fn judge_window(
             "judging…",
             "",
         );
+        pending.prompt_hash = judged_prompt_hash.clone();
         let pending_id = pending.id.clone();
         store.upsert_judgement(pending);
         store.persist()?;
@@ -313,6 +432,7 @@ pub fn judge_window(
         drop(store);
         (
             pending_id,
+            judged_prompt_hash,
             scope,
             journal,
             evidence_source,
@@ -331,7 +451,7 @@ pub fn judge_window(
         if let Some(id) = &pending_id {
             store.data.messages.retain(|m| m.id.as_deref() != Some(id));
         }
-        let ready = SessionMessage::judgement(
+        let mut ready = SessionMessage::judgement(
             from_count,
             to_count,
             JudgementVerdict::InsufficientEvidence,
@@ -342,6 +462,7 @@ pub fn judge_window(
                  Scopey refuses to emit warning/off_track without visible tool evidence."
             ),
         );
+        ready.prompt_hash = judged_prompt_hash.clone();
         store.upsert_judgement(ready);
         store.data.last_judged_to_count = to_count;
         if store
@@ -386,6 +507,11 @@ Structured tool journal for THIS window only ({tool_n} tools, source={evidence_s
 
 Judge whether the agent is still working within the scope requirements.
 Treat LATEST USER PROMPT as authoritative if it conflicts with or supersedes the extracted scope.
+Do not enforce a planning-only, research-only, no-implementation, no-tools,
+no-edit, or read-only boundary unless the latest prompt explicitly imposes it
+or the scope bullet quotes the user's exact supporting words. Phrases such as
+"figure out how to", "design", "construct", "evaluate", and "research" are
+goals, not proof that implementation or tools are forbidden.
 If the latest prompt is a question, status request, or assessment, judge only whether the agent is answering/investigating that request; do not require implementation merely because an older scope did.
 Do not penalize the agent for retiring completed or superseded requirements.
 Focus especially on file writes/edits and shell commands that change system state.
@@ -411,7 +537,7 @@ Respond with EXACTLY this JSON object (no markdown fences):
         Err(e) => {
             crate::model_health::record_failure(cfg, "judge", &format!("{e:#}"));
             let mut store = SessionStore::open_or_create(cfg, cwd, session_id, &harness)?;
-            let failed = SessionMessage::judgement(
+            let mut failed = SessionMessage::judgement(
                 from_count,
                 to_count,
                 JudgementVerdict::Unknown,
@@ -419,6 +545,7 @@ Respond with EXACTLY this JSON object (no markdown fences):
                 format!("judge model error: {e:#}"),
                 "",
             );
+            failed.prompt_hash = judged_prompt_hash.clone();
             if let Some(id) = &pending_id {
                 store.data.messages.retain(|m| m.id.as_deref() != Some(id));
             }
@@ -453,7 +580,29 @@ Respond with EXACTLY this JSON object (no markdown fences):
         store.data.messages.retain(|m| m.id.as_deref() != Some(id));
     }
 
-    let ready = SessionMessage::judgement(
+    if store.latest_user_prompt_hash() != judged_prompt_hash.as_deref() {
+        let mut superseded = SessionMessage::judgement(
+            from_count,
+            to_count,
+            JudgementVerdict::Unknown,
+            JudgementStatus::Failed,
+            "judgement discarded because a newer user prompt changed scope",
+            "The judgement completed after its prompt epoch ended and was not eligible for notification or injection.",
+        );
+        superseded.prompt_hash = judged_prompt_hash;
+        store.data.pending_judgement_id = None;
+        store.upsert_judgement(superseded);
+        store.persist()?;
+        eventlog::info(
+            session_id,
+            "job.judge.superseded",
+            format!("discarded window [{from_count},{to_count}) after scope changed"),
+            json!({ "from": from_count, "to": to_count }),
+        );
+        return Ok(());
+    }
+
+    let mut ready = SessionMessage::judgement(
         from_count,
         to_count,
         verdict.clone(),
@@ -461,6 +610,7 @@ Respond with EXACTLY this JSON object (no markdown fences):
         summary.clone(),
         details.clone(),
     );
+    ready.prompt_hash = judged_prompt_hash;
     store.upsert_judgement(ready);
     store.data.last_judged_to_count = to_count;
     if store
@@ -917,11 +1067,72 @@ mod tests {
         assert!(prompt.contains("show me sample extractions"));
         assert!(prompt.contains("authoritative mutation"));
         assert!(prompt.contains("preserve every unaffected active requirement"));
-        assert!(prompt.contains("Never convert the\n  query itself into authorization"));
+        assert!(prompt.contains("State the requested output\n  positively"));
         assert!(prompt.contains("ADD,SUBTRACT"));
         assert!(prompt.contains("possibly stale"));
+        assert!(prompt.contains("does not mean planning-only"));
+        assert!(prompt.contains("quote the user's exact supporting words"));
         assert!(!prompt.contains("old mascot task"));
         assert!(prompt.contains("add analytics"));
+    }
+
+    #[test]
+    fn invented_planning_only_boundary_is_removed() {
+        let prompts =
+            vec!["Let's figure out how to construct that test and evaluate it".to_string()];
+        let scope = "- Construct the baseline test\n- Current task is planning/analysis; do not edit files or run tools.";
+        let (sanitized, removed) =
+            remove_unsubstantiated_permission_boundaries(scope, &prompts, "REPLACE");
+        assert_eq!(removed, 1);
+        assert_eq!(sanitized, "- Construct the baseline test");
+    }
+
+    #[test]
+    fn explicit_no_edit_boundary_is_preserved() {
+        let prompts = vec!["Investigate only; do not edit files".to_string()];
+        let scope = "- Investigate the failure\n- Do not edit files.";
+        let (sanitized, removed) =
+            remove_unsubstantiated_permission_boundaries(scope, &prompts, "REPLACE");
+        assert_eq!(removed, 0);
+        assert_eq!(sanitized, scope);
+    }
+
+    #[test]
+    fn permission_filter_can_detect_empty_scope_for_safe_fallback() {
+        let prompts = vec!["Construct and evaluate the test".to_string()];
+        let (sanitized, removed) = remove_unsubstantiated_permission_boundaries(
+            "- Planning only; do not edit files.",
+            &prompts,
+            "REPLACE",
+        );
+        assert_eq!(removed, 1);
+        assert!(sanitized.is_empty());
+        let fallback = latest_prompt_scope(prompts.last().unwrap());
+        assert!(fallback.contains("Construct and evaluate"));
+        assert!(!fallback.contains(crate::session::FALLBACK_SCOPE_MARKER));
+    }
+
+    #[test]
+    fn replace_does_not_reuse_old_permission_boundary() {
+        let prompts = vec![
+            "Only investigate the old failure; do not edit files".to_string(),
+            "Instead, implement the new benchmark".to_string(),
+        ];
+        let scope = "- Implement the new benchmark\n- Do not edit files.";
+        let (sanitized, removed) =
+            remove_unsubstantiated_permission_boundaries(scope, &prompts, "REPLACE");
+        assert_eq!(removed, 1);
+        assert_eq!(sanitized, "- Implement the new benchmark");
+    }
+
+    #[test]
+    fn semantic_constraints_are_not_permission_boundaries() {
+        let prompts = vec!["Refactor the query while preserving its join semantics".to_string()];
+        let scope = "- Refactor the query\n- Do not modify the join semantics.";
+        let (sanitized, removed) =
+            remove_unsubstantiated_permission_boundaries(scope, &prompts, "REPLACE");
+        assert_eq!(removed, 0);
+        assert_eq!(sanitized, scope);
     }
 
     #[test]

@@ -255,6 +255,10 @@ pub struct SessionData {
     pub last_reminder_at_count: u64,
     #[serde(default)]
     pub last_injection_at_count: u64,
+    /// Meaningful-tool count when the latest user-authored scope epoch began.
+    /// Judge windows must never include tools before this boundary.
+    #[serde(default)]
+    pub scope_epoch_start_tool_count: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transcript_path: Option<String>,
     #[serde(default)]
@@ -490,6 +494,7 @@ impl SessionStore {
             last_judged_to_count: 0,
             last_reminder_at_count: 0,
             last_injection_at_count: 0,
+            scope_epoch_start_tool_count: 0,
             transcript_path: None,
             messages: vec![],
             pending_judgement_id: None,
@@ -620,12 +625,47 @@ impl SessionStore {
             .collect()
     }
 
+    pub fn latest_user_prompt_hash(&self) -> Option<&str> {
+        self.data
+            .messages
+            .iter()
+            .rev()
+            .find(|m| m.type_ == MessageType::UserPrompt)
+            .and_then(|m| m.prompt_hash.as_deref())
+    }
+
+    /// Start a new user-authored scope epoch.
+    ///
+    /// A judgement about tools from an older prompt cannot be applied to the
+    /// new prompt, even when it is still young according to the tool-lag cap.
+    pub fn begin_scope_epoch(&mut self) -> usize {
+        let mut invalidated = 0;
+        for message in &mut self.data.messages {
+            if message.type_ == MessageType::Judgement
+                && matches!(
+                    message.status,
+                    Some(JudgementStatus::Pending) | Some(JudgementStatus::Ready)
+                )
+            {
+                message.status = Some(JudgementStatus::Failed);
+                message.summary = Some("superseded by a newer user prompt".into());
+                invalidated += 1;
+            }
+        }
+        self.data.pending_judgement_id = None;
+        self.data.pending_judge = None;
+        self.data.scope_epoch_start_tool_count = self.data.tool_call_count;
+        invalidated
+    }
+
     /// Ready judgement that has not been injected yet (prefer newest).
     /// Never returns InsufficientEvidence / OnTrack / Unknown.
     pub fn ready_judgement_for_injection(&self) -> Option<&SessionMessageWire> {
+        let current_prompt_hash = self.latest_user_prompt_hash();
         self.data.messages.iter().rev().find(|m| {
             m.type_ == MessageType::Judgement
                 && m.status == Some(JudgementStatus::Ready)
+                && m.prompt_hash.as_deref() == current_prompt_hash
                 && matches!(
                     m.verdict,
                     Some(JudgementVerdict::OffTrack) | Some(JudgementVerdict::Warning)
@@ -979,6 +1019,7 @@ mod tests {
             last_judged_to_count: 0,
             last_reminder_at_count: 0,
             last_injection_at_count: 0,
+            scope_epoch_start_tool_count: 0,
             transcript_path: None,
             messages: vec![],
             pending_judgement_id: None,
@@ -1074,6 +1115,67 @@ mod tests {
             Some("drifted")
         );
         s.mark_judgement_injected(&jid);
+        assert!(s.ready_judgement_for_injection().is_none());
+    }
+
+    #[test]
+    fn new_user_prompt_epoch_invalidates_prior_judgements() {
+        let dir = tempfile::tempdir().unwrap();
+        let cfg = test_cfg(dir.path());
+        let cwd = dir.path().join("proj");
+        fs::create_dir_all(&cwd).unwrap();
+        let mut s = SessionStore::open_or_create(&cfg, &cwd, "epoch", "codex").unwrap();
+        let first_hash = hash_prompt("write the plan");
+        s.append(SessionMessage::user_prompt("write the plan", &first_hash));
+        s.data.tool_call_count = 45;
+        let mut judgement = SessionMessage::judgement(
+            30,
+            45,
+            JudgementVerdict::OffTrack,
+            JudgementStatus::Ready,
+            "old scope",
+            "old tools",
+        );
+        judgement.prompt_hash = Some(first_hash);
+        s.upsert_judgement(judgement);
+        assert!(s.ready_judgement_for_injection().is_some());
+
+        assert_eq!(s.begin_scope_epoch(), 1);
+        s.append(SessionMessage::user_prompt(
+            "create a new branch",
+            hash_prompt("create a new branch"),
+        ));
+
+        assert_eq!(s.data.scope_epoch_start_tool_count, 45);
+        assert!(s.data.pending_judge.is_none());
+        assert!(s.ready_judgement_for_injection().is_none());
+        assert!(s.data.messages.iter().any(|message| {
+            message.status == Some(JudgementStatus::Failed)
+                && message.summary.as_deref() == Some("superseded by a newer user prompt")
+        }));
+    }
+
+    #[test]
+    fn judgement_for_different_prompt_hash_is_not_injectable() {
+        let dir = tempfile::tempdir().unwrap();
+        let cfg = test_cfg(dir.path());
+        let cwd = dir.path().join("proj");
+        fs::create_dir_all(&cwd).unwrap();
+        let mut s = SessionStore::open_or_create(&cfg, &cwd, "hash", "codex").unwrap();
+        s.append(SessionMessage::user_prompt(
+            "new task",
+            hash_prompt("new task"),
+        ));
+        let mut judgement = SessionMessage::judgement(
+            0,
+            15,
+            JudgementVerdict::OffTrack,
+            JudgementStatus::Ready,
+            "old task",
+            "old tools",
+        );
+        judgement.prompt_hash = Some(hash_prompt("old task"));
+        s.upsert_judgement(judgement);
         assert!(s.ready_judgement_for_injection().is_none());
     }
 
