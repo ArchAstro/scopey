@@ -1,0 +1,6 @@
+dataset,seed,baseline_seconds,candidate_seconds,baseline_accuracy,candidate_accuracy
+alpha,7,12.4,11.8,0.884,0.881
+beta,7,4.1,3.9,0.912,0.901
+gamma,7,38.7,42.5,0.771,0.779
+delta,7,8.6,8.2,0.843,0.842
+epsilon,7,21.3,19.7,0.926,0.914

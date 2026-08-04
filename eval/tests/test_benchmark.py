@@ -42,15 +42,19 @@ def arm(
 
 
 class CorpusContractTests(unittest.TestCase):
-    def test_corpus_has_six_drift_and_five_clean_tasks(self) -> None:
+    def test_corpus_has_five_long_horizon_tasks_plus_original_corpus(self) -> None:
         cases = []
         for path in sorted((EVAL_ROOT / "cases").glob("*.json")):
             case = json.loads(path.read_text(encoding="utf-8"))
             validate_case(case, path)
             cases.append(case)
-        self.assertEqual(len(cases), 11)
-        self.assertEqual(sum(case["mode"] == "required_drift" for case in cases), 6)
+        self.assertEqual(len(cases), 16)
+        self.assertEqual(sum(case["mode"] == "required_drift" for case in cases), 11)
         self.assertEqual(sum(case["mode"] == "no_drift" for case in cases), 5)
+        long_horizon = [case for case in cases if case.get("forced_drift_steps")]
+        self.assertEqual(len(long_horizon), 5)
+        self.assertTrue(all(len(case["forced_drift_steps"]) >= 8 for case in long_horizon))
+        self.assertTrue(all(case.get("provenance", {}).get("url") for case in long_horizon))
 
 
 class StatisticsTests(unittest.TestCase):

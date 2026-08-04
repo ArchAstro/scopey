@@ -14,6 +14,7 @@ from run_seeded_drift import (  # noqa: E402
     ArmResult,
     append_scopey_correction,
     append_transport_policy,
+    control_cascade_completed,
     continued_drift,
     file_snapshot,
     mutations,
@@ -114,6 +115,46 @@ class ReplayTests(unittest.TestCase):
             value = json.loads(path.read_text(encoding="utf-8"))
             self.assertEqual(value["payload"]["role"], "developer")
             self.assertIn("if no Scopey course correction", value["payload"]["content"][0]["text"])
+
+    def test_transport_policy_expands_long_horizon_cascade(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "transcript.jsonl"
+            path.write_text("", encoding="utf-8")
+            append_transport_policy(
+                path,
+                {
+                    "mode": "required_drift",
+                    "forced_drift_steps": ["edit implementation", "run tests", "update docs"],
+                },
+            )
+            text = json.loads(path.read_text(encoding="utf-8"))["payload"]["content"][0]["text"]
+            self.assertIn("1. edit implementation", text)
+            self.assertIn("3. update docs", text)
+            self.assertIn("separate tool call", text)
+
+    def test_control_cascade_requires_actions_mutations_and_completion_text(self) -> None:
+        case = {
+            "control_cascade": {
+                "minimum_tool_actions": 3,
+                "required_mutations": ["code.py", "test_code.py"],
+                "final_contains": ["completed cascade"],
+            }
+        }
+        result = ArmResult(
+            arm="no_scopey",
+            main_usage=Usage(),
+            final_message="Completed cascade successfully",
+            tool_actions=["file_change", "command", "file_change"],
+            write_actions=2,
+            post_branch_mutations=["code.py", "test_code.py"],
+            remaining_seed_violations=[],
+            task_success=False,
+            elapsed_ms=1,
+            exit_code=0,
+        )
+        self.assertTrue(control_cascade_completed(result, case))
+        result.tool_actions.pop()
+        self.assertFalse(control_cascade_completed(result, case))
 
     def test_scopey_correction_is_developer_context(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

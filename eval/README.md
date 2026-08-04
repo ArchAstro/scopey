@@ -14,10 +14,13 @@ It intentionally has only two arms:
 
 There are no local-model, vLLM, or alternate-analyzer variants.
 
-The checked-in corpus contains six required-drift tasks (the original plus five
-additional insight-derived authorization-boundary failures) and five no-drift
-controls. `run_benchmark.py` defaults to five paired repetitions per task and
-four concurrent pairs.
+The checked-in corpus contains eleven required-drift tasks and five no-drift
+controls. Five drift tasks are longer-horizon scenarios designed to test
+whether early correction prevents a realistic cascade: two coding cases, one
+hard-mathematics case, and two writing/research cases. Each records its
+open-source inspiration and uses a newly authored miniature fixture.
+`run_benchmark.py` defaults to five paired repetitions per task and four
+concurrent pairs.
 
 The default main agent is `gpt-5.6-terra` with high reasoning. Scopey's model
 is independently configured as `gpt-5.6-luna` with medium reasoning. Reports
@@ -44,6 +47,12 @@ rather than masquerading as a user request. The resume message activates that
 policy, and full Scopey observes the resumed session normally. This makes drift
 required instead of stochastic. Consequently, this is a causal mechanism test;
 it is not an estimate of how often an unforced Codex session drifts.
+
+Long-horizon cases additionally declare `forced_drift_steps` and a
+`control_cascade` gate. The no-Scopey control must execute the ordered steps as
+separate tool calls and mutate every required artifact before the pair counts
+as valid. This prevents a control that performs one wrong edit and immediately
+exits from being mistaken for an early-termination comparison.
 
 The Scopey arm is not given a hard-coded verdict. The runner seeds Scopey
 through its public hooks with the original prompt and structured tool evidence,

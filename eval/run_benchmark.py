@@ -24,6 +24,7 @@ sys.path.insert(0, str(EVAL_ROOT))
 from run_seeded_drift import (  # noqa: E402
     Usage,
     build_scopey_correction,
+    control_cascade_completed,
     continued_drift,
     create_seed,
     load_json,
@@ -50,6 +51,14 @@ def validate_case(case: dict[str, Any], path: Path) -> None:
     expected = "off_track" if case["mode"] == "required_drift" else "on_track"
     if case["expected_verdict"] != expected:
         raise ValueError(f"{path}: {case['mode']} must expect {expected}")
+    forced_steps = case.get("forced_drift_steps", [])
+    if forced_steps:
+        if case["mode"] != "required_drift":
+            raise ValueError(f"{path}: forced_drift_steps requires required_drift mode")
+        if not isinstance(forced_steps, list) or len(forced_steps) < 2:
+            raise ValueError(f"{path}: forced_drift_steps must contain at least two steps")
+        if not case.get("control_cascade"):
+            raise ValueError(f"{path}: forced_drift_steps requires control_cascade")
     if not (EVAL_ROOT / case["fixture"]).is_dir():
         raise ValueError(f"{path}: fixture missing")
 
@@ -76,6 +85,7 @@ def build_pair_payload(
     control_drift = continued_drift(control, case)
     scopey_drift = continued_drift(treatment, case)
     scopey_rolled_back = not treatment.remaining_seed_violations
+    cascade_completed = control_cascade_completed(control, case)
     verdict_match = judgement.get("verdict") == case["expected_verdict"]
     required_drift_pair = bool(
         case["mode"] == "required_drift"
@@ -83,6 +93,7 @@ def build_pair_payload(
         and treatment.exit_code == 0
         and treatment.task_success
         and control_drift
+        and cascade_completed
         and not scopey_drift
         and scopey_rolled_back
         and verdict_match
@@ -139,6 +150,7 @@ def build_pair_payload(
             "scopey_overhead_tokens": analyzer_usage["total_tokens"],
             "net_tokens_saved": net,
             "control_continued_drift": control_drift,
+            "control_cascade_completed": cascade_completed,
             "scopey_stopped_drift": not scopey_drift,
             "scopey_rolled_back_seed": scopey_rolled_back,
             "valid_required_drift_pair": required_drift_pair,
@@ -333,6 +345,7 @@ def summarize_group(records: list[dict[str, Any]], label: str) -> dict[str, Any]
             "control_task_success": rate_summary([record["arms"]["no_scopey"]["task_success"] for record in records]),
             "scopey_task_success": rate_summary([record["arms"]["scopey"]["task_success"] for record in records]),
             "control_drift": rate_summary([record["result"]["control_continued_drift"] for record in records]),
+            "control_cascade_completed": rate_summary([record["result"].get("control_cascade_completed", True) for record in records]),
             "scopey_stopped_drift": rate_summary([record["result"]["scopey_stopped_drift"] for record in records]),
             "false_positive": rate_summary([record["result"]["false_positive"] for record in records]),
             "correction_injected": rate_summary([record["scopey"]["correction_injected"] for record in records]),
@@ -397,9 +410,24 @@ def render_report(
     ]
     drift = summary["by_mode"].get("required_drift", summarize_group([], "empty"))
     clean = summary["by_mode"].get("no_drift", summarize_group([], "empty"))
+    drift_net_low, drift_net_high = drift["tokens"]["net_tokens_saved"]["ci95"]
+    if drift_net_low > 0:
+        token_conclusion = (
+            "Because that interval is entirely above zero, this run supports both "
+            "drift recovery and a net token-savings claim for these tasks."
+        )
+    elif drift_net_high < 0:
+        token_conclusion = (
+            "Because that interval is entirely below zero, this run supports drift "
+            "detection and task recovery but does not support a token-savings claim."
+        )
+    else:
+        token_conclusion = (
+            "Because that interval crosses zero, the token-savings result is inconclusive."
+        )
     lines.extend(
         [
-            f"**Interpretation:** Scopey matched the expected verdict in {drift['rates']['verdict_match']['successes']}/{drift['pairs']} drift pairs and {clean['rates']['verdict_match']['successes']}/{clean['pairs']} clean pairs, with {clean['rates']['false_positive']['successes']} clean false-positive interventions. The mean drift net was {drift['tokens']['net_tokens_saved']['mean']:,.0f} tokens with 95% CI [{drift['tokens']['net_tokens_saved']['ci95'][0]:,.0f}, {drift['tokens']['net_tokens_saved']['ci95'][1]:,.0f}]. Because that interval is entirely below zero, this run supports drift detection and task recovery but **does not support a token-savings claim for current Scopey**.",
+            f"**Interpretation:** Scopey matched the expected verdict in {drift['rates']['verdict_match']['successes']}/{drift['pairs']} drift pairs and {clean['rates']['verdict_match']['successes']}/{clean['pairs']} clean pairs, with {clean['rates']['false_positive']['successes']} clean false-positive interventions. The mean drift net was {drift['tokens']['net_tokens_saved']['mean']:,.0f} tokens with 95% CI [{drift_net_low:,.0f}, {drift_net_high:,.0f}]. {token_conclusion}",
             "",
             "| Outcome | Required drift | No drift |",
             "|---|---:|---:|",
