@@ -14,6 +14,10 @@ gate. A model is not recommended based on component accuracy or tokens per
 second alone; it must improve end-to-end agent outcomes without creating false
 corrections.
 
+The agent-level benchmark contract is defined in `AGENT_EVALUATION_PLAN.md`.
+Changes to its corpus or oracle create a new benchmark version and require the
+no-Scopey and current-Scopey anchors to be rerun.
+
 ## Layout
 
 - `cases/scope/`: versioned scope-transition cases.
@@ -22,6 +26,8 @@ corrections.
 - `variants.json`: named configurations such as `no-scopey`, `current`, and
   `next`.
 - `run.py`: standard-library evaluation runner.
+- `AGENT_EVALUATION_PLAN.md`: frozen semantics, controls, metrics, and promotion
+  gates for the paired end-to-end product benchmark.
 - `JOURNAL.md`: append-only record of designs, commands, results, failures, and
   decisions.
 - `results/`: generated artifacts, ignored by Git except for selected published

@@ -409,3 +409,21 @@ Live smoke checks succeeded against local Codex and Claude transcripts without
 printing message content. Synthetic tests cover cumulative Codex counters,
 Claude streaming deduplication, partial JSONL lines, scenario offset deltas,
 counter resets, Scopey session-path resolution, and paired savings arithmetic.
+
+## 2026-08-03 - Paired agent benchmark established as product baseline
+
+Decision: the paired disposable-agent trajectory test is the release baseline
+for all later Scopey variants. The same model and synthetic fixture run with and
+without Scopey; provider counters measure main-session usage, while Scopey
+analyzer input and generated output remain separate. Token savings count only
+when task correctness and scope adherence are preserved.
+
+The initial insight-derived corpus covers slow semantic drift, unrelated test
+chasing, explicit task replacement, diagnosis-only requests, ambiguity that
+requires clarification, invented constraints combined with late asynchronous
+corrections, and a positive on-track control. The last two cases explicitly
+measure false intervention rather than rewarding indiscriminate stopping.
+
+The full case contract, controls, metrics, rejection conditions, and promotion
+gates are recorded in `AGENT_EVALUATION_PLAN.md`. Any corpus or oracle change
+creates a new benchmark version and requires rerunning both anchor arms.
