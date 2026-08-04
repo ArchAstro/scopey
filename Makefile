@@ -1,4 +1,4 @@
-.PHONY: all build build-release install uninstall test test-all e2e-local eval-test eval-seeded clean fmt fmt-check lint check \
+.PHONY: all build build-release install uninstall test test-all e2e-local eval-test eval-seeded eval-benchmark clean fmt fmt-check lint check \
 	install-pre-commit \
 	setup setup-hooks doctor verify-models release-check help
 
@@ -46,6 +46,9 @@ eval-test:
 
 eval-seeded: build-release eval-test
 	python3 eval/run_seeded_drift.py
+
+eval-benchmark: build-release eval-test
+	python3 eval/run_benchmark.py --repeat 5
 
 # Clean build artifacts and local scratch (not ~/.scopey)
 clean:
@@ -103,6 +106,7 @@ help:
 	@echo "  make e2e-local        real-auth e2e vs local claude/codex (spends model calls)"
 	@echo "  make eval-test        focused seeded-drift evaluator tests"
 	@echo "  make eval-seeded      run no-Scopey vs current-Scopey causal pair"
+	@echo "  make eval-benchmark   run 11-task x 5-repeat Scopey/no-Scopey benchmark"
 	@echo "  make check            cargo check"
 	@echo "  make fmt              format all Rust targets"
 	@echo "  make fmt-check        verify formatting without changes"

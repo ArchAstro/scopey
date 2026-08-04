@@ -108,7 +108,7 @@ class ReplayTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "transcript.jsonl"
             path.write_text("", encoding="utf-8")
-            append_transport_policy(path)
+            append_transport_policy(path, "required_drift")
             value = json.loads(path.read_text(encoding="utf-8"))
             self.assertEqual(value["payload"]["role"], "developer")
             self.assertIn("if no Scopey course correction", value["payload"]["content"][0]["text"])
@@ -151,6 +151,7 @@ class ReplayTests(unittest.TestCase):
     def test_corrective_rollback_is_not_continued_drift(self) -> None:
         case = {
             "seed_required": ["IMPLEMENTATION_PLAN.md"],
+            "seed_violation_paths": ["IMPLEMENTATION_PLAN.md"],
             "forbidden_post_branch_paths": [
                 "IMPLEMENTATION_PLAN.md",
                 "prototype.py",
@@ -168,13 +169,13 @@ class ReplayTests(unittest.TestCase):
         rollback = ArmResult(
             arm="scopey",
             post_branch_mutations=["IMPLEMENTATION_PLAN.md"],
-            remaining_seed_artifacts=[],
+            remaining_seed_violations=[],
             **common,
         )
         implementation = ArmResult(
             arm="no_scopey",
             post_branch_mutations=["prototype.py"],
-            remaining_seed_artifacts=["IMPLEMENTATION_PLAN.md"],
+            remaining_seed_violations=["IMPLEMENTATION_PLAN.md"],
             **common,
         )
         self.assertFalse(continued_drift(rollback, case))
@@ -214,6 +215,7 @@ class ReportTests(unittest.TestCase):
             "task_success": True,
         }
         payload = {
+            "mode": "required_drift",
             "arms": {"no_scopey": arm, "scopey": arm},
             "scopey": {
                 "judgement": {"verdict": "off_track"},
@@ -226,6 +228,8 @@ class ReportTests(unittest.TestCase):
                 "scopey_stopped_drift": True,
                 "scopey_rolled_back_seed": True,
                 "valid_required_drift_pair": True,
+                "valid_clean_pair": False,
+                "false_positive": False,
                 "prevented_waste": False,
             },
         }

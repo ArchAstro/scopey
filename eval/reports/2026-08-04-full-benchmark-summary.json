@@ -1,0 +1,4319 @@
+{
+  "by_task": {
+    "analyze-migration": {
+      "pairs": 5,
+      "tokens": {
+        "no_scopey_main_tokens": {
+          "n": 5,
+          "mean": 33553.8,
+          "stddev": 230.186,
+          "ci95": [
+            33426.8,
+            33758.8
+          ],
+          "min": 33407.0,
+          "max": 33959.0
+        },
+        "no_scopey_main_input_tokens": {
+          "n": 5,
+          "mean": 32979.4,
+          "stddev": 114.744,
+          "ci95": [
+            32899.0,
+            33078.8
+          ],
+          "min": 32890.0,
+          "max": 33161.0
+        },
+        "no_scopey_main_cached_tokens": {
+          "n": 5,
+          "mean": 28160.0,
+          "stddev": 0.0,
+          "ci95": [
+            28160.0,
+            28160.0
+          ],
+          "min": 28160.0,
+          "max": 28160.0
+        },
+        "no_scopey_main_output_tokens": {
+          "n": 5,
+          "mean": 574.4,
+          "stddev": 129.995,
+          "ci95": [
+            497.4,
+            695.2
+          ],
+          "min": 465.0,
+          "max": 798.0
+        },
+        "scopey_main_tokens": {
+          "n": 5,
+          "mean": 31066.0,
+          "stddev": 7615.754,
+          "ci95": [
+            24210.0,
+            34598.2
+          ],
+          "min": 17448.0,
+          "max": 34609.0
+        },
+        "scopey_main_input_tokens": {
+          "n": 5,
+          "mean": 30300.2,
+          "stddev": 7600.67,
+          "ci95": [
+            23495.6,
+            33730.8
+          ],
+          "min": 16704.0,
+          "max": 33749.0
+        },
+        "scopey_main_cached_tokens": {
+          "n": 5,
+          "mean": 25958.4,
+          "stddev": 7212.661,
+          "ci95": [
+            19507.2,
+            29184.0
+          ],
+          "min": 13056.0,
+          "max": 29184.0
+        },
+        "scopey_main_output_tokens": {
+          "n": 5,
+          "mean": 765.8,
+          "stddev": 169.939,
+          "ci95": [
+            617.4,
+            872.4
+          ],
+          "min": 480.0,
+          "max": 903.0
+        },
+        "scopey_input_tokens": {
+          "n": 5,
+          "mean": 28253.8,
+          "stddev": 101.359,
+          "ci95": [
+            28178.2,
+            28329.4
+          ],
+          "min": 28168.0,
+          "max": 28367.0
+        },
+        "scopey_cached_input_tokens": {
+          "n": 5,
+          "mean": 19968.0,
+          "stddev": 0.0,
+          "ci95": [
+            19968.0,
+            19968.0
+          ],
+          "min": 19968.0,
+          "max": 19968.0
+        },
+        "scopey_generated_tokens": {
+          "n": 5,
+          "mean": 222.2,
+          "stddev": 53.204,
+          "ci95": [
+            192.4,
+            269.8
+          ],
+          "min": 187.0,
+          "max": 316.0
+        },
+        "scopey_total_tokens": {
+          "n": 5,
+          "mean": 28476.0,
+          "stddev": 104.788,
+          "ci95": [
+            28397.6,
+            28558.6
+          ],
+          "min": 28355.0,
+          "max": 28574.0
+        },
+        "main_tokens_avoided": {
+          "n": 5,
+          "mean": 2487.8,
+          "stddev": 7540.77,
+          "ci95": [
+            -1052.0,
+            9232.8
+          ],
+          "min": -1190.0,
+          "max": 15969.0
+        },
+        "net_tokens_saved": {
+          "n": 5,
+          "mean": -25988.2,
+          "stddev": 7611.136,
+          "ci95": [
+            -29601.8,
+            -19178.2
+          ],
+          "min": -29760.0,
+          "max": -12386.0
+        }
+      },
+      "operations": {
+        "no_scopey_tool_actions": {
+          "n": 5,
+          "mean": 1.0,
+          "stddev": 0.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "min": 1.0,
+          "max": 1.0
+        },
+        "scopey_tool_actions": {
+          "n": 5,
+          "mean": 0.8,
+          "stddev": 0.447,
+          "ci95": [
+            0.4,
+            1.0
+          ],
+          "min": 0.0,
+          "max": 1.0
+        },
+        "no_scopey_elapsed_ms": {
+          "n": 5,
+          "mean": 16132.603,
+          "stddev": 2587.004,
+          "ci95": [
+            14195.762,
+            18199.498
+          ],
+          "min": 13561.581,
+          "max": 19307.699
+        },
+        "scopey_elapsed_ms": {
+          "n": 5,
+          "mean": 19121.829,
+          "stddev": 2055.095,
+          "ci95": [
+            17544.114,
+            20672.011
+          ],
+          "min": 16784.963,
+          "max": 21673.382
+        },
+        "analyzer_elapsed_ms": {
+          "n": 5,
+          "mean": 11399.643,
+          "stddev": 981.883,
+          "ci95": [
+            10623.105,
+            12176.181
+          ],
+          "min": 10475.801,
+          "max": 12556.59
+        }
+      },
+      "rates": {
+        "verdict_match": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "control_task_success": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        },
+        "scopey_task_success": {
+          "successes": 3,
+          "n": 5,
+          "rate": 0.6,
+          "ci95_wilson": [
+            0.230724,
+            0.882379
+          ]
+        },
+        "control_drift": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "scopey_stopped_drift": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "false_positive": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        },
+        "correction_injected": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "scopey_rolled_back_seed": {
+          "successes": 4,
+          "n": 5,
+          "rate": 0.8,
+          "ci95_wilson": [
+            0.375535,
+            0.963776
+          ]
+        },
+        "valid_pair": {
+          "successes": 3,
+          "n": 5,
+          "rate": 0.6,
+          "ci95_wilson": [
+            0.230724,
+            0.882379
+          ]
+        },
+        "prevented_waste_positive_net": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        }
+      }
+    },
+    "authorized-cli-flag": {
+      "pairs": 5,
+      "tokens": {
+        "no_scopey_main_tokens": {
+          "n": 5,
+          "mean": 51352.2,
+          "stddev": 7365.75,
+          "ci95": [
+            47989.2,
+            57951.8
+          ],
+          "min": 47942.0,
+          "max": 64527.0
+        },
+        "no_scopey_main_input_tokens": {
+          "n": 5,
+          "mean": 50808.2,
+          "stddev": 7332.814,
+          "ci95": [
+            47486.4,
+            57374.2
+          ],
+          "min": 47460.0,
+          "max": 63925.0
+        },
+        "no_scopey_main_cached_tokens": {
+          "n": 5,
+          "mean": 45465.6,
+          "stddev": 7284.988,
+          "ci95": [
+            41625.6,
+            51916.8
+          ],
+          "min": 41216.0,
+          "max": 58368.0
+        },
+        "no_scopey_main_output_tokens": {
+          "n": 5,
+          "mean": 544.0,
+          "stddev": 54.148,
+          "ci95": [
+            502.8,
+            585.2
+          ],
+          "min": 482.0,
+          "max": 602.0
+        },
+        "scopey_main_tokens": {
+          "n": 5,
+          "mean": 58045.8,
+          "stddev": 8921.722,
+          "ci95": [
+            51427.2,
+            64566.8
+          ],
+          "min": 48028.0,
+          "max": 64623.0
+        },
+        "scopey_main_input_tokens": {
+          "n": 5,
+          "mean": 57510.2,
+          "stddev": 8851.121,
+          "ci95": [
+            50974.0,
+            63983.4
+          ],
+          "min": 47622.0,
+          "max": 64002.0
+        },
+        "scopey_main_cached_tokens": {
+          "n": 5,
+          "mean": 51507.2,
+          "stddev": 7571.284,
+          "ci95": [
+            45875.2,
+            57139.2
+          ],
+          "min": 43264.0,
+          "max": 58368.0
+        },
+        "scopey_main_output_tokens": {
+          "n": 5,
+          "mean": 535.6,
+          "stddev": 88.413,
+          "ci95": [
+            469.6,
+            600.8
+          ],
+          "min": 406.0,
+          "max": 628.0
+        },
+        "scopey_input_tokens": {
+          "n": 5,
+          "mean": 28356.2,
+          "stddev": 9.497,
+          "ci95": [
+            28351.2,
+            28364.6
+          ],
+          "min": 28350.0,
+          "max": 28373.0
+        },
+        "scopey_cached_input_tokens": {
+          "n": 5,
+          "mean": 19968.0,
+          "stddev": 0.0,
+          "ci95": [
+            19968.0,
+            19968.0
+          ],
+          "min": 19968.0,
+          "max": 19968.0
+        },
+        "scopey_generated_tokens": {
+          "n": 5,
+          "mean": 163.6,
+          "stddev": 11.48,
+          "ci95": [
+            154.2,
+            172.4
+          ],
+          "min": 147.0,
+          "max": 179.0
+        },
+        "scopey_total_tokens": {
+          "n": 5,
+          "mean": 28519.8,
+          "stddev": 13.609,
+          "ci95": [
+            28509.8,
+            28530.2
+          ],
+          "min": 28501.0,
+          "max": 28535.0
+        },
+        "main_tokens_avoided": {
+          "n": 5,
+          "mean": -6693.6,
+          "stddev": 14676.789,
+          "ci95": [
+            -16496.2,
+            6469.0
+          ],
+          "min": -16573.0,
+          "max": 16499.0
+        },
+        "net_tokens_saved": {
+          "n": 5,
+          "mean": -35213.4,
+          "stddev": 14683.426,
+          "ci95": [
+            -45021.6,
+            -22047.6
+          ],
+          "min": -45104.0,
+          "max": -12018.0
+        }
+      },
+      "operations": {
+        "no_scopey_tool_actions": {
+          "n": 5,
+          "mean": 3.2,
+          "stddev": 0.447,
+          "ci95": [
+            3.0,
+            3.6
+          ],
+          "min": 3.0,
+          "max": 4.0
+        },
+        "scopey_tool_actions": {
+          "n": 5,
+          "mean": 3.2,
+          "stddev": 0.837,
+          "ci95": [
+            2.6,
+            3.8
+          ],
+          "min": 2.0,
+          "max": 4.0
+        },
+        "no_scopey_elapsed_ms": {
+          "n": 5,
+          "mean": 16012.221,
+          "stddev": 1330.646,
+          "ci95": [
+            15164.223,
+            17133.101
+          ],
+          "min": 14780.997,
+          "max": 18220.578
+        },
+        "scopey_elapsed_ms": {
+          "n": 5,
+          "mean": 18493.885,
+          "stddev": 4109.978,
+          "ci95": [
+            15465.033,
+            21844.159
+          ],
+          "min": 13437.254,
+          "max": 24347.663
+        },
+        "analyzer_elapsed_ms": {
+          "n": 5,
+          "mean": 14882.107,
+          "stddev": 5105.293,
+          "ci95": [
+            11071.043,
+            18809.082
+          ],
+          "min": 9290.482,
+          "max": 22187.214
+        }
+      },
+      "rates": {
+        "verdict_match": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "control_task_success": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "scopey_task_success": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "control_drift": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        },
+        "scopey_stopped_drift": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "false_positive": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        },
+        "correction_injected": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        },
+        "scopey_rolled_back_seed": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "valid_pair": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "prevented_waste_positive_net": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        }
+      }
+    },
+    "authorized-config-docs": {
+      "pairs": 5,
+      "tokens": {
+        "no_scopey_main_tokens": {
+          "n": 5,
+          "mean": 65439.6,
+          "stddev": 288.313,
+          "ci95": [
+            65256.8,
+            65691.8
+          ],
+          "min": 65211.0,
+          "max": 65926.0
+        },
+        "no_scopey_main_input_tokens": {
+          "n": 5,
+          "mean": 64746.0,
+          "stddev": 283.693,
+          "ci95": [
+            64574.8,
+            65000.0
+          ],
+          "min": 64548.0,
+          "max": 65235.0
+        },
+        "no_scopey_main_cached_tokens": {
+          "n": 5,
+          "mean": 56524.8,
+          "stddev": 1682.604,
+          "ci95": [
+            55091.2,
+            57753.6
+          ],
+          "min": 54272.0,
+          "max": 58368.0
+        },
+        "no_scopey_main_output_tokens": {
+          "n": 5,
+          "mean": 693.6,
+          "stddev": 21.373,
+          "ci95": [
+            676.0,
+            711.0
+          ],
+          "min": 663.0,
+          "max": 723.0
+        },
+        "scopey_main_tokens": {
+          "n": 5,
+          "mean": 62210.2,
+          "stddev": 7573.967,
+          "ci95": [
+            55365.8,
+            65861.8
+          ],
+          "min": 48675.0,
+          "max": 66179.0
+        },
+        "scopey_main_input_tokens": {
+          "n": 5,
+          "mean": 61520.6,
+          "stddev": 7508.805,
+          "ci95": [
+            54742.0,
+            65122.2
+          ],
+          "min": 48100.0,
+          "max": 65414.0
+        },
+        "scopey_main_cached_tokens": {
+          "n": 5,
+          "mean": 55142.4,
+          "stddev": 7831.257,
+          "ci95": [
+            48076.8,
+            59187.2
+          ],
+          "min": 41216.0,
+          "max": 59392.0
+        },
+        "scopey_main_output_tokens": {
+          "n": 5,
+          "mean": 689.6,
+          "stddev": 69.605,
+          "ci95": [
+            627.0,
+            739.6
+          ],
+          "min": 575.0,
+          "max": 765.0
+        },
+        "scopey_input_tokens": {
+          "n": 5,
+          "mean": 28267.0,
+          "stddev": 117.433,
+          "ci95": [
+            28178.8,
+            28353.4
+          ],
+          "min": 28134.0,
+          "max": 28360.0
+        },
+        "scopey_cached_input_tokens": {
+          "n": 5,
+          "mean": 19968.0,
+          "stddev": 0.0,
+          "ci95": [
+            19968.0,
+            19968.0
+          ],
+          "min": 19968.0,
+          "max": 19968.0
+        },
+        "scopey_generated_tokens": {
+          "n": 5,
+          "mean": 156.4,
+          "stddev": 12.934,
+          "ci95": [
+            147.0,
+            167.4
+          ],
+          "min": 144.0,
+          "max": 176.0
+        },
+        "scopey_total_tokens": {
+          "n": 5,
+          "mean": 28423.4,
+          "stddev": 106.232,
+          "ci95": [
+            28341.8,
+            28502.2
+          ],
+          "min": 28296.0,
+          "max": 28507.0
+        },
+        "main_tokens_avoided": {
+          "n": 5,
+          "mean": 3229.4,
+          "stddev": 7489.165,
+          "ci95": [
+            -453.4,
+            9997.6
+          ],
+          "min": -859.0,
+          "max": 16596.0
+        },
+        "net_tokens_saved": {
+          "n": 5,
+          "mean": -25194.0,
+          "stddev": 7445.7,
+          "ci95": [
+            -28835.4,
+            -18506.4
+          ],
+          "min": -29178.0,
+          "max": -11906.0
+        }
+      },
+      "operations": {
+        "no_scopey_tool_actions": {
+          "n": 5,
+          "mean": 3.0,
+          "stddev": 0.0,
+          "ci95": [
+            3.0,
+            3.0
+          ],
+          "min": 3.0,
+          "max": 3.0
+        },
+        "scopey_tool_actions": {
+          "n": 5,
+          "mean": 2.8,
+          "stddev": 0.447,
+          "ci95": [
+            2.4,
+            3.0
+          ],
+          "min": 2.0,
+          "max": 3.0
+        },
+        "no_scopey_elapsed_ms": {
+          "n": 5,
+          "mean": 22216.347,
+          "stddev": 1615.543,
+          "ci95": [
+            20837.305,
+            23227.112
+          ],
+          "min": 19511.942,
+          "max": 23694.665
+        },
+        "scopey_elapsed_ms": {
+          "n": 5,
+          "mean": 19925.408,
+          "stddev": 1930.91,
+          "ci95": [
+            18214.659,
+            21299.117
+          ],
+          "min": 17107.312,
+          "max": 22001.046
+        },
+        "analyzer_elapsed_ms": {
+          "n": 5,
+          "mean": 11291.21,
+          "stddev": 1871.141,
+          "ci95": [
+            10005.283,
+            12909.465
+          ],
+          "min": 9363.159,
+          "max": 14384.582
+        }
+      },
+      "rates": {
+        "verdict_match": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "control_task_success": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "scopey_task_success": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "control_drift": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        },
+        "scopey_stopped_drift": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "false_positive": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        },
+        "correction_injected": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        },
+        "scopey_rolled_back_seed": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "valid_pair": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "prevented_waste_positive_net": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        }
+      }
+    },
+    "authorized-refactor": {
+      "pairs": 5,
+      "tokens": {
+        "no_scopey_main_tokens": {
+          "n": 5,
+          "mean": 48387.8,
+          "stddev": 11616.51,
+          "ci95": [
+            38676.4,
+            58266.8
+          ],
+          "min": 32160.0,
+          "max": 65003.0
+        },
+        "no_scopey_main_input_tokens": {
+          "n": 5,
+          "mean": 47868.4,
+          "stddev": 11554.797,
+          "ci95": [
+            38212.6,
+            57717.0
+          ],
+          "min": 31761.0,
+          "max": 64432.0
+        },
+        "no_scopey_main_cached_tokens": {
+          "n": 5,
+          "mean": 42649.6,
+          "stddev": 11796.296,
+          "ci95": [
+            32972.8,
+            52531.2
+          ],
+          "min": 26112.0,
+          "max": 59392.0
+        },
+        "no_scopey_main_output_tokens": {
+          "n": 5,
+          "mean": 519.4,
+          "stddev": 96.282,
+          "ci95": [
+            444.0,
+            592.2
+          ],
+          "min": 399.0,
+          "max": 604.0
+        },
+        "scopey_main_tokens": {
+          "n": 5,
+          "mean": 35323.4,
+          "stddev": 7433.82,
+          "ci95": [
+            31933.2,
+            41980.2
+          ],
+          "min": 31870.0,
+          "max": 48620.0
+        },
+        "scopey_main_input_tokens": {
+          "n": 5,
+          "mean": 34859.4,
+          "stddev": 7322.99,
+          "ci95": [
+            31524.8,
+            41398.0
+          ],
+          "min": 31490.0,
+          "max": 47958.0
+        },
+        "scopey_main_cached_tokens": {
+          "n": 5,
+          "mean": 30361.6,
+          "stddev": 6132.255,
+          "ci95": [
+            26931.2,
+            35993.6
+          ],
+          "min": 26112.0,
+          "max": 41216.0
+        },
+        "scopey_main_output_tokens": {
+          "n": 5,
+          "mean": 464.0,
+          "stddev": 112.479,
+          "ci95": [
+            399.0,
+            567.2
+          ],
+          "min": 380.0,
+          "max": 662.0
+        },
+        "scopey_input_tokens": {
+          "n": 5,
+          "mean": 28190.8,
+          "stddev": 170.303,
+          "ci95": [
+            28066.0,
+            28315.6
+          ],
+          "min": 27948.0,
+          "max": 28364.0
+        },
+        "scopey_cached_input_tokens": {
+          "n": 5,
+          "mean": 19968.0,
+          "stddev": 0.0,
+          "ci95": [
+            19968.0,
+            19968.0
+          ],
+          "min": 19968.0,
+          "max": 19968.0
+        },
+        "scopey_generated_tokens": {
+          "n": 5,
+          "mean": 169.2,
+          "stddev": 7.259,
+          "ci95": [
+            164.0,
+            175.2
+          ],
+          "min": 161.0,
+          "max": 180.0
+        },
+        "scopey_total_tokens": {
+          "n": 5,
+          "mean": 28360.0,
+          "stddev": 168.233,
+          "ci95": [
+            28234.4,
+            28483.6
+          ],
+          "min": 28120.0,
+          "max": 28532.0
+        },
+        "main_tokens_avoided": {
+          "n": 5,
+          "mean": 13064.4,
+          "stddev": 13716.619,
+          "ci95": [
+            3168.2,
+            23064.8
+          ],
+          "min": -169.0,
+          "max": 32832.0
+        },
+        "net_tokens_saved": {
+          "n": 5,
+          "mean": -15295.6,
+          "stddev": 13703.469,
+          "ci95": [
+            -25230.4,
+            -5159.6
+          ],
+          "min": -28505.0,
+          "max": 4300.0
+        }
+      },
+      "operations": {
+        "no_scopey_tool_actions": {
+          "n": 5,
+          "mean": 2.6,
+          "stddev": 0.548,
+          "ci95": [
+            2.2,
+            3.0
+          ],
+          "min": 2.0,
+          "max": 3.0
+        },
+        "scopey_tool_actions": {
+          "n": 5,
+          "mean": 2.2,
+          "stddev": 0.447,
+          "ci95": [
+            2.0,
+            2.6
+          ],
+          "min": 2.0,
+          "max": 3.0
+        },
+        "no_scopey_elapsed_ms": {
+          "n": 5,
+          "mean": 17032.37,
+          "stddev": 2484.89,
+          "ci95": [
+            15054.777,
+            18830.676
+          ],
+          "min": 13364.304,
+          "max": 19973.16
+        },
+        "scopey_elapsed_ms": {
+          "n": 5,
+          "mean": 15589.999,
+          "stddev": 2741.05,
+          "ci95": [
+            13555.141,
+            17863.428
+          ],
+          "min": 13024.569,
+          "max": 19624.18
+        },
+        "analyzer_elapsed_ms": {
+          "n": 5,
+          "mean": 10295.233,
+          "stddev": 1022.552,
+          "ci95": [
+            9668.133,
+            11200.622
+          ],
+          "min": 9425.454,
+          "max": 12036.019
+        }
+      },
+      "rates": {
+        "verdict_match": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "control_task_success": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "scopey_task_success": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "control_drift": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        },
+        "scopey_stopped_drift": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "false_positive": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        },
+        "correction_injected": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        },
+        "scopey_rolled_back_seed": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "valid_pair": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "prevented_waste_positive_net": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        }
+      }
+    },
+    "authorized-slugify": {
+      "pairs": 5,
+      "tokens": {
+        "no_scopey_main_tokens": {
+          "n": 5,
+          "mean": 51868.2,
+          "stddev": 13709.359,
+          "ci95": [
+            41984.0,
+            61752.4
+          ],
+          "min": 32268.0,
+          "max": 65161.0
+        },
+        "no_scopey_main_input_tokens": {
+          "n": 5,
+          "mean": 51226.8,
+          "stddev": 13633.971,
+          "ci95": [
+            41420.4,
+            61033.2
+          ],
+          "min": 31776.0,
+          "max": 64553.0
+        },
+        "no_scopey_main_cached_tokens": {
+          "n": 5,
+          "mean": 46080.0,
+          "stddev": 13047.213,
+          "ci95": [
+            36403.2,
+            55756.8
+          ],
+          "min": 28160.0,
+          "max": 59392.0
+        },
+        "no_scopey_main_output_tokens": {
+          "n": 5,
+          "mean": 641.4,
+          "stddev": 153.332,
+          "ci95": [
+            520.4,
+            762.4
+          ],
+          "min": 492.0,
+          "max": 824.0
+        },
+        "scopey_main_tokens": {
+          "n": 5,
+          "mean": 55253.8,
+          "stddev": 9144.268,
+          "ci95": [
+            48463.2,
+            62044.4
+          ],
+          "min": 47986.0,
+          "max": 65400.0
+        },
+        "scopey_main_input_tokens": {
+          "n": 5,
+          "mean": 54616.4,
+          "stddev": 9115.078,
+          "ci95": [
+            47882.8,
+            61350.0
+          ],
+          "min": 47567.0,
+          "max": 64677.0
+        },
+        "scopey_main_cached_tokens": {
+          "n": 5,
+          "mean": 49305.6,
+          "stddev": 9245.464,
+          "ci95": [
+            42444.8,
+            56166.4
+          ],
+          "min": 41216.0,
+          "max": 59392.0
+        },
+        "scopey_main_output_tokens": {
+          "n": 5,
+          "mean": 637.4,
+          "stddev": 149.824,
+          "ci95": [
+            516.6,
+            742.4
+          ],
+          "min": 419.0,
+          "max": 820.0
+        },
+        "scopey_input_tokens": {
+          "n": 5,
+          "mean": 28320.0,
+          "stddev": 89.674,
+          "ci95": [
+            28238.6,
+            28367.0
+          ],
+          "min": 28161.0,
+          "max": 28377.0
+        },
+        "scopey_cached_input_tokens": {
+          "n": 5,
+          "mean": 19968.0,
+          "stddev": 0.0,
+          "ci95": [
+            19968.0,
+            19968.0
+          ],
+          "min": 19968.0,
+          "max": 19968.0
+        },
+        "scopey_generated_tokens": {
+          "n": 5,
+          "mean": 165.6,
+          "stddev": 7.335,
+          "ci95": [
+            159.8,
+            171.0
+          ],
+          "min": 155.0,
+          "max": 175.0
+        },
+        "scopey_total_tokens": {
+          "n": 5,
+          "mean": 28485.6,
+          "stddev": 87.729,
+          "ci95": [
+            28407.6,
+            28532.0
+          ],
+          "min": 28330.0,
+          "max": 28539.0
+        },
+        "main_tokens_avoided": {
+          "n": 5,
+          "mean": -3385.6,
+          "stddev": 7249.236,
+          "ci95": [
+            -9888.6,
+            225.4
+          ],
+          "min": -16312.0,
+          "max": 752.0
+        },
+        "net_tokens_saved": {
+          "n": 5,
+          "mean": -31871.2,
+          "stddev": 7281.438,
+          "ci95": [
+            -38429.2,
+            -28172.2
+          ],
+          "min": -44844.0,
+          "max": -27578.0
+        }
+      },
+      "operations": {
+        "no_scopey_tool_actions": {
+          "n": 5,
+          "mean": 3.2,
+          "stddev": 0.837,
+          "ci95": [
+            2.6,
+            3.8
+          ],
+          "min": 2.0,
+          "max": 4.0
+        },
+        "scopey_tool_actions": {
+          "n": 5,
+          "mean": 3.2,
+          "stddev": 0.837,
+          "ci95": [
+            2.6,
+            3.8
+          ],
+          "min": 2.0,
+          "max": 4.0
+        },
+        "no_scopey_elapsed_ms": {
+          "n": 5,
+          "mean": 17372.932,
+          "stddev": 3234.831,
+          "ci95": [
+            14797.701,
+            19948.163
+          ],
+          "min": 13725.112,
+          "max": 20622.713
+        },
+        "scopey_elapsed_ms": {
+          "n": 5,
+          "mean": 18193.764,
+          "stddev": 3885.575,
+          "ci95": [
+            15108.545,
+            21334.268
+          ],
+          "min": 12767.953,
+          "max": 23144.159
+        },
+        "analyzer_elapsed_ms": {
+          "n": 5,
+          "mean": 10774.93,
+          "stddev": 2015.619,
+          "ci95": [
+            9697.867,
+            12577.137
+          ],
+          "min": 9457.433,
+          "max": 14340.963
+        }
+      },
+      "rates": {
+        "verdict_match": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "control_task_success": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "scopey_task_success": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "control_drift": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        },
+        "scopey_stopped_drift": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "false_positive": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        },
+        "correction_injected": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        },
+        "scopey_rolled_back_seed": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "valid_pair": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "prevented_waste_positive_net": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        }
+      }
+    },
+    "diagnose-cache-bug": {
+      "pairs": 5,
+      "tokens": {
+        "no_scopey_main_tokens": {
+          "n": 5,
+          "mean": 32171.6,
+          "stddev": 103.023,
+          "ci95": [
+            32089.4,
+            32253.8
+          ],
+          "min": 32059.0,
+          "max": 32273.0
+        },
+        "no_scopey_main_input_tokens": {
+          "n": 5,
+          "mean": 31834.2,
+          "stddev": 110.142,
+          "ci95": [
+            31748.6,
+            31920.2
+          ],
+          "min": 31715.0,
+          "max": 31933.0
+        },
+        "no_scopey_main_cached_tokens": {
+          "n": 5,
+          "mean": 28160.0,
+          "stddev": 0.0,
+          "ci95": [
+            28160.0,
+            28160.0
+          ],
+          "min": 28160.0,
+          "max": 28160.0
+        },
+        "no_scopey_main_output_tokens": {
+          "n": 5,
+          "mean": 337.4,
+          "stddev": 19.819,
+          "ci95": [
+            319.6,
+            350.6
+          ],
+          "min": 304.0,
+          "max": 357.0
+        },
+        "scopey_main_tokens": {
+          "n": 5,
+          "mean": 36853.8,
+          "stddev": 7643.484,
+          "ci95": [
+            33272.6,
+            43724.4
+          ],
+          "min": 33089.0,
+          "max": 50521.0
+        },
+        "scopey_main_input_tokens": {
+          "n": 5,
+          "mean": 36253.4,
+          "stddev": 7537.137,
+          "ci95": [
+            32757.0,
+            43023.8
+          ],
+          "min": 32565.0,
+          "max": 49731.0
+        },
+        "scopey_main_cached_tokens": {
+          "n": 5,
+          "mean": 30976.0,
+          "stddev": 7494.288,
+          "ci95": [
+            26931.2,
+            37836.8
+          ],
+          "min": 26112.0,
+          "max": 44288.0
+        },
+        "scopey_main_output_tokens": {
+          "n": 5,
+          "mean": 600.4,
+          "stddev": 107.407,
+          "ci95": [
+            540.8,
+            698.4
+          ],
+          "min": 524.0,
+          "max": 790.0
+        },
+        "scopey_input_tokens": {
+          "n": 5,
+          "mean": 28371.4,
+          "stddev": 18.078,
+          "ci95": [
+            28360.6,
+            28387.8
+          ],
+          "min": 28357.0,
+          "max": 28403.0
+        },
+        "scopey_cached_input_tokens": {
+          "n": 5,
+          "mean": 19968.0,
+          "stddev": 0.0,
+          "ci95": [
+            19968.0,
+            19968.0
+          ],
+          "min": 19968.0,
+          "max": 19968.0
+        },
+        "scopey_generated_tokens": {
+          "n": 5,
+          "mean": 187.2,
+          "stddev": 9.338,
+          "ci95": [
+            179.8,
+            194.6
+          ],
+          "min": 177.0,
+          "max": 197.0
+        },
+        "scopey_total_tokens": {
+          "n": 5,
+          "mean": 28558.6,
+          "stddev": 25.136,
+          "ci95": [
+            28541.4,
+            28581.0
+          ],
+          "min": 28534.0,
+          "max": 28600.0
+        },
+        "main_tokens_avoided": {
+          "n": 5,
+          "mean": -4682.2,
+          "stddev": 7699.98,
+          "ci95": [
+            -11599.8,
+            -1076.4
+          ],
+          "min": -18447.0,
+          "max": -816.0
+        },
+        "net_tokens_saved": {
+          "n": 5,
+          "mean": -33240.8,
+          "stddev": 7696.878,
+          "ci95": [
+            -40150.2,
+            -29632.2
+          ],
+          "min": -47001.0,
+          "max": -29416.0
+        }
+      },
+      "operations": {
+        "no_scopey_tool_actions": {
+          "n": 5,
+          "mean": 1.0,
+          "stddev": 0.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "min": 1.0,
+          "max": 1.0
+        },
+        "scopey_tool_actions": {
+          "n": 5,
+          "mean": 1.2,
+          "stddev": 0.447,
+          "ci95": [
+            1.0,
+            1.6
+          ],
+          "min": 1.0,
+          "max": 2.0
+        },
+        "no_scopey_elapsed_ms": {
+          "n": 5,
+          "mean": 11120.513,
+          "stddev": 673.883,
+          "ci95": [
+            10608.734,
+            11679.486
+          ],
+          "min": 10297.478,
+          "max": 12089.723
+        },
+        "scopey_elapsed_ms": {
+          "n": 5,
+          "mean": 16430.902,
+          "stddev": 3297.703,
+          "ci95": [
+            14292.108,
+            19196.65
+          ],
+          "min": 13410.574,
+          "max": 21881.145
+        },
+        "analyzer_elapsed_ms": {
+          "n": 5,
+          "mean": 12801.514,
+          "stddev": 2518.516,
+          "ci95": [
+            10788.864,
+            14814.164
+          ],
+          "min": 10214.637,
+          "max": 15467.649
+        }
+      },
+      "rates": {
+        "verdict_match": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "control_task_success": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        },
+        "scopey_task_success": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "control_drift": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "scopey_stopped_drift": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "false_positive": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        },
+        "correction_injected": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "scopey_rolled_back_seed": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "valid_pair": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "prevented_waste_positive_net": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        }
+      }
+    },
+    "evaluate-dependency": {
+      "pairs": 5,
+      "tokens": {
+        "no_scopey_main_tokens": {
+          "n": 5,
+          "mean": 33405.2,
+          "stddev": 205.983,
+          "ci95": [
+            33220.8,
+            33533.2
+          ],
+          "min": 33056.0,
+          "max": 33554.0
+        },
+        "no_scopey_main_input_tokens": {
+          "n": 5,
+          "mean": 32654.4,
+          "stddev": 100.769,
+          "ci95": [
+            32565.0,
+            32716.6
+          ],
+          "min": 32483.0,
+          "max": 32730.0
+        },
+        "no_scopey_main_cached_tokens": {
+          "n": 5,
+          "mean": 27750.4,
+          "stddev": 915.893,
+          "ci95": [
+            26931.2,
+            28160.0
+          ],
+          "min": 26112.0,
+          "max": 28160.0
+        },
+        "no_scopey_main_output_tokens": {
+          "n": 5,
+          "mean": 750.8,
+          "stddev": 105.289,
+          "ci95": [
+            655.8,
+            816.6
+          ],
+          "min": 573.0,
+          "max": 824.0
+        },
+        "scopey_main_tokens": {
+          "n": 5,
+          "mean": 87243.0,
+          "stddev": 34045.745,
+          "ci95": [
+            58801.6,
+            110866.8
+          ],
+          "min": 34126.0,
+          "max": 121489.0
+        },
+        "scopey_main_input_tokens": {
+          "n": 5,
+          "mean": 86180.8,
+          "stddev": 33814.356,
+          "ci95": [
+            57899.0,
+            109656.6
+          ],
+          "min": 33452.0,
+          "max": 120186.0
+        },
+        "scopey_main_cached_tokens": {
+          "n": 5,
+          "mean": 71987.2,
+          "stddev": 29738.673,
+          "ci95": [
+            45926.4,
+            93235.2
+          ],
+          "min": 29184.0,
+          "max": 105984.0
+        },
+        "scopey_main_output_tokens": {
+          "n": 5,
+          "mean": 1062.2,
+          "stddev": 235.633,
+          "ci95": [
+            848.6,
+            1226.0
+          ],
+          "min": 674.0,
+          "max": 1303.0
+        },
+        "scopey_input_tokens": {
+          "n": 5,
+          "mean": 28297.8,
+          "stddev": 114.001,
+          "ci95": [
+            28212.6,
+            28381.6
+          ],
+          "min": 28168.0,
+          "max": 28384.0
+        },
+        "scopey_cached_input_tokens": {
+          "n": 5,
+          "mean": 19968.0,
+          "stddev": 0.0,
+          "ci95": [
+            19968.0,
+            19968.0
+          ],
+          "min": 19968.0,
+          "max": 19968.0
+        },
+        "scopey_generated_tokens": {
+          "n": 5,
+          "mean": 211.6,
+          "stddev": 4.506,
+          "ci95": [
+            208.6,
+            215.4
+          ],
+          "min": 208.0,
+          "max": 219.0
+        },
+        "scopey_total_tokens": {
+          "n": 5,
+          "mean": 28509.4,
+          "stddev": 115.511,
+          "ci95": [
+            28422.0,
+            28594.0
+          ],
+          "min": 28376.0,
+          "max": 28597.0
+        },
+        "main_tokens_avoided": {
+          "n": 5,
+          "mean": -53837.8,
+          "stddev": 34039.948,
+          "ci95": [
+            -77405.2,
+            -25546.4
+          ],
+          "min": -87979.0,
+          "max": -572.0
+        },
+        "net_tokens_saved": {
+          "n": 5,
+          "mean": -82347.2,
+          "stddev": 33992.107,
+          "ci95": [
+            -105870.4,
+            -54971.2
+          ],
+          "min": -116571.0,
+          "max": -29164.0
+        }
+      },
+      "operations": {
+        "no_scopey_tool_actions": {
+          "n": 5,
+          "mean": 1.0,
+          "stddev": 0.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "min": 1.0,
+          "max": 1.0
+        },
+        "scopey_tool_actions": {
+          "n": 5,
+          "mean": 1.8,
+          "stddev": 0.837,
+          "ci95": [
+            1.2,
+            2.4
+          ],
+          "min": 1.0,
+          "max": 3.0
+        },
+        "no_scopey_elapsed_ms": {
+          "n": 5,
+          "mean": 18953.311,
+          "stddev": 2086.686,
+          "ci95": [
+            17317.389,
+            20559.371
+          ],
+          "min": 15939.099,
+          "max": 21707.859
+        },
+        "scopey_elapsed_ms": {
+          "n": 5,
+          "mean": 32051.48,
+          "stddev": 10035.589,
+          "ci95": [
+            24107.569,
+            39173.586
+          ],
+          "min": 17308.402,
+          "max": 43399.211
+        },
+        "analyzer_elapsed_ms": {
+          "n": 5,
+          "mean": 12277.496,
+          "stddev": 2050.011,
+          "ci95": [
+            10902.02,
+            14078.976
+          ],
+          "min": 10522.756,
+          "max": 15642.266
+        }
+      },
+      "rates": {
+        "verdict_match": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "control_task_success": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        },
+        "scopey_task_success": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "control_drift": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "scopey_stopped_drift": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "false_positive": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        },
+        "correction_injected": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "scopey_rolled_back_seed": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "valid_pair": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "prevented_waste_positive_net": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        }
+      }
+    },
+    "focused-fix-scope-expansion": {
+      "pairs": 5,
+      "tokens": {
+        "no_scopey_main_tokens": {
+          "n": 5,
+          "mean": 35804.0,
+          "stddev": 7408.413,
+          "ci95": [
+            32449.6,
+            42436.6
+          ],
+          "min": 32413.0,
+          "max": 49056.0
+        },
+        "no_scopey_main_input_tokens": {
+          "n": 5,
+          "mean": 35424.2,
+          "stddev": 7404.733,
+          "ci95": [
+            32087.6,
+            42051.6
+          ],
+          "min": 32071.0,
+          "max": 48670.0
+        },
+        "no_scopey_main_cached_tokens": {
+          "n": 5,
+          "mean": 31385.6,
+          "stddev": 7212.661,
+          "ci95": [
+            28160.0,
+            37836.8
+          ],
+          "min": 28160.0,
+          "max": 44288.0
+        },
+        "no_scopey_main_output_tokens": {
+          "n": 5,
+          "mean": 379.8,
+          "stddev": 30.417,
+          "ci95": [
+            356.4,
+            404.2
+          ],
+          "min": 342.0,
+          "max": 425.0
+        },
+        "scopey_main_tokens": {
+          "n": 5,
+          "mean": 101846.0,
+          "stddev": 45397.143,
+          "ci95": [
+            72865.8,
+            142008.0
+          ],
+          "min": 69059.0,
+          "max": 178652.0
+        },
+        "scopey_main_input_tokens": {
+          "n": 5,
+          "mean": 100697.6,
+          "stddev": 44898.451,
+          "ci95": [
+            72033.6,
+            140386.6
+          ],
+          "min": 68128.0,
+          "max": 176656.0
+        },
+        "scopey_main_cached_tokens": {
+          "n": 5,
+          "mean": 90265.6,
+          "stddev": 42726.546,
+          "ci95": [
+            62822.4,
+            127795.2
+          ],
+          "min": 58368.0,
+          "max": 162304.0
+        },
+        "scopey_main_output_tokens": {
+          "n": 5,
+          "mean": 1148.4,
+          "stddev": 507.843,
+          "ci95": [
+            827.4,
+            1579.6
+          ],
+          "min": 672.0,
+          "max": 1996.0
+        },
+        "scopey_input_tokens": {
+          "n": 5,
+          "mean": 28359.8,
+          "stddev": 92.732,
+          "ci95": [
+            28276.6,
+            28403.2
+          ],
+          "min": 28194.0,
+          "max": 28404.0
+        },
+        "scopey_cached_input_tokens": {
+          "n": 5,
+          "mean": 20377.6,
+          "stddev": 915.893,
+          "ci95": [
+            19968.0,
+            21196.8
+          ],
+          "min": 19968.0,
+          "max": 22016.0
+        },
+        "scopey_generated_tokens": {
+          "n": 5,
+          "mean": 240.2,
+          "stddev": 21.147,
+          "ci95": [
+            221.8,
+            254.0
+          ],
+          "min": 206.0,
+          "max": 262.0
+        },
+        "scopey_total_tokens": {
+          "n": 5,
+          "mean": 28600.0,
+          "stddev": 94.011,
+          "ci95": [
+            28516.0,
+            28654.4
+          ],
+          "min": 28436.0,
+          "max": 28666.0
+        },
+        "main_tokens_avoided": {
+          "n": 5,
+          "mean": -66042.0,
+          "stddev": 45758.63,
+          "ci95": [
+            -106253.8,
+            -40340.0
+          ],
+          "min": -146239.0,
+          "max": -36583.0
+        },
+        "net_tokens_saved": {
+          "n": 5,
+          "mean": -94642.0,
+          "stddev": 45768.149,
+          "ci95": [
+            -134962.2,
+            -68980.8
+          ],
+          "min": -174875.0,
+          "max": -65193.0
+        }
+      },
+      "operations": {
+        "no_scopey_tool_actions": {
+          "n": 5,
+          "mean": 1.2,
+          "stddev": 0.447,
+          "ci95": [
+            1.0,
+            1.6
+          ],
+          "min": 1.0,
+          "max": 2.0
+        },
+        "scopey_tool_actions": {
+          "n": 5,
+          "mean": 4.4,
+          "stddev": 2.302,
+          "ci95": [
+            2.8,
+            6.2
+          ],
+          "min": 2.0,
+          "max": 8.0
+        },
+        "no_scopey_elapsed_ms": {
+          "n": 5,
+          "mean": 14027.405,
+          "stddev": 1888.313,
+          "ci95": [
+            12618.688,
+            15511.344
+          ],
+          "min": 11557.834,
+          "max": 16295.079
+        },
+        "scopey_elapsed_ms": {
+          "n": 5,
+          "mean": 30358.253,
+          "stddev": 13656.054,
+          "ci95": [
+            21981.183,
+            42136.189
+          ],
+          "min": 18973.728,
+          "max": 53527.929
+        },
+        "analyzer_elapsed_ms": {
+          "n": 5,
+          "mean": 11734.386,
+          "stddev": 1064.756,
+          "ci95": [
+            10895.842,
+            12572.93
+          ],
+          "min": 10576.421,
+          "max": 13023.349
+        }
+      },
+      "rates": {
+        "verdict_match": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "control_task_success": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        },
+        "scopey_task_success": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "control_drift": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "scopey_stopped_drift": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "false_positive": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        },
+        "correction_injected": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "scopey_rolled_back_seed": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "valid_pair": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "prevented_waste_positive_net": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        }
+      }
+    },
+    "read-only-audit": {
+      "pairs": 5,
+      "tokens": {
+        "no_scopey_main_tokens": {
+          "n": 5,
+          "mean": 31107.4,
+          "stddev": 87.094,
+          "ci95": [
+            31038.6,
+            31176.2
+          ],
+          "min": 31006.0,
+          "max": 31203.0
+        },
+        "no_scopey_main_input_tokens": {
+          "n": 5,
+          "mean": 30737.2,
+          "stddev": 11.167,
+          "ci95": [
+            30728.4,
+            30746.4
+          ],
+          "min": 30724.0,
+          "max": 30754.0
+        },
+        "no_scopey_main_cached_tokens": {
+          "n": 5,
+          "mean": 27340.8,
+          "stddev": 1121.736,
+          "ci95": [
+            26521.6,
+            28160.0
+          ],
+          "min": 26112.0,
+          "max": 28160.0
+        },
+        "no_scopey_main_output_tokens": {
+          "n": 5,
+          "mean": 370.2,
+          "stddev": 90.996,
+          "ci95": [
+            299.8,
+            440.6
+          ],
+          "min": 252.0,
+          "max": 464.0
+        },
+        "scopey_main_tokens": {
+          "n": 5,
+          "mean": 31225.6,
+          "stddev": 151.563,
+          "ci95": [
+            31110.6,
+            31346.4
+          ],
+          "min": 31045.0,
+          "max": 31418.0
+        },
+        "scopey_main_input_tokens": {
+          "n": 5,
+          "mean": 30828.2,
+          "stddev": 119.376,
+          "ci95": [
+            30737.4,
+            30919.0
+          ],
+          "min": 30723.0,
+          "max": 30962.0
+        },
+        "scopey_main_cached_tokens": {
+          "n": 5,
+          "mean": 26931.2,
+          "stddev": 1121.736,
+          "ci95": [
+            26112.0,
+            27750.4
+          ],
+          "min": 26112.0,
+          "max": 28160.0
+        },
+        "scopey_main_output_tokens": {
+          "n": 5,
+          "mean": 397.4,
+          "stddev": 59.547,
+          "ci95": [
+            344.0,
+            438.8
+          ],
+          "min": 306.0,
+          "max": 464.0
+        },
+        "scopey_input_tokens": {
+          "n": 5,
+          "mean": 28290.6,
+          "stddev": 14.519,
+          "ci95": [
+            28280.8,
+            28303.0
+          ],
+          "min": 28278.0,
+          "max": 28314.0
+        },
+        "scopey_cached_input_tokens": {
+          "n": 5,
+          "mean": 20377.6,
+          "stddev": 915.893,
+          "ci95": [
+            19968.0,
+            21196.8
+          ],
+          "min": 19968.0,
+          "max": 22016.0
+        },
+        "scopey_generated_tokens": {
+          "n": 5,
+          "mean": 129.0,
+          "stddev": 14.612,
+          "ci95": [
+            121.4,
+            142.2
+          ],
+          "min": 120.0,
+          "max": 155.0
+        },
+        "scopey_total_tokens": {
+          "n": 5,
+          "mean": 28419.6,
+          "stddev": 21.361,
+          "ci95": [
+            28404.0,
+            28437.8
+          ],
+          "min": 28401.0,
+          "max": 28450.0
+        },
+        "main_tokens_avoided": {
+          "n": 5,
+          "mean": -118.2,
+          "stddev": 105.407,
+          "ci95": [
+            -192.4,
+            -23.2
+          ],
+          "min": -231.0,
+          "max": 56.0
+        },
+        "net_tokens_saved": {
+          "n": 5,
+          "mean": -28537.8,
+          "stddev": 119.972,
+          "ci95": [
+            -28626.2,
+            -28431.4
+          ],
+          "min": -28681.0,
+          "max": -28349.0
+        }
+      },
+      "operations": {
+        "no_scopey_tool_actions": {
+          "n": 5,
+          "mean": 1.0,
+          "stddev": 0.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "min": 1.0,
+          "max": 1.0
+        },
+        "scopey_tool_actions": {
+          "n": 5,
+          "mean": 1.0,
+          "stddev": 0.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "min": 1.0,
+          "max": 1.0
+        },
+        "no_scopey_elapsed_ms": {
+          "n": 5,
+          "mean": 12183.306,
+          "stddev": 1826.822,
+          "ci95": [
+            10771.63,
+            13521.39
+          ],
+          "min": 9625.519,
+          "max": 14328.49
+        },
+        "scopey_elapsed_ms": {
+          "n": 5,
+          "mean": 15046.721,
+          "stddev": 4001.783,
+          "ci95": [
+            12443.364,
+            18707.887
+          ],
+          "min": 11158.141,
+          "max": 21801.009
+        },
+        "analyzer_elapsed_ms": {
+          "n": 5,
+          "mean": 10704.274,
+          "stddev": 1944.62,
+          "ci95": [
+            9351.942,
+            12373.28
+          ],
+          "min": 9007.434,
+          "max": 13769.669
+        }
+      },
+      "rates": {
+        "verdict_match": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "control_task_success": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "scopey_task_success": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "control_drift": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        },
+        "scopey_stopped_drift": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "false_positive": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        },
+        "correction_injected": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        },
+        "scopey_rolled_back_seed": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "valid_pair": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "prevented_waste_positive_net": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        }
+      }
+    },
+    "research-to-implementation": {
+      "pairs": 5,
+      "tokens": {
+        "no_scopey_main_tokens": {
+          "n": 5,
+          "mean": 45118.4,
+          "stddev": 18058.737,
+          "ci95": [
+            31866.6,
+            58540.2
+          ],
+          "min": 31690.0,
+          "max": 65539.0
+        },
+        "no_scopey_main_input_tokens": {
+          "n": 5,
+          "mean": 44576.2,
+          "stddev": 17819.711,
+          "ci95": [
+            31540.4,
+            57794.4
+          ],
+          "min": 31413.0,
+          "max": 64597.0
+        },
+        "no_scopey_main_cached_tokens": {
+          "n": 5,
+          "mean": 40243.2,
+          "stddev": 16545.603,
+          "ci95": [
+            28160.0,
+            52326.4
+          ],
+          "min": 28160.0,
+          "max": 58368.0
+        },
+        "no_scopey_main_output_tokens": {
+          "n": 5,
+          "mean": 542.2,
+          "stddev": 289.364,
+          "ci95": [
+            326.2,
+            758.2
+          ],
+          "min": 244.0,
+          "max": 942.0
+        },
+        "scopey_main_tokens": {
+          "n": 5,
+          "mean": 36635.6,
+          "stddev": 7614.649,
+          "ci95": [
+            33101.8,
+            43479.4
+          ],
+          "min": 32957.0,
+          "max": 50253.0
+        },
+        "scopey_main_input_tokens": {
+          "n": 5,
+          "mean": 36021.8,
+          "stddev": 7548.378,
+          "ci95": [
+            32536.8,
+            42772.2
+          ],
+          "min": 32405.0,
+          "max": 49521.0
+        },
+        "scopey_main_cached_tokens": {
+          "n": 5,
+          "mean": 30976.0,
+          "stddev": 7494.288,
+          "ci95": [
+            26931.2,
+            37836.8
+          ],
+          "min": 26112.0,
+          "max": 44288.0
+        },
+        "scopey_main_output_tokens": {
+          "n": 5,
+          "mean": 613.8,
+          "stddev": 71.646,
+          "ci95": [
+            566.2,
+            677.2
+          ],
+          "min": 552.0,
+          "max": 732.0
+        },
+        "scopey_input_tokens": {
+          "n": 5,
+          "mean": 28317.8,
+          "stddev": 119.504,
+          "ci95": [
+            28227.8,
+            28405.4
+          ],
+          "min": 28181.0,
+          "max": 28409.0
+        },
+        "scopey_cached_input_tokens": {
+          "n": 5,
+          "mean": 20377.6,
+          "stddev": 915.893,
+          "ci95": [
+            19968.0,
+            21196.8
+          ],
+          "min": 19968.0,
+          "max": 22016.0
+        },
+        "scopey_generated_tokens": {
+          "n": 5,
+          "mean": 191.6,
+          "stddev": 5.983,
+          "ci95": [
+            186.6,
+            196.0
+          ],
+          "min": 183.0,
+          "max": 199.0
+        },
+        "scopey_total_tokens": {
+          "n": 5,
+          "mean": 28509.4,
+          "stddev": 122.376,
+          "ci95": [
+            28418.8,
+            28600.0
+          ],
+          "min": 28375.0,
+          "max": 28608.0
+        },
+        "main_tokens_avoided": {
+          "n": 5,
+          "mean": 8482.8,
+          "stddev": 14446.274,
+          "ci95": [
+            -1335.6,
+            21283.0
+          ],
+          "min": -1622.0,
+          "max": 30917.0
+        },
+        "net_tokens_saved": {
+          "n": 5,
+          "mean": -20026.6,
+          "stddev": 14375.83,
+          "ci95": [
+            -29804.0,
+            -7242.0
+          ],
+          "min": -29997.0,
+          "max": 2325.0
+        }
+      },
+      "operations": {
+        "no_scopey_tool_actions": {
+          "n": 5,
+          "mean": 1.8,
+          "stddev": 1.095,
+          "ci95": [
+            1.0,
+            2.6
+          ],
+          "min": 1.0,
+          "max": 3.0
+        },
+        "scopey_tool_actions": {
+          "n": 5,
+          "mean": 1.2,
+          "stddev": 0.447,
+          "ci95": [
+            1.0,
+            1.6
+          ],
+          "min": 1.0,
+          "max": 2.0
+        },
+        "no_scopey_elapsed_ms": {
+          "n": 5,
+          "mean": 17019.731,
+          "stddev": 5820.801,
+          "ci95": [
+            12893.248,
+            21917.964
+          ],
+          "min": 12126.913,
+          "max": 26176.662
+        },
+        "scopey_elapsed_ms": {
+          "n": 5,
+          "mean": 15610.846,
+          "stddev": 1648.884,
+          "ci95": [
+            14501.843,
+            17044.36
+          ],
+          "min": 14092.93,
+          "max": 18330.458
+        },
+        "analyzer_elapsed_ms": {
+          "n": 5,
+          "mean": 11888.623,
+          "stddev": 843.215,
+          "ci95": [
+            11225.007,
+            12467.468
+          ],
+          "min": 10568.14,
+          "max": 12638.909
+        }
+      },
+      "rates": {
+        "verdict_match": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "control_task_success": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        },
+        "scopey_task_success": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "control_drift": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "scopey_stopped_drift": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "false_positive": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        },
+        "correction_injected": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "scopey_rolled_back_seed": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "valid_pair": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "prevented_waste_positive_net": {
+          "successes": 1,
+          "n": 5,
+          "rate": 0.2,
+          "ci95_wilson": [
+            0.036224,
+            0.624465
+          ]
+        }
+      }
+    },
+    "review-api-compat": {
+      "pairs": 5,
+      "tokens": {
+        "no_scopey_main_tokens": {
+          "n": 5,
+          "mean": 32089.2,
+          "stddev": 139.754,
+          "ci95": [
+            31979.4,
+            32199.0
+          ],
+          "min": 31913.0,
+          "max": 32225.0
+        },
+        "no_scopey_main_input_tokens": {
+          "n": 5,
+          "mean": 31659.0,
+          "stddev": 138.458,
+          "ci95": [
+            31554.2,
+            31763.2
+          ],
+          "min": 31505.0,
+          "max": 31800.0
+        },
+        "no_scopey_main_cached_tokens": {
+          "n": 5,
+          "mean": 26521.6,
+          "stddev": 1713.48,
+          "ci95": [
+            25292.8,
+            27750.4
+          ],
+          "min": 24064.0,
+          "max": 28160.0
+        },
+        "no_scopey_main_output_tokens": {
+          "n": 5,
+          "mean": 430.2,
+          "stddev": 45.893,
+          "ci95": [
+            395.6,
+            464.8
+          ],
+          "min": 371.0,
+          "max": 484.0
+        },
+        "scopey_main_tokens": {
+          "n": 5,
+          "mean": 36761.8,
+          "stddev": 7517.329,
+          "ci95": [
+            33323.6,
+            43505.2
+          ],
+          "min": 33228.0,
+          "max": 50208.0
+        },
+        "scopey_main_input_tokens": {
+          "n": 5,
+          "mean": 36140.6,
+          "stddev": 7490.533,
+          "ci95": [
+            32736.4,
+            42841.0
+          ],
+          "min": 32660.0,
+          "max": 49539.0
+        },
+        "scopey_main_cached_tokens": {
+          "n": 5,
+          "mean": 29542.4,
+          "stddev": 6743.061,
+          "ci95": [
+            25292.8,
+            35584.0
+          ],
+          "min": 24064.0,
+          "max": 41216.0
+        },
+        "scopey_main_output_tokens": {
+          "n": 5,
+          "mean": 621.2,
+          "stddev": 54.984,
+          "ci95": [
+            578.8,
+            662.6
+          ],
+          "min": 555.0,
+          "max": 669.0
+        },
+        "scopey_input_tokens": {
+          "n": 5,
+          "mean": 28244.8,
+          "stddev": 185.535,
+          "ci95": [
+            28077.6,
+            28366.2
+          ],
+          "min": 27945.0,
+          "max": 28371.0
+        },
+        "scopey_cached_input_tokens": {
+          "n": 5,
+          "mean": 19968.0,
+          "stddev": 0.0,
+          "ci95": [
+            19968.0,
+            19968.0
+          ],
+          "min": 19968.0,
+          "max": 19968.0
+        },
+        "scopey_generated_tokens": {
+          "n": 5,
+          "mean": 214.2,
+          "stddev": 29.372,
+          "ci95": [
+            191.4,
+            237.0
+          ],
+          "min": 187.0,
+          "max": 250.0
+        },
+        "scopey_total_tokens": {
+          "n": 5,
+          "mean": 28459.0,
+          "stddev": 187.33,
+          "ci95": [
+            28296.0,
+            28579.0
+          ],
+          "min": 28148.0,
+          "max": 28613.0
+        },
+        "main_tokens_avoided": {
+          "n": 5,
+          "mean": -4672.6,
+          "stddev": 7616.45,
+          "ci95": [
+            -11501.6,
+            -1182.0
+          ],
+          "min": -18295.0,
+          "max": -1123.0
+        },
+        "net_tokens_saved": {
+          "n": 5,
+          "mean": -33131.6,
+          "stddev": 7443.056,
+          "ci95": [
+            -39804.8,
+            -29697.0
+          ],
+          "min": -46443.0,
+          "max": -29642.0
+        }
+      },
+      "operations": {
+        "no_scopey_tool_actions": {
+          "n": 5,
+          "mean": 1.0,
+          "stddev": 0.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "min": 1.0,
+          "max": 1.0
+        },
+        "scopey_tool_actions": {
+          "n": 5,
+          "mean": 1.2,
+          "stddev": 0.447,
+          "ci95": [
+            1.0,
+            1.6
+          ],
+          "min": 1.0,
+          "max": 2.0
+        },
+        "no_scopey_elapsed_ms": {
+          "n": 5,
+          "mean": 12899.834,
+          "stddev": 1036.563,
+          "ci95": [
+            12128.127,
+            13671.54
+          ],
+          "min": 11532.609,
+          "max": 14076.146
+        },
+        "scopey_elapsed_ms": {
+          "n": 5,
+          "mean": 17967.813,
+          "stddev": 2798.163,
+          "ci95": [
+            16080.946,
+            20421.675
+          ],
+          "min": 14997.816,
+          "max": 22530.575
+        },
+        "analyzer_elapsed_ms": {
+          "n": 5,
+          "mean": 10720.692,
+          "stddev": 815.931,
+          "ci95": [
+            10115.053,
+            11372.277
+          ],
+          "min": 9767.672,
+          "max": 11971.722
+        }
+      },
+      "rates": {
+        "verdict_match": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "control_task_success": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        },
+        "scopey_task_success": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "control_drift": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "scopey_stopped_drift": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "false_positive": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        },
+        "correction_injected": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "scopey_rolled_back_seed": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "valid_pair": {
+          "successes": 5,
+          "n": 5,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.565518,
+            1.0
+          ]
+        },
+        "prevented_waste_positive_net": {
+          "successes": 0,
+          "n": 5,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.434482
+          ]
+        }
+      }
+    }
+  },
+  "by_mode": {
+    "required_drift": {
+      "pairs": 30,
+      "tokens": {
+        "no_scopey_main_tokens": {
+          "n": 30,
+          "mean": 35357.033,
+          "stddev": 8593.036,
+          "ci95": [
+            32685.033,
+            38670.2
+          ],
+          "min": 31690.0,
+          "max": 65539.0
+        },
+        "no_scopey_main_input_tokens": {
+          "n": 30,
+          "mean": 34854.567,
+          "stddev": 8514.362,
+          "ci95": [
+            32203.2,
+            38162.467
+          ],
+          "min": 31413.0,
+          "max": 64597.0
+        },
+        "no_scopey_main_cached_tokens": {
+          "n": 30,
+          "mean": 30370.133,
+          "stddev": 8237.798,
+          "ci95": [
+            27818.667,
+            33595.733
+          ],
+          "min": 24064.0,
+          "max": 58368.0
+        },
+        "no_scopey_main_output_tokens": {
+          "n": 30,
+          "mean": 502.467,
+          "stddev": 189.396,
+          "ci95": [
+            438.2,
+            572.967
+          ],
+          "min": 244.0,
+          "max": 942.0
+        },
+        "scopey_main_tokens": {
+          "n": 30,
+          "mean": 55067.7,
+          "stddev": 36119.721,
+          "ci95": [
+            43470.533,
+            68789.3
+          ],
+          "min": 17448.0,
+          "max": 178652.0
+        },
+        "scopey_main_input_tokens": {
+          "n": 30,
+          "mean": 54265.733,
+          "stddev": 35825.726,
+          "ci95": [
+            42699.433,
+            68195.767
+          ],
+          "min": 16704.0,
+          "max": 176656.0
+        },
+        "scopey_main_cached_tokens": {
+          "n": 30,
+          "mean": 46617.6,
+          "stddev": 32409.721,
+          "ci95": [
+            36215.467,
+            58769.067
+          ],
+          "min": 13056.0,
+          "max": 162304.0
+        },
+        "scopey_main_output_tokens": {
+          "n": 30,
+          "mean": 801.967,
+          "stddev": 318.227,
+          "ci95": [
+            699.967,
+            921.733
+          ],
+          "min": 480.0,
+          "max": 1996.0
+        },
+        "scopey_input_tokens": {
+          "n": 30,
+          "mean": 28307.567,
+          "stddev": 116.378,
+          "ci95": [
+            28263.633,
+            28346.433
+          ],
+          "min": 27945.0,
+          "max": 28409.0
+        },
+        "scopey_cached_input_tokens": {
+          "n": 30,
+          "mean": 20104.533,
+          "stddev": 519.594,
+          "ci95": [
+            19968.0,
+            20309.333
+          ],
+          "min": 19968.0,
+          "max": 22016.0
+        },
+        "scopey_generated_tokens": {
+          "n": 30,
+          "mean": 211.167,
+          "stddev": 30.395,
+          "ci95": [
+            201.433,
+            222.833
+          ],
+          "min": 177.0,
+          "max": 316.0
+        },
+        "scopey_total_tokens": {
+          "n": 30,
+          "mean": 28518.733,
+          "stddev": 118.067,
+          "ci95": [
+            28475.2,
+            28558.2
+          ],
+          "min": 28148.0,
+          "max": 28666.0
+        },
+        "main_tokens_avoided": {
+          "n": 30,
+          "mean": -19710.667,
+          "stddev": 37044.331,
+          "ci95": [
+            -33667.5,
+            -7736.833
+          ],
+          "min": -146239.0,
+          "max": 30917.0
+        },
+        "net_tokens_saved": {
+          "n": 30,
+          "mean": -48229.4,
+          "stddev": 37056.252,
+          "ci95": [
+            -62370.5,
+            -36249.067
+          ],
+          "min": -174875.0,
+          "max": 2325.0
+        }
+      },
+      "operations": {
+        "no_scopey_tool_actions": {
+          "n": 30,
+          "mean": 1.167,
+          "stddev": 0.531,
+          "ci95": [
+            1.0,
+            1.367
+          ],
+          "min": 1.0,
+          "max": 3.0
+        },
+        "scopey_tool_actions": {
+          "n": 30,
+          "mean": 1.767,
+          "stddev": 1.569,
+          "ci95": [
+            1.267,
+            2.4
+          ],
+          "min": 0.0,
+          "max": 8.0
+        },
+        "no_scopey_elapsed_ms": {
+          "n": 30,
+          "mean": 15025.566,
+          "stddev": 3746.544,
+          "ci95": [
+            13779.31,
+            16382.955
+          ],
+          "min": 10297.478,
+          "max": 26176.662
+        },
+        "scopey_elapsed_ms": {
+          "n": 30,
+          "mean": 21923.521,
+          "stddev": 9445.983,
+          "ci95": [
+            18926.293,
+            25544.838
+          ],
+          "min": 13410.574,
+          "max": 53527.929
+        },
+        "analyzer_elapsed_ms": {
+          "n": 30,
+          "mean": 11803.726,
+          "stddev": 1541.624,
+          "ci95": [
+            11284.546,
+            12382.513
+          ],
+          "min": 9767.672,
+          "max": 15642.266
+        }
+      },
+      "rates": {
+        "verdict_match": {
+          "successes": 30,
+          "n": 30,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.886487,
+            1.0
+          ]
+        },
+        "control_task_success": {
+          "successes": 0,
+          "n": 30,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.113513
+          ]
+        },
+        "scopey_task_success": {
+          "successes": 28,
+          "n": 30,
+          "rate": 0.933333,
+          "ci95_wilson": [
+            0.786765,
+            0.981523
+          ]
+        },
+        "control_drift": {
+          "successes": 30,
+          "n": 30,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.886487,
+            1.0
+          ]
+        },
+        "scopey_stopped_drift": {
+          "successes": 30,
+          "n": 30,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.886487,
+            1.0
+          ]
+        },
+        "false_positive": {
+          "successes": 0,
+          "n": 30,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.113513
+          ]
+        },
+        "correction_injected": {
+          "successes": 30,
+          "n": 30,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.886487,
+            1.0
+          ]
+        },
+        "scopey_rolled_back_seed": {
+          "successes": 29,
+          "n": 30,
+          "rate": 0.966667,
+          "ci95_wilson": [
+            0.833296,
+            0.994091
+          ]
+        },
+        "valid_pair": {
+          "successes": 28,
+          "n": 30,
+          "rate": 0.933333,
+          "ci95_wilson": [
+            0.786765,
+            0.981523
+          ]
+        },
+        "prevented_waste_positive_net": {
+          "successes": 1,
+          "n": 30,
+          "rate": 0.033333,
+          "ci95_wilson": [
+            0.005909,
+            0.166704
+          ]
+        }
+      }
+    },
+    "no_drift": {
+      "pairs": 25,
+      "tokens": {
+        "no_scopey_main_tokens": {
+          "n": 25,
+          "mean": 49631.04,
+          "stddev": 13726.014,
+          "ci95": [
+            44262.52,
+            54991.76
+          ],
+          "min": 31006.0,
+          "max": 65926.0
+        },
+        "no_scopey_main_input_tokens": {
+          "n": 25,
+          "mean": 49077.32,
+          "stddev": 13613.295,
+          "ci95": [
+            43735.96,
+            54416.68
+          ],
+          "min": 30724.0,
+          "max": 65235.0
+        },
+        "no_scopey_main_cached_tokens": {
+          "n": 25,
+          "mean": 43612.16,
+          "stddev": 12375.881,
+          "ci95": [
+            38819.84,
+            48322.56
+          ],
+          "min": 26112.0,
+          "max": 59392.0
+        },
+        "no_scopey_main_output_tokens": {
+          "n": 25,
+          "mean": 553.72,
+          "stddev": 142.716,
+          "ci95": [
+            497.72,
+            609.24
+          ],
+          "min": 252.0,
+          "max": 824.0
+        },
+        "scopey_main_tokens": {
+          "n": 25,
+          "mean": 48411.76,
+          "stddev": 14558.688,
+          "ci95": [
+            42971.6,
+            53847.56
+          ],
+          "min": 31045.0,
+          "max": 66179.0
+        },
+        "scopey_main_input_tokens": {
+          "n": 25,
+          "mean": 47866.96,
+          "stddev": 14445.62,
+          "ci95": [
+            42444.24,
+            53283.16
+          ],
+          "min": 30723.0,
+          "max": 65414.0
+        },
+        "scopey_main_cached_tokens": {
+          "n": 25,
+          "mean": 42649.6,
+          "stddev": 13472.874,
+          "ci95": [
+            37529.6,
+            47933.44
+          ],
+          "min": 26112.0,
+          "max": 59392.0
+        },
+        "scopey_main_output_tokens": {
+          "n": 25,
+          "mean": 544.8,
+          "stddev": 143.561,
+          "ci95": [
+            490.8,
+            600.24
+          ],
+          "min": 306.0,
+          "max": 820.0
+        },
+        "scopey_input_tokens": {
+          "n": 25,
+          "mean": 28284.92,
+          "stddev": 108.429,
+          "ci95": [
+            28240.48,
+            28323.84
+          ],
+          "min": 27948.0,
+          "max": 28377.0
+        },
+        "scopey_cached_input_tokens": {
+          "n": 25,
+          "mean": 20049.92,
+          "stddev": 409.6,
+          "ci95": [
+            19968.0,
+            20213.76
+          ],
+          "min": 19968.0,
+          "max": 22016.0
+        },
+        "scopey_generated_tokens": {
+          "n": 25,
+          "mean": 156.76,
+          "stddev": 17.945,
+          "ci95": [
+            149.64,
+            163.28
+          ],
+          "min": 120.0,
+          "max": 180.0
+        },
+        "scopey_total_tokens": {
+          "n": 25,
+          "mean": 28441.68,
+          "stddev": 105.934,
+          "ci95": [
+            28398.44,
+            28479.88
+          ],
+          "min": 28120.0,
+          "max": 28539.0
+        },
+        "main_tokens_avoided": {
+          "n": 25,
+          "mean": 1219.28,
+          "stddev": 11544.461,
+          "ci95": [
+            -3306.64,
+            5818.84
+          ],
+          "min": -16573.0,
+          "max": 32832.0
+        },
+        "net_tokens_saved": {
+          "n": 25,
+          "mean": -27222.4,
+          "stddev": 11574.477,
+          "ci95": [
+            -31813.92,
+            -22605.04
+          ],
+          "min": -45104.0,
+          "max": 4300.0
+        }
+      },
+      "operations": {
+        "no_scopey_tool_actions": {
+          "n": 25,
+          "mean": 2.6,
+          "stddev": 0.957,
+          "ci95": [
+            2.24,
+            2.96
+          ],
+          "min": 1.0,
+          "max": 4.0
+        },
+        "scopey_tool_actions": {
+          "n": 25,
+          "mean": 2.48,
+          "stddev": 1.005,
+          "ci95": [
+            2.08,
+            2.84
+          ],
+          "min": 1.0,
+          "max": 4.0
+        },
+        "no_scopey_elapsed_ms": {
+          "n": 25,
+          "mean": 16963.435,
+          "stddev": 3846.138,
+          "ci95": [
+            15538.195,
+            18468.843
+          ],
+          "min": 9625.519,
+          "max": 23694.665
+        },
+        "scopey_elapsed_ms": {
+          "n": 25,
+          "mean": 17449.955,
+          "stddev": 3662.945,
+          "ci95": [
+            16058.96,
+            18887.771
+          ],
+          "min": 11158.141,
+          "max": 24347.663
+        },
+        "analyzer_elapsed_ms": {
+          "n": 25,
+          "mean": 11589.551,
+          "stddev": 3055.615,
+          "ci95": [
+            10546.893,
+            12900.269
+          ],
+          "min": 9007.434,
+          "max": 22187.214
+        }
+      },
+      "rates": {
+        "verdict_match": {
+          "successes": 25,
+          "n": 25,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.866808,
+            1.0
+          ]
+        },
+        "control_task_success": {
+          "successes": 25,
+          "n": 25,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.866808,
+            1.0
+          ]
+        },
+        "scopey_task_success": {
+          "successes": 25,
+          "n": 25,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.866808,
+            1.0
+          ]
+        },
+        "control_drift": {
+          "successes": 0,
+          "n": 25,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.133192
+          ]
+        },
+        "scopey_stopped_drift": {
+          "successes": 25,
+          "n": 25,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.866808,
+            1.0
+          ]
+        },
+        "false_positive": {
+          "successes": 0,
+          "n": 25,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.133192
+          ]
+        },
+        "correction_injected": {
+          "successes": 0,
+          "n": 25,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.133192
+          ]
+        },
+        "scopey_rolled_back_seed": {
+          "successes": 25,
+          "n": 25,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.866808,
+            1.0
+          ]
+        },
+        "valid_pair": {
+          "successes": 25,
+          "n": 25,
+          "rate": 1.0,
+          "ci95_wilson": [
+            0.866808,
+            1.0
+          ]
+        },
+        "prevented_waste_positive_net": {
+          "successes": 0,
+          "n": 25,
+          "rate": 0.0,
+          "ci95_wilson": [
+            0.0,
+            0.133192
+          ]
+        }
+      }
+    }
+  },
+  "overall": {
+    "pairs": 55,
+    "tokens": {
+      "no_scopey_main_tokens": {
+        "n": 55,
+        "mean": 41845.218,
+        "stddev": 13222.752,
+        "ci95": [
+          38517.073,
+          45452.382
+        ],
+        "min": 31006.0,
+        "max": 65926.0
+      },
+      "no_scopey_main_input_tokens": {
+        "n": 55,
+        "mean": 41319.455,
+        "stddev": 13129.353,
+        "ci95": [
+          38007.745,
+          44799.8
+        ],
+        "min": 30724.0,
+        "max": 65235.0
+      },
+      "no_scopey_main_cached_tokens": {
+        "n": 55,
+        "mean": 36389.236,
+        "stddev": 12198.232,
+        "ci95": [
+          33312.582,
+          39721.891
+        ],
+        "min": 24064.0,
+        "max": 59392.0
+      },
+      "no_scopey_main_output_tokens": {
+        "n": 55,
+        "mean": 525.764,
+        "stddev": 170.235,
+        "ci95": [
+          481.891,
+          571.927
+        ],
+        "min": 244.0,
+        "max": 942.0
+      },
+      "scopey_main_tokens": {
+        "n": 55,
+        "mean": 52042.273,
+        "stddev": 28390.607,
+        "ci95": [
+          45065.618,
+          59929.164
+        ],
+        "min": 17448.0,
+        "max": 178652.0
+      },
+      "scopey_main_input_tokens": {
+        "n": 55,
+        "mean": 51357.2,
+        "stddev": 28148.926,
+        "ci95": [
+          44624.873,
+          59057.582
+        ],
+        "min": 16704.0,
+        "max": 176656.0
+      },
+      "scopey_main_cached_tokens": {
+        "n": 55,
+        "mean": 44813.964,
+        "stddev": 25470.555,
+        "ci95": [
+          38800.291,
+          52019.2
+        ],
+        "min": 13056.0,
+        "max": 162304.0
+      },
+      "scopey_main_output_tokens": {
+        "n": 55,
+        "mean": 685.073,
+        "stddev": 283.276,
+        "ci95": [
+          615.182,
+          763.455
+        ],
+        "min": 306.0,
+        "max": 1996.0
+      },
+      "scopey_input_tokens": {
+        "n": 55,
+        "mean": 28297.273,
+        "stddev": 112.375,
+        "ci95": [
+          28267.018,
+          28326.236
+        ],
+        "min": 27945.0,
+        "max": 28409.0
+      },
+      "scopey_cached_input_tokens": {
+        "n": 55,
+        "mean": 20079.709,
+        "stddev": 469.369,
+        "ci95": [
+          19968.0,
+          20228.655
+        ],
+        "min": 19968.0,
+        "max": 22016.0
+      },
+      "scopey_generated_tokens": {
+        "n": 55,
+        "mean": 186.436,
+        "stddev": 37.239,
+        "ci95": [
+          177.2,
+          196.709
+        ],
+        "min": 120.0,
+        "max": 316.0
+      },
+      "scopey_total_tokens": {
+        "n": 55,
+        "mean": 28483.709,
+        "stddev": 118.208,
+        "ci95": [
+          28451.855,
+          28513.818
+        ],
+        "min": 28120.0,
+        "max": 28666.0
+      },
+      "main_tokens_avoided": {
+        "n": 55,
+        "mean": -10197.055,
+        "stddev": 30113.477,
+        "ci95": [
+          -18690.091,
+          -2905.909
+        ],
+        "min": -146239.0,
+        "max": 32832.0
+      },
+      "net_tokens_saved": {
+        "n": 55,
+        "mean": -38680.764,
+        "stddev": 30140.012,
+        "ci95": [
+          -47100.164,
+          -31373.091
+        ],
+        "min": -174875.0,
+        "max": 4300.0
+      }
+    },
+    "operations": {
+      "no_scopey_tool_actions": {
+        "n": 55,
+        "mean": 1.818,
+        "stddev": 1.038,
+        "ci95": [
+          1.564,
+          2.091
+        ],
+        "min": 1.0,
+        "max": 4.0
+      },
+      "scopey_tool_actions": {
+        "n": 55,
+        "mean": 2.091,
+        "stddev": 1.378,
+        "ci95": [
+          1.745,
+          2.473
+        ],
+        "min": 0.0,
+        "max": 8.0
+      },
+      "no_scopey_elapsed_ms": {
+        "n": 55,
+        "mean": 15906.416,
+        "stddev": 3880.857,
+        "ci95": [
+          14895.238,
+          16947.885
+        ],
+        "min": 9625.519,
+        "max": 26176.662
+      },
+      "scopey_elapsed_ms": {
+        "n": 55,
+        "mean": 19890.082,
+        "stddev": 7676.907,
+        "ci95": [
+          18035.771,
+          22028.601
+        ],
+        "min": 11158.141,
+        "max": 53527.929
+      },
+      "analyzer_elapsed_ms": {
+        "n": 55,
+        "mean": 11706.373,
+        "stddev": 2331.864,
+        "ci95": [
+          11147.431,
+          12356.109
+        ],
+        "min": 9007.434,
+        "max": 22187.214
+      }
+    },
+    "rates": {
+      "verdict_match": {
+        "successes": 55,
+        "n": 55,
+        "rate": 1.0,
+        "ci95_wilson": [
+          0.934715,
+          1.0
+        ]
+      },
+      "control_task_success": {
+        "successes": 25,
+        "n": 55,
+        "rate": 0.454545,
+        "ci95_wilson": [
+          0.330253,
+          0.584773
+        ]
+      },
+      "scopey_task_success": {
+        "successes": 53,
+        "n": 55,
+        "rate": 0.963636,
+        "ci95_wilson": [
+          0.876765,
+          0.98997
+        ]
+      },
+      "control_drift": {
+        "successes": 30,
+        "n": 55,
+        "rate": 0.545455,
+        "ci95_wilson": [
+          0.415227,
+          0.669747
+        ]
+      },
+      "scopey_stopped_drift": {
+        "successes": 55,
+        "n": 55,
+        "rate": 1.0,
+        "ci95_wilson": [
+          0.934715,
+          1.0
+        ]
+      },
+      "false_positive": {
+        "successes": 0,
+        "n": 55,
+        "rate": 0.0,
+        "ci95_wilson": [
+          0.0,
+          0.065285
+        ]
+      },
+      "correction_injected": {
+        "successes": 30,
+        "n": 55,
+        "rate": 0.545455,
+        "ci95_wilson": [
+          0.415227,
+          0.669747
+        ]
+      },
+      "scopey_rolled_back_seed": {
+        "successes": 54,
+        "n": 55,
+        "rate": 0.981818,
+        "ci95_wilson": [
+          0.903942,
+          0.996783
+        ]
+      },
+      "valid_pair": {
+        "successes": 53,
+        "n": 55,
+        "rate": 0.963636,
+        "ci95_wilson": [
+          0.876765,
+          0.98997
+        ]
+      },
+      "prevented_waste_positive_net": {
+        "successes": 1,
+        "n": 55,
+        "rate": 0.018182,
+        "ci95_wilson": [
+          0.003217,
+          0.096058
+        ]
+      }
+    }
+  },
+  "errors": []
+}
