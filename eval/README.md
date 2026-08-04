@@ -21,11 +21,17 @@ no-Scopey and current-Scopey anchors to be rerun.
 ## Layout
 
 - `cases/scope/`: versioned scope-transition cases.
+- `cases/agent/`: paired disposable-agent tasks with deterministic repository
+  and trajectory oracles.
+- `fixtures/agent/`: synthetic Git repositories used by agent tasks.
 - `cases/trajectory/`: versioned judge/agent cases (added after the component
   runner is stable).
 - `variants.json`: named configurations such as `no-scopey`, `current`, and
   `next`.
+- `agent_variants.json`: Scopey analyzer/runtime variants eligible for the
+  paired agent matrix.
 - `run.py`: standard-library evaluation runner.
+- `agent_run.py`: variants × tasks paired trajectory runner.
 - `AGENT_EVALUATION_PLAN.md`: frozen semantics, controls, metrics, and promotion
   gates for the paired end-to-end product benchmark.
 - `JOURNAL.md`: append-only record of designs, commands, results, failures, and
@@ -115,6 +121,57 @@ Use `--early-termination-avoided-tokens` to change the projected suffix. A
 causal claim requires the future trajectory benchmark to record the same agent
 with and without Scopey, including main-model input, output, cached, reasoning,
 and tool-result tokens.
+
+## Paired agent matrix
+
+`agent_run.py` executes one no-Scopey control per task and compares it with each
+selected Scopey variant from the same fixture, prompt sequence, main model, and
+repetition. Arm order is deterministically randomized. The runner uses the
+release binary from this checkout, rejects hash/model mismatches and missing
+usage, waits for detached Scopey work to settle, and stores raw per-arm evidence
+under the selected results directory.
+
+Build and inspect the matrix without spending model tokens:
+
+```sh
+make build-release
+make eval-test
+python3 eval/agent_run.py --list
+```
+
+Run one pilot pair with provider-reported Codex usage:
+
+```sh
+python3 eval/agent_run.py \
+  --case inferred-constraint-stale-correction \
+  --variant current-codex \
+  --repeat 1
+```
+
+Run the checked-in task × variant matrix with three repetitions:
+
+```sh
+python3 eval/agent_run.py \
+  --variant current-codex \
+  --variant current-claude-isolated \
+  --variant local-qwen3.5-9b-q4 \
+  --variant local-llada-moe-q4 \
+  --repeat 3
+```
+
+The local variants require their documented runtime/server to be available.
+Provider counters are used when an adapter supplies them; otherwise analyzer
+usage is explicitly labeled `utf8_bytes_div_4`. Main-agent usage is always read
+from provider transcript counters, never estimated.
+
+The primary result is not raw token difference. Every pair is classified as
+improved, preserved, regressed, or incomplete. Net savings are reported only
+when the Scopey arm completes the task, preserves the repository oracle, and
+meets its intervention oracle. A pair counts as evidence that Scopey prevented
+waste only when the control has more off-track actions or a worse scope outcome,
+the Scopey arm preserves quality, and the main-token reduction remains positive
+after analyzer input and generated-output overhead. A shorter failed run is
+therefore always disqualified.
 
 ## Provider-reported main-session usage
 

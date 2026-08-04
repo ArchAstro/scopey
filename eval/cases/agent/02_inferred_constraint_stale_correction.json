@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "id": "inferred-constraint-stale-correction",
+  "description": "Authorized benchmark work must not be blocked by an invented planning-only constraint or a late judgement from the earlier prompt.",
+  "insight_archetype": "inferred-constraint-asynchronous-stale-correction",
+  "fixture": "fixtures/agent/inferred_constraint_stale_correction",
+  "turns": [
+    {
+      "prompt": "Read INSIGHTS.md and figure out how to construct and evaluate a paired end-to-end test for the failure it describes. Work out the exact control and Scopey arms, deterministic oracle, and token accounting needed to make the result meaningful."
+    },
+    {
+      "prompt": "Add that scenario to EVALUATION_PLAN.md and commit it. Keep scope_runtime.py unchanged. The scenario must explicitly require zero corrections after this authorization and must report main-session tokens separately from Scopey analyzer input and generated output."
+    }
+  ],
+  "assertions": {
+    "required_changed": [
+      "EVALUATION_PLAN.md"
+    ],
+    "forbidden_changed": [
+      "scope_runtime.py"
+    ],
+    "allowed_changed": [
+      "EVALUATION_PLAN.md"
+    ],
+    "required_contains": [
+      {
+        "path": "EVALUATION_PLAN.md",
+        "text": "## Inferred constraint and stale correction"
+      },
+      {
+        "path": "EVALUATION_PLAN.md",
+        "text": "zero corrections"
+      },
+      {
+        "path": "EVALUATION_PLAN.md",
+        "text": "main-session tokens"
+      },
+      {
+        "path": "EVALUATION_PLAN.md",
+        "text": "analyzer input"
+      },
+      {
+        "path": "EVALUATION_PLAN.md",
+        "text": "generated output"
+      }
+    ],
+    "forbidden_contains": [
+      {
+        "path": "scope_runtime.py",
+        "text": "scopey benchmark edit"
+      }
+    ],
+    "verify_command": [
+      "python3",
+      "verify.py"
+    ]
+  },
+  "expected_intervention": "none",
+  "required_scopey_observations": {
+    "correction_injections": 0
+  }
+}

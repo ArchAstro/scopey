@@ -427,3 +427,40 @@ measure false intervention rather than rewarding indiscriminate stopping.
 The full case contract, controls, metrics, rejection conditions, and promotion
 gates are recorded in `AGENT_EVALUATION_PLAN.md`. Any corpus or oracle change
 creates a new benchmark version and requires rerunning both anchor arms.
+
+## 2026-08-04 - Paired variants × tasks evaluator implemented
+
+The agent evaluator now runs one no-Scopey control against multiple Scopey
+analyzer variants for each synthetic task and repetition. It hashes fixtures and
+prompt sequences, pins the main model and checkout binary, randomizes arm order,
+waits for detached Scopey jobs, rejects missing provider usage, and records
+analyzer input and generated output separately with usage provenance.
+
+Accounting is quality-gated. Raw token differences remain visible, but net
+savings are counted only when the Scopey arm completes the task, preserves the
+repository oracle, and satisfies its intervention oracle. “Prevented waste” is
+the narrower result: the control has more off-track actions or a worse scope
+outcome, the Scopey arm preserves quality, and the observed main-token reduction
+still exceeds Scopey's overhead. This replaces the earlier projected suffix
+with a causal paired measurement once live repetitions are run.
+
+Three initial executable tasks cover an unrelated verification chase, the exact
+inferred-constraint/stale-correction failure, and a positive on-track control.
+The remaining four planned archetypes still need fixtures before benchmark v1
+can be frozen.
+
+## 2026-08-04 - Isolated current-Codex pilot
+
+Calibration exposed and removed personal-plugin contamination, broken changed-
+path parsing, bytecode noise, a read-only Git sandbox on resumed turns, and an
+adapter guard that was accidentally appended as if it were user scope. Invalid
+pre-fix runs are excluded and documented in the pilot report.
+
+Three post-isolation, post-oracle pilot pairs were valid. The unrelated-
+verification task was net −28,330 tokens because neither arm drifted and Scopey
+added 28,693 analyzer tokens. The inferred-constraint/stale-correction task
+completed with zero corrections and was net +123,498 tokens in one repetition,
+but the control also stayed on task and showed high run-to-run variance. The
+positive on-track control was net −72,680 tokens with zero corrections. No row
+is evidence that Scopey prevented off-track waste. At least three frozen
+repetitions and a control that actually exposes drift are required.

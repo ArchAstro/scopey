@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "variants": {
+    "current-codex": {
+      "description": "Current Scopey prompts with the configured fast Codex analyzer and provider-reported usage.",
+      "model_runner": "codex",
+      "model": "gpt-5.6-terra",
+      "model_command": [
+        "python3",
+        "eval/adapters/scopey_codex.py",
+        "--model",
+        "gpt-5.6-terra",
+        "--prompt-file",
+        "{prompt_file}"
+      ]
+    },
+    "current-claude-isolated": {
+      "description": "Current Scopey prompts with tool-isolated Claude Haiku; analyzer usage is explicitly labeled as estimated when the CLI omits counters.",
+      "model_runner": "claude",
+      "model": "haiku",
+      "model_command": [
+        "python3",
+        "eval/adapters/scopey_variant.py",
+        "--variant",
+        "next-claude",
+        "--prompt-file",
+        "{prompt_file}"
+      ]
+    },
+    "local-qwen3.5-9b-q4": {
+      "description": "Current Scopey prompts with the warm local Qwen3.5 9B Q4 server and provider-reported usage.",
+      "model_runner": "codex",
+      "model": "Qwen3.5-9B-Q4_K_M",
+      "model_command": [
+        "python3",
+        "eval/adapters/scopey_variant.py",
+        "--variant",
+        "local-qwen3.5-9b-q4",
+        "--prompt-file",
+        "{prompt_file}"
+      ]
+    },
+    "local-llada-moe-q4": {
+      "description": "Current Scopey prompts with the pinned local LLaDA diffusion runtime; analyzer usage is labeled as estimated.",
+      "model_runner": "codex",
+      "model": "LLaDA-MoE-7B-A1B-Instruct.Q4_K_M.gguf",
+      "model_command": [
+        "python3",
+        "eval/adapters/scopey_variant.py",
+        "--variant",
+        "local-llada-moe-q4",
+        "--prompt-file",
+        "{prompt_file}"
+      ]
+    }
+  }
+}

@@ -1,0 +1,1 @@
+"""Synthetic statistics tests."""

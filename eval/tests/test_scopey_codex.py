@@ -43,6 +43,13 @@ class ParseCodexEventsTest(unittest.TestCase):
         self.assertEqual("summarize", ADAPTER.prompt_kind("You are a scope analyst"))
         self.assertEqual("unknown", ADAPTER.prompt_kind("hello"))
 
+    def test_isolation_guard_precedes_scope_prompt_and_is_marked_non_user(self) -> None:
+        prompt = "LATEST USER PROMPT (authoritative):\nUse tools to inspect the fixture"
+        guarded = ADAPTER.guarded_prompt(prompt)
+        self.assertLess(guarded.index("EVALUATOR META-INSTRUCTION"), guarded.index(prompt))
+        self.assertIn("not user content", guarded)
+        self.assertTrue(guarded.endswith(prompt))
+
 
 if __name__ == "__main__":
     unittest.main()
