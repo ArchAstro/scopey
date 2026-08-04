@@ -4,6 +4,7 @@
 use std::fs;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
 
 fn scopey_bin() -> PathBuf {
     // Prefer cargo's test binary path sibling: CARGO_BIN_EXE_scopey when available
@@ -14,11 +15,25 @@ fn scopey_bin() -> PathBuf {
 }
 
 fn run_hook(home: &std::path::Path, sub: &str, payload: &str) -> std::process::Output {
-    Command::new(scopey_bin())
+    run_hook_with_config(home, None, sub, payload)
+}
+
+fn run_hook_with_config(
+    home: &std::path::Path,
+    config: Option<&std::path::Path>,
+    sub: &str,
+    payload: &str,
+) -> std::process::Output {
+    let mut command = Command::new(scopey_bin());
+    command
         .args(["hook", sub])
         .env("SCOPEY_HOME", home)
         .env_remove("SCOPEY_INTERNAL")
-        .env_remove("SCOPEY_HOOKS_DISABLED")
+        .env_remove("SCOPEY_HOOKS_DISABLED");
+    if let Some(config) = config {
+        command.env("SCOPEY_CONFIG", config);
+    }
+    command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -29,6 +44,17 @@ fn run_hook(home: &std::path::Path, sub: &str, payload: &str) -> std::process::O
             c.wait_with_output()
         })
         .expect("spawn hook")
+}
+
+fn wait_for(timeout: Duration, mut ready: impl FnMut() -> bool) -> bool {
+    let started = Instant::now();
+    while started.elapsed() < timeout {
+        if ready() {
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    false
 }
 
 #[test]
@@ -182,6 +208,151 @@ fn post_tool_batch_counts_and_logs() {
             || text.contains("tool count")
             || text.contains("post_tool")
     );
+}
+
+#[test]
+fn new_prompt_suppresses_stale_correction_end_to_end() {
+    let home = tempfile::tempdir().unwrap();
+    let cwd = home.path().join("proj");
+    fs::create_dir_all(&cwd).unwrap();
+    let sid = "cli-prompt-epoch-e2e";
+    let config = home.path().join("config.toml");
+    fs::write(
+        &config,
+        format!(
+            r#"
+work_root = "{}"
+model_runner = "claude"
+model_command = "printf '%s\\n' '<!-- scope-transition: REPLACE -->' '- Construct and evaluate the baseline test' '- Current task is planning/analysis; do not edit files or run tools.'"
+min_job_interval_secs = 0
+max_global_jobs = 1
+n_tool_calls = 15
+m_reminder = 9999
+notify_on_off_track = false
+notify_on_warning = false
+notify_on_model_fallback = false
+herdr_report_state = false
+"#,
+            home.path().join("work").display()
+        ),
+    )
+    .unwrap();
+
+    let first = format!(
+        r#"{{"session_id":"{sid}","cwd":"{}","prompt":"write the evaluation plan","hook_event_name":"UserPromptSubmit"}}"#,
+        cwd.display()
+    );
+    let first_out = run_hook_with_config(home.path(), Some(&config), "user-prompt", &first);
+    assert!(
+        first_out.status.success(),
+        "first hook stderr={}",
+        String::from_utf8_lossy(&first_out.stderr)
+    );
+
+    let store_path = home.path().join("work/by-id").join(format!("{sid}.json"));
+    assert!(wait_for(Duration::from_secs(10), || {
+        fs::read_to_string(&store_path)
+            .ok()
+            .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+            .and_then(|store| store["messages"].as_array().cloned())
+            .is_some_and(|messages| {
+                messages
+                    .iter()
+                    .filter(|message| message["type"] == "scope_requirements")
+                    .count()
+                    == 1
+            })
+    }));
+
+    let mut store: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&store_path).unwrap()).unwrap();
+    let first_prompt_hash = store["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|message| message["type"] == "user_prompt")
+        .and_then(|message| message["prompt_hash"].as_str())
+        .unwrap()
+        .to_string();
+    store["tool_call_count"] = serde_json::json!(15);
+    store["messages"]
+        .as_array_mut()
+        .unwrap()
+        .push(serde_json::json!({
+            "type": "judgement",
+            "ts": chrono::Utc::now().to_rfc3339(),
+            "tool_count": 15,
+            "from_count": 0,
+            "to_count": 15,
+            "verdict": "off_track",
+            "status": "ready",
+            "summary": "old work drifted",
+            "details": "this verdict belongs to the previous user prompt",
+            "prompt_hash": first_prompt_hash,
+            "id": "stale-ready-judgement"
+        }));
+    fs::write(&store_path, serde_json::to_string_pretty(&store).unwrap()).unwrap();
+
+    let second = format!(
+        r#"{{"session_id":"{sid}","cwd":"{}","prompt":"Instead, figure out how to construct and evaluate the baseline test","hook_event_name":"UserPromptSubmit"}}"#,
+        cwd.display()
+    );
+    let second_out = run_hook_with_config(home.path(), Some(&config), "user-prompt", &second);
+    assert!(
+        second_out.status.success(),
+        "second hook stderr={}",
+        String::from_utf8_lossy(&second_out.stderr)
+    );
+
+    let post_tool = format!(
+        r#"{{"session_id":"{sid}","cwd":"{}","hook_event_name":"PostToolUse","tool_name":"Read","tool_input":{{"file_path":"README.md"}}}}"#,
+        cwd.display()
+    );
+    let post_out = run_hook_with_config(home.path(), Some(&config), "post-tool", &post_tool);
+    assert!(post_out.status.success());
+    let post_stdout = String::from_utf8_lossy(&post_out.stdout);
+    assert!(
+        !post_stdout.contains("COURSE CORRECTION"),
+        "stale judgement was injected: {post_stdout}"
+    );
+
+    assert!(wait_for(Duration::from_secs(10), || {
+        fs::read_to_string(&store_path)
+            .ok()
+            .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+            .and_then(|store| store["messages"].as_array().cloned())
+            .is_some_and(|messages| {
+                messages
+                    .iter()
+                    .filter(|message| message["type"] == "scope_requirements")
+                    .count()
+                    == 2
+            })
+    }));
+
+    let store: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&store_path).unwrap()).unwrap();
+    assert_eq!(store["scope_epoch_start_tool_count"], 15);
+    let stale = store["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|message| message["id"] == "stale-ready-judgement")
+        .unwrap();
+    assert_eq!(stale["status"], "failed");
+    assert_eq!(stale["summary"], "superseded by a newer user prompt");
+    let latest_scope = store["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .rev()
+        .find(|message| message["type"] == "scope_requirements")
+        .and_then(|message| message["content"].as_str())
+        .unwrap();
+    assert!(latest_scope.contains("Construct and evaluate"));
+    assert!(!latest_scope.contains("planning/analysis"));
+    assert!(!latest_scope.contains("do not edit"));
+    assert!(!latest_scope.contains("run tools"));
 }
 
 #[test]
