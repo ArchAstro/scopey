@@ -196,10 +196,13 @@ pub fn summarize_scope(
         cfg.summarize_prompt_chars,
     );
 
+    let mut completion: Option<model::Completion> = None;
     let (transition, out) = match model::complete(cfg, &sys, &harness) {
-        Ok(t) => {
+        Ok(c) => {
             crate::model_health::record_success(cfg, "summarize");
-            extract_scope_transition(&t)
+            let parsed = extract_scope_transition(&c.text);
+            completion = Some(c);
+            parsed
         }
         Err(e) => {
             crate::model_health::record_failure(cfg, "summarize", &format!("{e:#}"));
@@ -217,6 +220,9 @@ pub fn summarize_scope(
     let previous_scope_hash = previous_scope.as_deref().map(hash_prompt);
     let scope_hash = hash_prompt(&out);
     let mut store = SessionStore::open_or_create(cfg, cwd, session_id, &harness)?;
+    if let Some(c) = &completion {
+        store.record_analyzer_usage("summarize", c);
+    }
     store.append(SessionMessage::scope_requirements(out.trim(), Some(hash)));
     store.clear_summarize_pending();
     store.persist()?;
@@ -425,7 +431,7 @@ Respond with EXACTLY this JSON object (no markdown fences):
 "#
     );
 
-    let raw = match model::complete(cfg, &prompt, &harness) {
+    let completion = match model::complete(cfg, &prompt, &harness) {
         Ok(t) => {
             crate::model_health::record_success(cfg, "judge");
             t
@@ -457,7 +463,7 @@ Respond with EXACTLY this JSON object (no markdown fences):
         }
     };
 
-    let mut parsed = parse_judgement_json(&raw);
+    let mut parsed = parse_judgement_json(&completion.text);
     if matches!(
         parsed.0,
         JudgementVerdict::Warning | JudgementVerdict::OffTrack
@@ -472,6 +478,9 @@ Respond with EXACTLY this JSON object (no markdown fences):
     let (verdict, summary, details) = parsed;
 
     let mut store = SessionStore::open_or_create(cfg, cwd, session_id, &harness)?;
+    // The model call happened regardless of what becomes of the verdict
+    // (ready, superseded, discarded), so its cost is recorded first.
+    store.record_analyzer_usage("judge", &completion);
     if let Some(id) = &pending_id {
         store.data.messages.retain(|m| m.id.as_deref() != Some(id));
     }
