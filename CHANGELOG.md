@@ -7,6 +7,22 @@ and the project intends to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `scopey insights` now analyzes drift patterns and token usage, rendered
+  readably: a drift-patterns block (archetype taxonomy bars, onset-position
+  histogram, drift-by-session-length table, stated/implied-limit split, and
+  per-correction next-check recovery), provider-reported main-session token
+  totals with cache-read/fresh/output composition, and per-session drift
+  shape, categories, correction outcomes, and tokens. Output uses validated
+  truecolor palettes with unicode bars, degrades to plain text under
+  `NO_COLOR` or when piped, and renders the onset histogram as an inline
+  raster via the kitty graphics protocol on kitty/ghostty (layer-local
+  detection only, so nested PTYs degrade safely). Metrics use plain-language
+  labels with a full glossary in `--help`. New flags: `--no-patterns`,
+  `--tokens shown|all|off`, `--graphics auto|kitty|off`; `--json`
+  includes all new fields under stable names.
+
 ### Fixed
 
 - New user prompts now start a fresh judgement epoch: pending verdicts from the
