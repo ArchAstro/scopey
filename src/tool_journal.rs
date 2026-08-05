@@ -39,6 +39,132 @@ fn normalize_name(name: &str) -> String {
     name.trim().to_ascii_lowercase().replace('-', "_")
 }
 
+/// Tool names that never mutate repository or system state.
+const READ_ONLY_TOOLS: &[&str] = &[
+    "read",
+    "read_file",
+    "glob",
+    "grep",
+    "ls",
+    "list_dir",
+    "list_files",
+    "view",
+    "notebookread",
+];
+
+/// Tool names that execute a shell command carried in the args preview.
+const EXEC_TOOLS: &[&str] = &[
+    "bash",
+    "shell",
+    "exec_command",
+    "execute_command",
+    "run_command",
+    "run_terminal_cmd",
+    "terminal",
+];
+
+/// Shell programs that are read-only when their arguments pass the guards in
+/// `command_is_read_only`. Anything not listed is treated as mutating.
+const READ_ONLY_PROGRAMS: &[&str] = &[
+    "rg", "grep", "cat", "ls", "head", "tail", "wc", "find", "file", "stat", "pwd", "tree", "du",
+    "which", "git", "sed", "awk",
+];
+
+const READ_ONLY_GIT_SUBCOMMANDS: &[&str] = &[
+    "status",
+    "log",
+    "show",
+    "diff",
+    "branch",
+    "blame",
+    "rev-parse",
+    "ls-files",
+    "remote",
+    "describe",
+    "shortlog",
+    "grep",
+];
+
+/// Conservatively decide whether a shell command string is read-only.
+///
+/// Returns false on anything it cannot prove harmless: redirection, command
+/// substitution, unknown programs, sed without `-n`/with `-i`, find with
+/// `-delete`/`-exec`, non-allowlisted git subcommands, or a preview that was
+/// clipped (the dangerous part could be beyond the clip).
+pub fn command_is_read_only(command: &str) -> bool {
+    let trimmed = command.trim();
+    if trimmed.is_empty() || trimmed.ends_with('…') {
+        return false;
+    }
+    if trimmed.contains('>') || trimmed.contains('`') || trimmed.contains("$(") {
+        return false;
+    }
+    let segments = trimmed
+        .split("&&")
+        .flat_map(|s| s.split("||"))
+        .flat_map(|s| s.split(';'))
+        .flat_map(|s| s.split('|'));
+    for segment in segments {
+        let tokens: Vec<&str> = segment.split_whitespace().collect();
+        let Some(first) = tokens.first() else {
+            return false;
+        };
+        if first.contains('=') {
+            return false;
+        }
+        let program = first
+            .rsplit('/')
+            .next()
+            .unwrap_or(first)
+            .to_ascii_lowercase();
+        if !READ_ONLY_PROGRAMS.contains(&program.as_str()) {
+            return false;
+        }
+        match program.as_str() {
+            "sed" if !tokens.contains(&"-n") || tokens.iter().any(|t| t.starts_with("-i")) => {
+                return false;
+            }
+            "find"
+                if tokens
+                    .iter()
+                    .any(|t| matches!(*t, "-delete" | "-exec" | "-execdir" | "-ok" | "-okdir")) =>
+            {
+                return false;
+            }
+            "git" => {
+                let sub = tokens
+                    .iter()
+                    .skip(1)
+                    .find(|t| !t.starts_with('-'))
+                    .copied()
+                    .unwrap_or("");
+                if !READ_ONLY_GIT_SUBCOMMANDS.contains(&sub) {
+                    return false;
+                }
+            }
+            _ => {}
+        }
+    }
+    true
+}
+
+/// True when this journal event provably cannot have mutated state.
+pub fn is_read_only_event(event: &ToolEvent) -> bool {
+    let name = normalize_name(&event.name);
+    if READ_ONLY_TOOLS.contains(&name.as_str()) {
+        return true;
+    }
+    if EXEC_TOOLS.contains(&name.as_str()) {
+        return command_is_read_only(&event.args_preview);
+    }
+    false
+}
+
+/// True when a non-empty window contains only provably read-only tools.
+pub fn window_is_read_only(events: &[ToolEvent]) -> bool {
+    !events.is_empty() && events.iter().all(is_read_only_event)
+}
+
 pub fn clip_args(args: &str, max_chars: usize) -> String {
     let max = max_chars.max(32);
     let t = args.trim();
@@ -262,5 +388,52 @@ mod tests {
     #[test]
     fn empty_window_format() {
         assert!(format_tools_for_judge(&[]).contains("no tool actions"));
+    }
+
+    fn event(name: &str, args: &str) -> ToolEvent {
+        ToolEvent {
+            index: 1,
+            name: name.into(),
+            args_preview: args.into(),
+            ts: Utc::now(),
+            noise: false,
+        }
+    }
+
+    #[test]
+    fn read_only_commands_are_conservative() {
+        assert!(command_is_read_only("rg -n scope src/"));
+        assert!(command_is_read_only("cat a.txt && grep foo b.txt"));
+        assert!(command_is_read_only("git log --oneline | head -5"));
+        assert!(command_is_read_only("sed -n '1,20p' file.rs"));
+        assert!(command_is_read_only("/usr/bin/ls -la"));
+        // Anything that could write, or that we cannot see fully, is not read-only.
+        assert!(!command_is_read_only("cat a.txt > b.txt"));
+        assert!(!command_is_read_only("sed -i '' 's/a/b/' file.rs"));
+        assert!(!command_is_read_only("sed 's/a/b/' file.rs"));
+        assert!(!command_is_read_only("find . -name '*.tmp' -delete"));
+        assert!(!command_is_read_only("git push"));
+        assert!(!command_is_read_only("git checkout main"));
+        assert!(!command_is_read_only("python3 run.py"));
+        assert!(!command_is_read_only("FOO=1 rg pattern"));
+        assert!(!command_is_read_only("echo $(rm -rf /tmp/x)"));
+        assert!(!command_is_read_only(
+            "rg -n very-long-command-that-was-clipped…"
+        ));
+        assert!(!command_is_read_only(""));
+    }
+
+    #[test]
+    fn read_only_window_requires_every_event_proven_safe() {
+        let safe = vec![event("Read", "src/main.rs"), event("Bash", "git status")];
+        assert!(window_is_read_only(&safe));
+        let mixed = vec![
+            event("Read", "src/main.rs"),
+            event("apply_patch", "Update File: a.rs"),
+        ];
+        assert!(!window_is_read_only(&mixed));
+        let unknown = vec![event("mystery_tool", "")];
+        assert!(!window_is_read_only(&unknown));
+        assert!(!window_is_read_only(&[]));
     }
 }

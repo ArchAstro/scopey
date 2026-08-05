@@ -28,6 +28,7 @@ sha2 = "0.10"
 tempfile = "3"
 thiserror = "2"
 toml = "0.8"
+ureq = { version = "2", features = ["json"] }
 uuid = { version = "1", features = ["v4"] }
 which = "7"
 

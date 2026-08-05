@@ -105,6 +105,16 @@ pub struct Config {
     /// debug level. Diagnostics only — payloads include prompts, so this
     /// inherits the same privacy caveats as the rest of `~/.scopey`.
     pub log_raw_events: bool,
+    /// When every tool in a judge window is provably read-only (Read/grep/ls
+    /// or an allowlisted read-only shell command), record a deterministic
+    /// on_track verdict without a model call. Off-track requires mutating
+    /// evidence, so this cannot change verdict semantics — it only removes
+    /// analyzer cost on quiet windows.
+    pub deterministic_readonly_judge: bool,
+    /// Skip re-summarizing scope when a new user prompt is a bare continuation
+    /// ("continue", "go on", "yes") and a scope already exists. Such prompts
+    /// cannot change scope; anything with content still summarizes normally.
+    pub skip_continuation_summarize: bool,
 
     /// Filled at load time — not serialized as user config preference.
     #[serde(skip)]
@@ -152,6 +162,8 @@ impl Default for Config {
             ascii_scopey_on_correction: true,
             ignore_subagents: true,
             log_raw_events: false,
+            deterministic_readonly_judge: true,
+            skip_continuation_summarize: true,
             loaded_from: PathBuf::new(),
         }
     }
@@ -382,7 +394,19 @@ m_reminder = 30
 #   grok    → always `grok -p --model …`
 #   pi      → always `pi --print …`
 #   opencode → always `opencode run …`
+#   openai-api    → direct HTTPS call using OPENAI_API_KEY (no CLI harness
+#                   context, so analyzer input shrinks ~85%; never auto-picked)
+#   anthropic-api → direct HTTPS call using ANTHROPIC_API_KEY (same benefit)
 model_runner = "auto"
+
+# Token-cost gates (both default true):
+# deterministic_readonly_judge — judge windows whose every tool is provably
+#   read-only record on_track without a model call (off-track needs mutating
+#   evidence, so semantics are unchanged).
+# skip_continuation_summarize — bare continuation prompts ("continue", "yes")
+#   reuse the existing scope instead of paying for a re-summarize.
+deterministic_readonly_judge = true
+skip_continuation_summarize = true
 
 # Model id/alias, or "auto" to use the runner's shipped fast default:
 #   Claude Code → claude_fast_model (alias "haiku" tracks current fast Haiku)

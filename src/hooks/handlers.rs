@@ -472,6 +472,25 @@ pub fn user_prompt(cfg: &Config) -> Result<()> {
         }),
     );
 
+    // A bare continuation prompt cannot change scope; when a scope already
+    // exists and no earlier summarize is still owed, skip the model call.
+    if cfg.skip_continuation_summarize
+        && !store.data.summarize_pending
+        && crate::trajectory::is_continuation_prompt(&prompt)
+        && store.latest_scope_requirements().is_some()
+    {
+        store.persist()?;
+        eventlog::info(
+            &sid,
+            "hook.user_prompt",
+            "continuation prompt; scope unchanged, summarize skipped",
+            json!({ "prompt_chars": prompt.len() }),
+        );
+        drop(store);
+        let _ = drain_pending_jobs(cfg, &sid, &cwd);
+        return Ok(());
+    }
+
     // Single-flight + throttle: defer summarize when busy (drain later).
     if !SessionJobGuard::can_spawn(cfg, &sid)? {
         store.mark_summarize_pending();

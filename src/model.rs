@@ -5,7 +5,7 @@ use std::process::{Command, Stdio};
 use std::time::Duration;
 use tempfile::NamedTempFile;
 
-/// Which product CLI runs summarize/judge jobs.
+/// Which product CLI (or direct API) runs summarize/judge jobs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Runner {
     Claude,
@@ -13,6 +13,14 @@ pub enum Runner {
     Grok,
     Pi,
     OpenCode,
+    /// Direct HTTPS call to the OpenAI API (OPENAI_API_KEY). Never auto-picked:
+    /// only used when `model_runner = "openai-api"` is set explicitly. Carries
+    /// no CLI-harness system prompt, so analyzer input is roughly the Scopey
+    /// prompt alone (~85% smaller than a `codex exec` call).
+    OpenAiApi,
+    /// Direct HTTPS call to the Anthropic API (ANTHROPIC_API_KEY). Same
+    /// explicit-only, no-harness-overhead contract as `OpenAiApi`.
+    AnthropicApi,
 }
 
 impl Runner {
@@ -23,6 +31,8 @@ impl Runner {
             Runner::Grok => "grok",
             Runner::Pi => "pi",
             Runner::OpenCode => "opencode",
+            Runner::OpenAiApi => "openai-api",
+            Runner::AnthropicApi => "anthropic-api",
         }
     }
 
@@ -33,6 +43,8 @@ impl Runner {
             "grok" | "grok-build" | "xai" => Some(Runner::Grok),
             "pi" => Some(Runner::Pi),
             "opencode" | "open-code" | "open_code" => Some(Runner::OpenCode),
+            "openai-api" | "openai_api" | "api-openai" => Some(Runner::OpenAiApi),
+            "anthropic-api" | "anthropic_api" | "api-anthropic" => Some(Runner::AnthropicApi),
             _ => None,
         }
     }
@@ -44,6 +56,8 @@ impl Runner {
             Runner::Grok => &["grok"],
             Runner::Pi => &["pi"],
             Runner::OpenCode => &["opencode"],
+            // API runners need no binary and must never win auto-resolution.
+            Runner::OpenAiApi | Runner::AnthropicApi => &[],
         }
     }
 }
@@ -116,10 +130,25 @@ pub fn resolve_model(cfg: &Config, runner: Runner) -> String {
     }
     match runner {
         Runner::Claude => nonempty_or(&cfg.claude_fast_model, "haiku"),
-        Runner::Codex => nonempty_or(&cfg.codex_fast_model, "gpt-5.6-terra"),
+        Runner::Codex | Runner::OpenAiApi => nonempty_or(&cfg.codex_fast_model, "gpt-5.6-terra"),
         Runner::Grok => nonempty_or(&cfg.grok_fast_model, "grok-3-mini"),
         Runner::Pi => cfg.pi_fast_model.trim().to_string(),
         Runner::OpenCode => cfg.opencode_fast_model.trim().to_string(),
+        Runner::AnthropicApi => {
+            anthropic_api_model_id(&nonempty_or(&cfg.claude_fast_model, "haiku"))
+        }
+    }
+}
+
+/// The raw Anthropic API needs full model ids; the Claude CLI accepts aliases.
+/// Map the common aliases so `claude_fast_model = "haiku"` keeps working when
+/// switching to the direct-API runner.
+fn anthropic_api_model_id(alias_or_id: &str) -> String {
+    match alias_or_id.trim().to_ascii_lowercase().as_str() {
+        "haiku" => "claude-haiku-4-5-20251001".into(),
+        "sonnet" => "claude-sonnet-5".into(),
+        "opus" => "claude-opus-5".into(),
+        _ => alias_or_id.trim().to_string(),
     }
 }
 
@@ -207,7 +236,150 @@ pub fn complete(cfg: &Config, prompt: &str, session_harness: &str) -> Result<Str
         Runner::Grok => complete_grok(cfg, prompt, &choice.model),
         Runner::Pi => complete_pi(cfg, prompt, &choice.model),
         Runner::OpenCode => complete_opencode(cfg, prompt, &choice.model),
+        Runner::OpenAiApi => complete_openai_api(cfg, prompt, &choice.model),
+        Runner::AnthropicApi => complete_anthropic_api(cfg, prompt, &choice.model),
     }
+}
+
+/// Output budget for direct-API analyzer calls. Generous because reasoning
+/// models count thinking tokens against the completion budget; the visible
+/// judge/summarize outputs themselves are a few hundred tokens.
+const API_MAX_OUTPUT_TOKENS: u64 = 4096;
+
+fn api_key(env_name: &str, runner: &str) -> Result<String> {
+    std::env::var(env_name)
+        .ok()
+        .map(|k| k.trim().to_string())
+        .filter(|k| !k.is_empty())
+        .with_context(|| format!("model_runner={runner} requires {env_name} in the environment"))
+}
+
+fn api_base(env_name: &str, default: &str) -> String {
+    std::env::var(env_name)
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| default.to_string())
+        .trim_end_matches('/')
+        .to_string()
+}
+
+fn clip_api_error(text: &str) -> String {
+    let t = text.trim();
+    if t.chars().count() <= 400 {
+        t.to_string()
+    } else {
+        let mut out: String = t.chars().take(400).collect();
+        out.push('…');
+        out
+    }
+}
+
+fn api_send(
+    cfg: &Config,
+    url: &str,
+    headers: &[(&str, &str)],
+    body: serde_json::Value,
+    label: &str,
+) -> Result<serde_json::Value> {
+    let agent = ureq::AgentBuilder::new()
+        .timeout(Duration::from_secs(cfg.model_timeout_secs.max(1)))
+        .build();
+    let mut request = agent.post(url);
+    for (name, value) in headers {
+        request = request.set(name, value);
+    }
+    match request.send_json(body) {
+        Ok(response) => response
+            .into_json::<serde_json::Value>()
+            .with_context(|| format!("{label}: response was not JSON")),
+        Err(ureq::Error::Status(code, response)) => {
+            let text = response.into_string().unwrap_or_default();
+            bail!("{label}: status {code}: {}", clip_api_error(&text));
+        }
+        Err(e) => bail!("{label}: transport error: {e}"),
+    }
+}
+
+fn parse_openai_content(value: &serde_json::Value) -> Result<String> {
+    let content = value
+        .get("choices")
+        .and_then(|c| c.get(0))
+        .and_then(|c| c.get("message"))
+        .and_then(|m| m.get("content"))
+        .and_then(|t| t.as_str())
+        .map(str::trim)
+        .unwrap_or("");
+    if content.is_empty() {
+        bail!(
+            "openai api returned no message content: {}",
+            clip_api_error(&value.to_string())
+        );
+    }
+    Ok(content.to_string())
+}
+
+fn parse_anthropic_content(value: &serde_json::Value) -> Result<String> {
+    let text = value
+        .get("content")
+        .and_then(|c| c.as_array())
+        .and_then(|items| {
+            items.iter().find_map(|item| {
+                (item.get("type").and_then(|t| t.as_str()) == Some("text"))
+                    .then(|| item.get("text").and_then(|t| t.as_str()))
+                    .flatten()
+            })
+        })
+        .map(str::trim)
+        .unwrap_or("");
+    if text.is_empty() {
+        bail!(
+            "anthropic api returned no text content: {}",
+            clip_api_error(&value.to_string())
+        );
+    }
+    Ok(text.to_string())
+}
+
+fn complete_openai_api(cfg: &Config, prompt: &str, model: &str) -> Result<String> {
+    let key = api_key("OPENAI_API_KEY", "openai-api")?;
+    let base = api_base("OPENAI_BASE_URL", "https://api.openai.com");
+    let url = format!("{base}/v1/chat/completions");
+    let body = serde_json::json!({
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_completion_tokens": API_MAX_OUTPUT_TOKENS,
+    });
+    let value = api_send(
+        cfg,
+        &url,
+        &[("Authorization", &format!("Bearer {key}"))],
+        body,
+        "openai api",
+    )?;
+    parse_openai_content(&value)
+}
+
+fn complete_anthropic_api(cfg: &Config, prompt: &str, model: &str) -> Result<String> {
+    let key = api_key("ANTHROPIC_API_KEY", "anthropic-api")?;
+    let base = api_base("ANTHROPIC_BASE_URL", "https://api.anthropic.com");
+    let url = format!("{base}/v1/messages");
+    let body = serde_json::json!({
+        "model": model,
+        "max_tokens": API_MAX_OUTPUT_TOKENS,
+        "messages": [{"role": "user", "content": prompt}],
+    });
+    let value = api_send(
+        cfg,
+        &url,
+        &[
+            ("x-api-key", key.as_str()),
+            ("anthropic-version", "2023-06-01"),
+        ],
+        body,
+        "anthropic api",
+    )?;
+    parse_anthropic_content(&value)
 }
 
 fn complete_claude(cfg: &Config, prompt: &str, model: &str) -> Result<String> {
@@ -711,5 +883,81 @@ mod tests {
         let message = error.to_string();
         assert!(message.contains("status=exit status: 7"), "{message}");
         assert!(message.contains("stdout=auth-error"), "{message}");
+    }
+
+    #[test]
+    fn api_runners_parse_but_are_never_auto_selected() {
+        assert_eq!(Runner::parse("openai-api"), Some(Runner::OpenAiApi));
+        assert_eq!(Runner::parse("anthropic_api"), Some(Runner::AnthropicApi));
+        // Auto-resolution must ignore API runners even when nothing else exists.
+        let cfg = Config {
+            model_runner: "auto".into(),
+            ..Config::default()
+        };
+        let err = resolve_runner_with(&cfg, "codex", |_| false).unwrap_err();
+        assert!(err.to_string().contains("no model runner"), "{err}");
+        // Explicit selection works without any binary on PATH.
+        let cfg = Config {
+            model_runner: "openai-api".into(),
+            ..Config::default()
+        };
+        assert_eq!(
+            resolve_runner_with(&cfg, "codex", |_| false).unwrap(),
+            Runner::OpenAiApi
+        );
+    }
+
+    #[test]
+    fn anthropic_api_model_ids_map_cli_aliases() {
+        assert_eq!(anthropic_api_model_id("haiku"), "claude-haiku-4-5-20251001");
+        assert_eq!(anthropic_api_model_id("sonnet"), "claude-sonnet-5");
+        assert_eq!(
+            anthropic_api_model_id("claude-haiku-4-5-20251001"),
+            "claude-haiku-4-5-20251001"
+        );
+    }
+
+    #[test]
+    fn openai_response_parsing_requires_content() {
+        let ok = serde_json::json!({
+            "choices": [{"message": {"content": " {\"verdict\":\"on_track\"} "}}]
+        });
+        assert_eq!(
+            parse_openai_content(&ok).unwrap(),
+            "{\"verdict\":\"on_track\"}"
+        );
+        let empty = serde_json::json!({"choices": [{"message": {"content": ""}}]});
+        assert!(parse_openai_content(&empty).is_err());
+        assert!(parse_openai_content(&serde_json::json!({})).is_err());
+    }
+
+    #[test]
+    fn anthropic_response_parsing_takes_first_text_block() {
+        let ok = serde_json::json!({
+            "content": [
+                {"type": "thinking", "thinking": "…"},
+                {"type": "text", "text": "verdict text"}
+            ]
+        });
+        assert_eq!(parse_anthropic_content(&ok).unwrap(), "verdict text");
+        assert!(parse_anthropic_content(&serde_json::json!({"content": []})).is_err());
+    }
+
+    #[test]
+    fn api_runner_without_key_reports_missing_env() {
+        // Ensure the env var truly is absent for this test.
+        let previous = std::env::var("OPENAI_API_KEY").ok();
+        std::env::remove_var("OPENAI_API_KEY");
+        let cfg = Config {
+            model_runner: "openai-api".into(),
+            model: "gpt-5.6-luna".into(),
+            ..Config::default()
+        };
+        let result = complete(&cfg, "ping", "codex");
+        if let Some(value) = previous {
+            std::env::set_var("OPENAI_API_KEY", value);
+        }
+        let message = result.unwrap_err().to_string();
+        assert!(message.contains("OPENAI_API_KEY"), "{message}");
     }
 }

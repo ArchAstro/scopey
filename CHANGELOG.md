@@ -7,6 +7,22 @@ and the project intends to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Direct-API analyzer runners: `model_runner = "openai-api"` (OPENAI_API_KEY)
+  and `"anthropic-api"` (ANTHROPIC_API_KEY) call the provider API directly
+  instead of spawning a CLI harness, shrinking analyzer input to roughly the
+  Scopey prompt alone (~85% smaller than a `codex exec` call). Never selected
+  by `auto`; explicit opt-in only. `OPENAI_BASE_URL`/`ANTHROPIC_BASE_URL`
+  override the endpoints.
+- Token-cost gates, both on by default and configurable:
+  `deterministic_readonly_judge` records an on_track verdict without a model
+  call when every tool in the judge window is provably read-only (off-track
+  requires mutating evidence, so semantics are unchanged), and
+  `skip_continuation_summarize` reuses the existing scope when a new prompt is
+  a bare continuation ("continue", "go on", "yes") instead of paying for a
+  re-summarize.
+
 ### Fixed
 
 - New user prompts now start a fresh judgement epoch: pending verdicts from the

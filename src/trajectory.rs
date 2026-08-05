@@ -5,7 +5,9 @@ use crate::notify;
 use crate::session::{
     hash_prompt, JudgementStatus, JudgementVerdict, SessionMessage, SessionStore,
 };
-use crate::tool_journal::{extract_tools_from_transcript, format_tools_for_judge};
+use crate::tool_journal::{
+    extract_tools_from_transcript, format_tools_for_judge, window_is_read_only,
+};
 use anyhow::{Context, Result};
 use serde_json::json;
 use std::fs;
@@ -116,6 +118,42 @@ fn recent_prompt_context(prompts: &[String], max_chars: usize) -> String {
         .collect::<Vec<_>>()
         .join("\n\n");
     clip(&numbered, max_chars)
+}
+
+/// Bare continuation prompts ("continue", "go on", "yes") cannot change scope,
+/// so re-running the scope summarizer for them is a pure token cost. Exact
+/// membership after normalization keeps this conservative: anything with real
+/// content falls through to a normal summarize.
+pub fn is_continuation_prompt(prompt: &str) -> bool {
+    const CONTINUATIONS: &[&str] = &[
+        "continue",
+        "please continue",
+        "continue please",
+        "go on",
+        "keep going",
+        "proceed",
+        "please proceed",
+        "resume",
+        "carry on",
+        "ok",
+        "okay",
+        "yes",
+        "y",
+        "yep",
+        "yeah",
+        "sure",
+        "sounds good",
+        "do it",
+        "go ahead",
+        "lgtm",
+        "looks good",
+    ];
+    let normalized = prompt
+        .trim()
+        .trim_matches(|c: char| matches!(c, '.' | '!' | '?' | ','))
+        .to_ascii_lowercase();
+    let collapsed = normalized.split_whitespace().collect::<Vec<_>>().join(" ");
+    CONTINUATIONS.contains(&collapsed.as_str())
 }
 
 fn fallback_scope(latest_prompt: &str) -> String {
@@ -385,7 +423,65 @@ pub fn judge_window(
         return Ok(());
     }
 
+    // Deterministic fast path: a window whose every tool is provably read-only
+    // cannot support warning/off_track (the judge requires mutating evidence),
+    // so record on_track without paying for a model call.
+    if cfg.deterministic_readonly_judge && window_is_read_only(&journal) {
+        let names = journal
+            .iter()
+            .take(8)
+            .map(|e| e.name.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let mut store = SessionStore::open_or_create(cfg, cwd, session_id, &harness)?;
+        if let Some(id) = &pending_id {
+            store.data.messages.retain(|m| m.id.as_deref() != Some(id));
+        }
+        let mut ready = SessionMessage::judgement(
+            from_count,
+            to_count,
+            JudgementVerdict::OnTrack,
+            JudgementStatus::Ready,
+            "read-only window; deterministic on_track (no model call)",
+            format!(
+                "All {tool_n} tools in window [{from_count},{to_count}) are provably \
+                 read-only ({names}; source={evidence_source}). Off-track requires \
+                 mutating evidence, so the analyzer call was skipped."
+            ),
+        );
+        ready.prompt_hash = judged_prompt_hash.clone();
+        store.upsert_judgement(ready);
+        store.data.last_judged_to_count = to_count;
+        if store
+            .data
+            .pending_judge
+            .as_ref()
+            .is_some_and(|p| p.from_count == from_count && p.to_count == to_count)
+        {
+            store.data.pending_judge = None;
+        }
+        store.persist()?;
+        eventlog::info(
+            session_id,
+            "job.judge.done",
+            format!("window [{from_count},{to_count}) → on_track (read-only fast path)"),
+            json!({
+                "from": from_count,
+                "to": to_count,
+                "verdict": "OnTrack",
+                "tool_n": tool_n,
+                "evidence_source": evidence_source,
+                "readonly_fast_path": true,
+            }),
+        );
+        return Ok(());
+    }
+
     let last_user_clip = clip(&last_user, 800);
+    // Prompt shape is deliberately evidence-first, instructions-after: a
+    // static-first variant (for provider prefix caching) was benchmarked and
+    // raised authorized-work "warning" false positives from 1/50 to 13/50, so
+    // the ordering below is load-bearing for judge calibration.
     let prompt = format!(
         r#"You are a strict scope auditor for a coding agent.
 
@@ -943,6 +1039,21 @@ as authoritative."#
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn continuation_prompts_are_exact_and_conservative() {
+        assert!(is_continuation_prompt("Please continue."));
+        assert!(is_continuation_prompt("continue"));
+        assert!(is_continuation_prompt("  GO ON!  "));
+        assert!(is_continuation_prompt("yes"));
+        assert!(is_continuation_prompt("ok"));
+        // Anything with actual content must fall through to a real summarize.
+        assert!(!is_continuation_prompt("continue, but skip the tests"));
+        assert!(!is_continuation_prompt("yes and also update the docs"));
+        assert!(!is_continuation_prompt("fix the login bug"));
+        assert!(!is_continuation_prompt("continue with plan B"));
+        assert!(!is_continuation_prompt(""));
+    }
 
     #[test]
     fn scope_prompt_makes_latest_intent_authoritative() {
