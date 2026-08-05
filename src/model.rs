@@ -213,52 +213,77 @@ pub fn complete(cfg: &Config, prompt: &str, session_harness: &str) -> Result<Str
 fn complete_claude(cfg: &Config, prompt: &str, model: &str) -> Result<String> {
     use crate::guard;
 
-    // Prefer normal `claude -p` with OAuth-compatible env (no CLAUDE_CODE_SIMPLE).
-    // `--bare` is tried second for API-key sandboxes that want minimal surface.
-    let attempts: [(&str, bool); 2] = [("oauth", false), ("bare", true)];
-    let mut last_err = String::new();
+    // Single OAuth-compatible invocation. A `--bare` (API-key-only) fallback
+    // used to run second; it can never succeed without an API key, and its
+    // "Not logged in" error overwrote the first attempt's real diagnostics
+    // (which hid a sustained claude-harness judge outage caused by a stale
+    // installed binary), so it is deliberately gone.
+    let mut cmd = Command::new("claude");
+    cmd.arg("-p")
+        .arg(prompt)
+        .arg("--model")
+        .arg(model)
+        .arg("--output-format")
+        .arg("text");
+    // Do not set CLAUDE_CODE_SIMPLE — it forces API-key-only auth.
+    guard::apply_hook_disable_env(&mut cmd);
+    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
-    for (label, bare) in attempts {
-        let mut cmd = Command::new("claude");
-        cmd.arg("-p").arg(prompt).arg("--model").arg(model);
-        if bare {
-            cmd.arg("--bare").arg("--output-format").arg("text");
-            // bare mode expects API key; SIMPLE is fine here
-            guard::apply_internal_env(&mut cmd);
-        } else {
-            cmd.arg("--output-format").arg("text");
-            // Do not set CLAUDE_CODE_SIMPLE — it forces API-key-only auth.
-            guard::apply_hook_disable_env(&mut cmd);
-        }
-        cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let output = run_with_timeout(cmd, cfg.model_timeout_secs, "claude")
+        .with_context(|| format!("claude -p --model {model} [{}]", claude_env_diagnostics()))?;
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    let combined = format!("{stdout}\n{stderr}").to_ascii_lowercase();
 
-        let output = match run_with_timeout(cmd, cfg.model_timeout_secs, "claude") {
-            Ok(o) => o,
-            Err(e) => {
-                last_err = format!("{label}: {e:#}");
-                continue;
-            }
-        };
-        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        let combined = format!("{stdout}\n{stderr}").to_ascii_lowercase();
-
-        // Claude sometimes exits 0 with "Not logged in · Please run /login" on stdout.
-        let not_logged_in =
-            combined.contains("not logged in") || combined.contains("please run /login");
-        if output.status.success() && !stdout.is_empty() && !not_logged_in {
-            return Ok(stdout);
-        }
-        last_err = if !stderr.is_empty() {
-            format!("{label}: status={} stderr={stderr}", output.status)
-        } else if !stdout.is_empty() {
-            format!("{label}: status={} stdout={stdout}", output.status)
-        } else {
-            format!("{label}: status={} (empty output)", output.status)
-        };
+    // Claude sometimes exits 0 with "Not logged in · Please run /login" on stdout.
+    let not_logged_in =
+        combined.contains("not logged in") || combined.contains("please run /login");
+    if output.status.success() && !stdout.is_empty() && !not_logged_in {
+        return Ok(stdout);
     }
+    bail!(
+        "claude -p --model {model} failed: status={} stdout={:?} stderr={:?} [{}]",
+        output.status,
+        clip_model_error(&stdout),
+        clip_model_error(&stderr),
+        claude_env_diagnostics(),
+    )
+}
 
-    bail!("claude -p --model {model} failed: {last_err}")
+/// Presence-only environment facts that decide Claude CLI auth behavior,
+/// attached to every failure so a single record diagnoses the auth context.
+/// HOME's value is included (auth state lives under it); everything else is
+/// reported set/unset only.
+fn claude_env_diagnostics() -> String {
+    let flag = |name: &str| {
+        format!(
+            "{name}={}",
+            if std::env::var_os(name).is_some() {
+                "set"
+            } else {
+                "unset"
+            }
+        )
+    };
+    format!(
+        "HOME={} {} {} {} {}",
+        std::env::var("HOME").unwrap_or_else(|_| "(unset)".into()),
+        flag("CLAUDECODE"),
+        flag("CLAUDE_CODE_SIMPLE"),
+        flag("ANTHROPIC_API_KEY"),
+        flag("CLAUDE_CONFIG_DIR"),
+    )
+}
+
+fn clip_model_error(text: &str) -> String {
+    let trimmed = text.trim();
+    if trimmed.chars().count() <= 400 {
+        trimmed.to_string()
+    } else {
+        let mut out: String = trimmed.chars().take(400).collect();
+        out.push('…');
+        out
+    }
 }
 
 fn complete_codex(cfg: &Config, prompt: &str, model: &str) -> Result<String> {
