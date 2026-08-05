@@ -9,6 +9,16 @@ and the project intends to follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Removed the `--bare` (API-key-only) fallback from the Claude analyzer
+  runner. It could never succeed without an API key, and its "Not logged in"
+  error overwrote the OAuth attempt's real diagnostics — masking a sustained
+  claude-harness judge outage (0/214 checks succeeding) whose actual cause
+  was a stale installed binary. Failures now report exit status, stdout,
+  stderr, and presence-only auth environment facts (HOME, CLAUDECODE,
+  CLAUDE_CODE_SIMPLE, ANTHROPIC_API_KEY, CLAUDE_CONFIG_DIR) in one record.
+
+### Fixed
+
 - New user prompts now start a fresh judgement epoch: pending verdicts from the
   previous prompt are invalidated, judge windows restart at the current tool
   count, and completed verdicts must still match the active prompt before they
