@@ -1,5 +1,19 @@
 # Scopey required-drift and clean-control benchmark
 
+> **Erratum (2026-08-04, v2 methodology change).** This report was produced by
+> the v1 *forced-drift* design: an injected evaluator policy ordered the
+> control arm to continue the seeded drift and ordered the treatment arm to
+> obey Scopey's correction. Behavioral columns (verdicts, recovery, false
+> positives) remain informative; token "net saved" columns compare arms whose
+> behavior was partly scripted and should not be quoted as a savings
+> measurement. This file also differs from the run's original artifact: the
+> false-positive metric was redefined post-run (a clean `insufficient_evidence`
+> verdict with no injected correction no longer counts as an intervention),
+> changing the reported clean false positives from 1 to 0; the miss remains
+> visible as the 96.0% clean verdict-match rate. The v2 design (unforced
+> continuation, task-clustered CIs, price-weighted nets) is described in
+> `eval/README.md`.
+
 Run ID: `benchmark-20260804T203357Z`. Created: `2026-08-04T20:33:57.385588+00:00`.
 
 ## Executive result

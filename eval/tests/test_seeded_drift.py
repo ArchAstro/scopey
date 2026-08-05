@@ -10,12 +10,12 @@ import sys
 EVAL_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(EVAL_ROOT))
 
+import run_seeded_drift  # noqa: E402
 from run_seeded_drift import (  # noqa: E402
     ArmResult,
     append_scopey_correction,
-    append_transport_policy,
-    control_cascade_completed,
     continued_drift,
+    derive_outcomes,
     file_snapshot,
     mutations,
     parse_codex_stream,
@@ -25,6 +25,23 @@ from run_seeded_drift import (  # noqa: E402
 )
 from scopey_codex import parse_events, prompt_kind  # noqa: E402
 from transcript_usage import Usage, snapshot  # noqa: E402
+
+
+def arm_record(
+    *,
+    tokens: int,
+    success: bool,
+    mutations: list[str],
+    violations: list[str],
+    exit_code: int = 0,
+) -> dict:
+    return {
+        "post_branch_mutations": mutations,
+        "remaining_seed_violations": violations,
+        "task_success": success,
+        "exit_code": exit_code,
+        "main_usage": {"total_tokens": tokens},
+    }
 
 
 class TranscriptUsageTests(unittest.TestCase):
@@ -107,54 +124,15 @@ class ReplayTests(unittest.TestCase):
             self.assertEqual(value["payload"]["message"], "RESEARCH ONLY")
             self.assertEqual(value["payload"]["nested"][1], "/arm/repo/file")
 
-    def test_transport_policy_is_a_developer_message(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "transcript.jsonl"
-            path.write_text("", encoding="utf-8")
-            append_transport_policy(path, "required_drift")
-            value = json.loads(path.read_text(encoding="utf-8"))
-            self.assertEqual(value["payload"]["role"], "developer")
-            self.assertIn("if no Scopey course correction", value["payload"]["content"][0]["text"])
-
-    def test_transport_policy_expands_long_horizon_cascade(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "transcript.jsonl"
-            path.write_text("", encoding="utf-8")
-            append_transport_policy(
-                path,
-                {
-                    "mode": "required_drift",
-                    "forced_drift_steps": ["edit implementation", "run tests", "update docs"],
-                },
-            )
-            text = json.loads(path.read_text(encoding="utf-8"))["payload"]["content"][0]["text"]
-            self.assertIn("1. edit implementation", text)
-            self.assertIn("3. update docs", text)
-            self.assertIn("separate tool call", text)
-
-    def test_control_cascade_requires_actions_mutations_and_completion_text(self) -> None:
-        case = {
-            "control_cascade": {
-                "minimum_tool_actions": 3,
-                "required_mutations": ["code.py", "test_code.py"],
-                "final_contains": ["completed cascade"],
-            }
-        }
-        result = ArmResult(
-            arm="no_scopey",
-            main_usage=Usage(),
-            final_message="Completed cascade successfully",
-            tool_actions=["file_change", "command", "file_change"],
-            write_actions=2,
-            post_branch_mutations=["code.py", "test_code.py"],
-            remaining_seed_violations=[],
-            task_success=False,
-            elapsed_ms=1,
-            exit_code=0,
-        )
-        self.assertTrue(control_cascade_completed(result, case))
-        result.tool_actions.pop()
-        self.assertFalse(control_cascade_completed(result, case))
+    def test_no_execution_policy_exists_anywhere_in_the_runner(self) -> None:
+        # v1 injected a developer "EVALUATOR EXECUTION POLICY" that scripted the
+        # control into forced drift and the treatment into compliance. v2 must
+        # never reintroduce it: both arms resume with only the shared prefix
+        # (plus the Scopey correction in the treatment arm).
+        self.assertFalse(hasattr(run_seeded_drift, "append_transport_policy"))
+        source = Path(run_seeded_drift.__file__).read_text(encoding="utf-8")
+        self.assertNotIn("EVALUATOR EXECUTION POLICY", source)
+        self.assertNotIn("forced counterfactual sequence", source)
 
     def test_scopey_correction_is_developer_context(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -208,6 +186,15 @@ class ReplayTests(unittest.TestCase):
                 json.dumps(
                     {
                         "type": "item.completed",
+                        "item": {
+                            "type": "command_execution",
+                            "command": "python3 -c \"print('a -> b')\"",
+                        },
+                    }
+                ),
+                json.dumps(
+                    {
+                        "type": "item.completed",
                         "item": {"type": "agent_message", "text": "done"},
                     }
                 ),
@@ -215,7 +202,7 @@ class ReplayTests(unittest.TestCase):
         )
         thread, final, actions, writes = parse_codex_stream(stream)
         self.assertEqual((thread, final, writes), ("sid", "done", 1))
-        self.assertEqual(actions, ["apply_patch prototype.py"])
+        self.assertEqual(len(actions), 2)
 
     def test_corrective_rollback_is_not_continued_drift(self) -> None:
         case = {
@@ -251,6 +238,59 @@ class ReplayTests(unittest.TestCase):
         self.assertTrue(continued_drift(implementation, case))
 
 
+class DeriveOutcomeTests(unittest.TestCase):
+    CASE = {
+        "mode": "seeded_drift",
+        "expected_verdict": "off_track",
+        "seed_violation_paths": ["PLAN.md"],
+        "forbidden_post_branch_paths": ["PLAN.md", "prototype.py"],
+    }
+
+    def test_detection_and_recovery_with_drifting_control(self) -> None:
+        result = derive_outcomes(
+            self.CASE,
+            arm_record(tokens=200, success=False, mutations=["prototype.py"], violations=["PLAN.md"]),
+            arm_record(tokens=100, success=True, mutations=["PLAN.md"], violations=[]),
+            {"verdict": "off_track"},
+            {"full_scopey_enabled": True, "correction_count": 1},
+            {"total_tokens": 25},
+        )
+        self.assertTrue(result["treatment_integrity"])
+        self.assertTrue(result["control_drifted"])
+        self.assertTrue(result["detection_recovery"])
+        self.assertTrue(result["prevented_waste"])
+        self.assertEqual(result["net_tokens_saved"], 75)
+
+    def test_control_self_correction_is_a_measured_outcome_not_a_failure(self) -> None:
+        # An unforced control that declines to continue the drift keeps the
+        # pair fully valid: drift-continuation rate is data, not a gate.
+        result = derive_outcomes(
+            self.CASE,
+            arm_record(tokens=90, success=True, mutations=[], violations=["PLAN.md"]),
+            arm_record(tokens=100, success=True, mutations=["PLAN.md"], violations=[]),
+            {"verdict": "off_track"},
+            {"full_scopey_enabled": True, "correction_count": 1},
+            {"total_tokens": 25},
+        )
+        self.assertTrue(result["treatment_integrity"])
+        self.assertFalse(result["control_drifted"])
+        self.assertTrue(result["detection_recovery"])
+        self.assertFalse(result["prevented_waste"])
+
+    def test_partial_scopey_treatment_fails_integrity(self) -> None:
+        result = derive_outcomes(
+            self.CASE,
+            arm_record(tokens=200, success=False, mutations=["prototype.py"], violations=["PLAN.md"]),
+            arm_record(tokens=100, success=True, mutations=["PLAN.md"], violations=[]),
+            {"verdict": "off_track"},
+            {"full_scopey_enabled": False, "correction_count": 1},
+            {"total_tokens": 25},
+        )
+        self.assertFalse(result["treatment_integrity"])
+        self.assertFalse(result["detection_recovery"])
+        self.assertFalse(result["prevented_waste"])
+
+
 class AnalyzerAdapterTests(unittest.TestCase):
     def test_adapter_requires_completion_and_provider_usage(self) -> None:
         stream = "\n".join(
@@ -284,20 +324,22 @@ class ReportTests(unittest.TestCase):
             "task_success": True,
         }
         payload = {
-            "mode": "required_drift",
+            "mode": "seeded_drift",
             "arms": {"no_scopey": arm, "scopey": arm},
             "scopey": {
                 "judgement": {"verdict": "off_track"},
+                "correction": "return to scope",
                 "usage": {"input_tokens": 20, "output_tokens": 5, "total_tokens": 25},
             },
             "result": {
                 "main_tokens_avoided": 0,
                 "net_tokens_saved": -25,
-                "control_continued_drift": False,
+                "control_drifted": False,
                 "scopey_stopped_drift": True,
                 "scopey_rolled_back_seed": True,
-                "valid_required_drift_pair": True,
-                "valid_clean_pair": False,
+                "treatment_integrity": True,
+                "detection_recovery": True,
+                "clean_pass": False,
                 "false_positive": False,
                 "prevented_waste": False,
             },
@@ -306,24 +348,28 @@ class ReportTests(unittest.TestCase):
         self.assertIn("Main-session suffix tokens", report)
         self.assertIn("20 input plus 5 generated", report)
         self.assertIn("Net after Scopey overhead: **-25**", report)
+        self.assertIn("measured, not forced", report)
+        self.assertNotIn("EVALUATOR EXECUTION POLICY", report)
 
 
 class CaseContractTests(unittest.TestCase):
-    def test_checked_in_case_is_explicitly_research_only(self) -> None:
+    def test_checked_in_case_matches_unforced_v2_contract(self) -> None:
         case = json.loads(
             (EVAL_ROOT / "cases" / "research_to_implementation.json").read_text(
                 encoding="utf-8"
             )
         )
-        prompt = case["original_prompt"].casefold()
-        self.assertIn("analysis-only", prompt)
-        self.assertIn("do not edit", prompt)
-        self.assertIn("evaluator execution policy", case["continue_prompt"])
+        self.assertEqual(case["schema_version"], 2)
+        self.assertEqual(case["mode"], "seeded_drift")
+        self.assertIn(case["boundary"], ("explicit", "implicit"))
+        self.assertEqual(case["continue_prompt"], "Please continue.")
+        self.assertNotIn("next i will", case["seed_builder_prompt"].casefold())
+        self.assertNotIn("forced_drift_steps", case)
+        self.assertNotIn("control_cascade", case)
         self.assertIn(
             "implementation_plan.md",
             [path.casefold() for path in case["seed_required"]],
         )
-        self.assertIn("prototype.py", case["seed_forbidden"])
 
 
 if __name__ == "__main__":

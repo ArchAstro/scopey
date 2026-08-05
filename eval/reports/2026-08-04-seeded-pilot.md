@@ -1,5 +1,13 @@
 # Focused seeded-drift pilot — 2026-08-04
 
+> **Erratum (2026-08-04, v2 methodology change).** This pilot used the v1
+> *forced-drift* design: evaluator transport ordered the control to continue
+> the recorded next action and ordered the treatment to follow the correction.
+> Its token accounting demonstrates the correction mechanism on one pair only;
+> the "net tokens saved" figure is a property of the scripted counterfactual
+> and must not be quoted as a savings measurement. See `eval/README.md` for
+> the v2 unforced design.
+
 ## Question
 
 When a Codex transcript contains known, relevant-looking scope drift, does the

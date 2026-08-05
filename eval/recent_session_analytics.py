@@ -16,6 +16,7 @@ import argparse
 from collections import Counter
 from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
+import functools
 import hashlib
 import json
 import math
@@ -33,16 +34,91 @@ from transcript_usage import Usage, claude_snapshot, codex_snapshot  # noqa: E40
 SCHEMA_VERSION = 1
 DEFAULT_WINDOW_HOURS = 48.0
 DEFAULT_EXCLUDES = ("/eval/results/", "/private/var/folders/", "/var/folders/")
-CALIBRATION = {
-    "id": "benchmark-20260804T170422Z",
-    "model": "gpt-5.6-terra",
-    "source": "eval/calibration/2026-08-04-terra-low-analyzer.json",
-    "sample_calls_per_kind": 55,
-    "input_tokens": {"summarize": 14198.673, "judge": 14098.600},
-    "input_min": {"summarize": 14039, "judge": 13894},
-    "input_max": {"summarize": 14277, "judge": 14141},
-}
+DEFAULT_CALIBRATION_PATH = EVAL_ROOT / "calibration" / "2026-08-04-terra-low-analyzer.json"
+# Wide enough to cover "all recorded history" for the all-history median fallback
+# without depending on wall-clock time.
+_EPOCH_START = datetime(1970, 1, 1, tzinfo=timezone.utc)
+_EPOCH_END = datetime(2100, 1, 1, tzinfo=timezone.utc)
 MODEL_RE = re.compile(r"scopey model: runner=([^ ]+).*; model=([^ ]+)")
+
+
+def load_calibration(path: Path) -> dict[str, Any]:
+    """Load Codex analyzer-call calibration constants from a benchmark-derived JSON file.
+
+    This is loaded at runtime rather than hand-transcribed into the module so the
+    script cannot silently drift from the checked-in calibration artifact. Raises
+    ValueError with a clear message on any missing/malformed input so the caller
+    (main()) fails the whole run instead of falling back to stale constants.
+    """
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ValueError(f"calibration file not found or unreadable: {path} ({exc})") from exc
+    try:
+        raw = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"calibration file is not valid JSON: {path} ({exc})") from exc
+    if not isinstance(raw, dict):
+        raise ValueError(f"calibration file must contain a JSON object: {path}")
+    calls = raw.get("calls")
+    if not isinstance(calls, dict) or not calls:
+        raise ValueError(f"calibration file has no non-empty 'calls' object: {path}")
+
+    input_tokens: dict[str, float] = {}
+    input_min: dict[str, int] = {}
+    input_max: dict[str, int] = {}
+    cached_input_tokens: dict[str, float] = {}
+    cache_write_input_tokens: dict[str, float] = {}
+    sample_calls_per_kind: dict[str, int] = {}
+    for kind, stats in calls.items():
+        if not isinstance(stats, dict):
+            raise ValueError(f"calibration file 'calls.{kind}' must be an object: {path}")
+        try:
+            input_tokens[kind] = float(stats["input_tokens_mean"])
+            input_min[kind] = int(stats["input_tokens_min"])
+            input_max[kind] = int(stats["input_tokens_max"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError(
+                f"calibration file 'calls.{kind}' is missing/invalid "
+                f"input_tokens_mean, input_tokens_min, or input_tokens_max: {path}"
+            ) from exc
+        if isinstance(stats.get("n"), int):
+            sample_calls_per_kind[kind] = stats["n"]
+        cached_mean = stats.get("cached_input_tokens_mean")
+        if cached_mean is not None:
+            try:
+                cached_input_tokens[kind] = float(cached_mean)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"calibration file 'calls.{kind}.cached_input_tokens_mean' is not numeric: {path}"
+                ) from exc
+        cache_write_mean = stats.get("cache_write_input_tokens_mean")
+        if cache_write_mean is not None:
+            try:
+                cache_write_input_tokens[kind] = float(cache_write_mean)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"calibration file 'calls.{kind}.cache_write_input_tokens_mean' is not numeric: {path}"
+                ) from exc
+    if not input_tokens:
+        raise ValueError(f"calibration file has no usable per-kind input token stats: {path}")
+
+    try:
+        source = str(path.resolve().relative_to(EVAL_ROOT.parent))
+    except ValueError:
+        source = str(path)
+    return {
+        "id": str(raw.get("run_id", path.stem)),
+        "model": str(raw.get("model", "")),
+        "source": source,
+        "schema_version": raw.get("schema_version"),
+        "sample_calls_per_kind": sample_calls_per_kind,
+        "input_tokens": input_tokens,
+        "input_min": input_min,
+        "input_max": input_max,
+        "cached_input_tokens": cached_input_tokens,
+        "cache_write_input_tokens": cache_write_input_tokens,
+    }
 
 
 def parse_time(value: str) -> datetime:
@@ -164,30 +240,46 @@ def output_chars(messages: list[dict[str, Any]], kind: str, since: datetime, unt
     ]
 
 
-def estimate_codex_job(kind: str, chars: int, model: str) -> dict[str, Any]:
-    calibrated = model == CALIBRATION["model"] and kind in CALIBRATION["input_tokens"]
+def estimate_codex_job(
+    kind: str, chars: int, model: str, calibration: dict[str, Any]
+) -> dict[str, Any]:
+    calibrated = model == calibration["model"] and kind in calibration["input_tokens"]
     generated = math.ceil(chars / 4)
+    cached_input_tokens: int | None = None
+    uncached_input_tokens: int | None = None
+    cache_write_input_tokens: int | None = None
     if calibrated:
-        input_tokens = round(CALIBRATION["input_tokens"][kind])
-        low = CALIBRATION["input_min"][kind] + math.ceil(chars / 5)
-        high = CALIBRATION["input_max"][kind] + math.ceil(chars / 3)
+        input_tokens = round(calibration["input_tokens"][kind])
+        low = calibration["input_min"][kind] + math.ceil(chars / 5)
+        high = calibration["input_max"][kind] + math.ceil(chars / 3)
         method = "benchmark-calibrated-input+chars/4-output"
+        source = "calibration-estimated"
+        cached_mean = calibration["cached_input_tokens"].get(kind)
+        if cached_mean is not None:
+            cached_input_tokens = round(cached_mean)
+            uncached_input_tokens = max(input_tokens - cached_input_tokens, 0)
+            cache_write_input_tokens = round(calibration["cache_write_input_tokens"].get(kind, 0.0))
     else:
         # Explicit fallback for an uncalibrated model. The wide range is retained
-        # in the result so this cannot masquerade as provider-reported usage.
+        # in the result so this cannot masquerade as provider-reported usage, and
+        # its cache composition is left unknown rather than guessed.
         input_tokens = math.ceil(chars / 4)
         low = math.ceil(chars / 5)
         high = math.ceil(chars / 3)
         method = "chars/4-uncalibrated"
+        source = "chars-estimated"
     return {
         "kind": kind,
         "model": model,
         "input_tokens": input_tokens,
+        "uncached_input_tokens": uncached_input_tokens,
+        "cached_input_tokens": cached_input_tokens,
+        "cache_write_input_tokens": cache_write_input_tokens,
         "generated_tokens": generated,
         "total_tokens": input_tokens + generated,
         "low_tokens": low,
         "high_tokens": high,
-        "source": "estimated",
+        "source": source,
         "method": method,
     }
 
@@ -259,6 +351,9 @@ def match_claude_call(
         "kind": kind,
         "model": chosen["model"],
         "input_tokens": usage.input_tokens,
+        "uncached_input_tokens": usage.uncached_input_tokens,
+        "cached_input_tokens": usage.cached_input_tokens,
+        "cache_write_input_tokens": usage.cache_write_input_tokens,
         "generated_tokens": usage.output_tokens,
         "total_tokens": usage.total_tokens,
         "low_tokens": usage.total_tokens,
@@ -268,30 +363,77 @@ def match_claude_call(
     }
 
 
-def estimate_unmatched_claude_job(
-    calls: list[dict[str, Any]], kind: str, model: str
+@functools.lru_cache(maxsize=None)
+def _all_history_claude_calls(root: Path) -> tuple[dict[str, Any], ...]:
+    """All analyzer-call candidates ever found under ``root``, regardless of window.
+
+    Memoized per root: this is only used as a fallback calibration pool when a
+    kind has zero in-window matches, so most runs never pay for it, and runs
+    that do pay for it only pay once no matter how many jobs need the fallback.
+    """
+    return tuple(claude_analyzer_calls(root, _EPOCH_START, _EPOCH_END))
+
+
+def _median_call_estimate(
+    observed: list[Usage], kind: str, model: str, source: str, method: str
 ) -> dict[str, Any]:
-    observed = [call["usage"] for call in calls if call["kind"] == kind]
     totals = [usage.total_tokens for usage in observed]
-    inputs = [usage.input_tokens for usage in observed]
-    outputs = [usage.output_tokens for usage in observed]
-    if not totals:
-        return {
-            "kind": kind, "model": model, "input_tokens": 0,
-            "generated_tokens": 0, "total_tokens": 0, "low_tokens": 0,
-            "high_tokens": 0, "source": "unmeasured",
-            "method": "no-matched-claude-calibration",
-        }
     return {
         "kind": kind,
         "model": model,
-        "input_tokens": round(statistics.median(inputs)),
-        "generated_tokens": round(statistics.median(outputs)),
+        "input_tokens": round(statistics.median([usage.input_tokens for usage in observed])),
+        "uncached_input_tokens": round(
+            statistics.median([usage.uncached_input_tokens for usage in observed])
+        ),
+        "cached_input_tokens": round(
+            statistics.median([usage.cached_input_tokens for usage in observed])
+        ),
+        "cache_write_input_tokens": round(
+            statistics.median([usage.cache_write_input_tokens for usage in observed])
+        ),
+        "generated_tokens": round(statistics.median([usage.output_tokens for usage in observed])),
         "total_tokens": round(statistics.median(totals)),
         "low_tokens": 0,
         "high_tokens": max(totals),
-        "source": "estimated",
-        "method": "same-window-matched-claude-median",
+        "source": source,
+        "method": method,
+    }
+
+
+def estimate_unmatched_claude_job(
+    window_calls: list[dict[str, Any]], kind: str, model: str, claude_root: Path
+) -> dict[str, Any]:
+    """Three-tier fallback for a Claude-harness analyzer job with no window match.
+
+    1. Same-window matched-call median, if any calls of this kind matched
+       elsewhere in the window (unchanged prior behavior).
+    2. All-history matched-call median, if no in-window calibration data exists
+       for this kind but a nonzero-usage transcript exists anywhere in history.
+    3. Zero tokens, source "unmeasured", only if neither pool has data. The
+       call is still tallied — it is never silently dropped.
+    """
+    window_observed = [call["usage"] for call in window_calls if call["kind"] == kind]
+    if window_observed:
+        return _median_call_estimate(
+            window_observed, kind, model,
+            source="median-estimated-window",
+            method="same-window-matched-claude-median",
+        )
+    history_observed = [
+        call["usage"] for call in _all_history_claude_calls(claude_root) if call["kind"] == kind
+    ]
+    if history_observed:
+        return _median_call_estimate(
+            history_observed, kind, model,
+            source="median-estimated-all-history",
+            method="all-history-matched-claude-median",
+        )
+    return {
+        "kind": kind, "model": model, "input_tokens": 0,
+        "uncached_input_tokens": 0, "cached_input_tokens": 0, "cache_write_input_tokens": 0,
+        "generated_tokens": 0, "total_tokens": 0, "low_tokens": 0,
+        "high_tokens": 0, "source": "unmeasured",
+        "method": "no-matched-claude-calibration",
     }
 
 
@@ -353,6 +495,61 @@ def numeric(values: list[float]) -> dict[str, Any]:
     }
 
 
+def token_concentration(measured: list[dict[str, Any]]) -> dict[str, Any]:
+    """How much of the window's main-token denominator a handful of sessions supply.
+
+    The weighted overhead ratio is a token-volume-weighted average; if a small
+    number of sessions supply most of the tokens, the weighted ratio is mostly a
+    statement about those sessions, not about a typical session.
+    """
+    total = sum(session["main_usage"]["total_tokens"] for session in measured)
+    ordered = sorted(measured, key=lambda session: -session["main_usage"]["total_tokens"])
+    sessions_for_80pct = 0
+    if total:
+        cumulative = 0
+        for index, session in enumerate(ordered):
+            cumulative += session["main_usage"]["total_tokens"]
+            if cumulative / total >= 0.8:
+                sessions_for_80pct = index + 1
+                break
+    top1_share = (ordered[0]["main_usage"]["total_tokens"] / total) if ordered and total else 0.0
+    return {
+        "measured_sessions": len(measured),
+        "sessions_for_80pct_of_tokens": sessions_for_80pct,
+        "top1_session_share": top1_share,
+    }
+
+
+def scopey_token_components(sessions: list[dict[str, Any]]) -> dict[str, Any]:
+    """Aggregate Scopey-side cache composition across all analyzer calls.
+
+    Composition is unknown for calls whose per-call ``cached_input_tokens`` is
+    None (an uncalibrated-model chars/4 estimate); those tokens are kept in a
+    separate ``unknown_composition_tokens`` bucket rather than being silently
+    counted as uncached.
+    """
+    cached = uncached = cache_write = output = known_total = unknown_total = 0
+    for session in sessions:
+        for call in session["scopey_usage"]["calls"]:
+            total = call["total_tokens"]
+            if call.get("cached_input_tokens") is None:
+                unknown_total += total
+                continue
+            cached += call["cached_input_tokens"]
+            uncached += call["uncached_input_tokens"]
+            cache_write += call["cache_write_input_tokens"]
+            output += call["generated_tokens"]
+            known_total += total
+    return {
+        "cached_input_tokens": cached,
+        "uncached_input_tokens": uncached,
+        "cache_write_input_tokens": cache_write,
+        "output_tokens": output,
+        "known_composition_tokens": known_total,
+        "unknown_composition_tokens": unknown_total,
+    }
+
+
 def group_metrics(sessions: list[dict[str, Any]]) -> dict[str, Any]:
     measured = [session for session in sessions if session["main_usage"]["total_tokens"] > 0]
     main = sum(session["main_usage"]["total_tokens"] for session in measured)
@@ -388,6 +585,17 @@ def summarize_sessions(sessions: list[dict[str, Any]]) -> dict[str, Any]:
     exact_calls = sum(session["scopey_usage"]["provider_reported_calls"] for session in sessions)
     estimated_calls = sum(session["scopey_usage"]["estimated_calls"] for session in sessions)
     unmeasured_jobs = sum(session["scopey_usage"]["unmeasured_jobs"] for session in sessions)
+    call_source_tally: Counter = Counter()
+    for session in sessions:
+        call_source_tally.update(session["scopey_usage"]["call_sources"])
+    total_analyzer_calls = sum(call_source_tally.values())
+    unmeasured_zero_calls = call_source_tally.get("unmeasured", 0)
+    full_price_denominator = sum(
+        session["main_usage"]["uncached_input_tokens"]
+        + session["main_usage"]["cache_write_input_tokens"]
+        + session["main_usage"]["output_tokens"]
+        for session in measured
+    )
     by_verdict = Counter()
     for session in sessions:
         by_verdict.update(session["verdicts"])
@@ -438,15 +646,53 @@ def summarize_sessions(sessions: list[dict[str, Any]]) -> dict[str, Any]:
         "weighted_overhead_ratio_high": total_overhead_high / total_main if total_main else 0.0,
         "total_main_tokens": total_main,
         "total_scopey_tokens": total_overhead,
+        "full_price_denominator": full_price_denominator,
+        "full_price_ratio": total_overhead / full_price_denominator if full_price_denominator else 0.0,
+        "full_price_ratio_low": total_overhead_low / full_price_denominator if full_price_denominator else 0.0,
+        "full_price_ratio_high": total_overhead_high / full_price_denominator if full_price_denominator else 0.0,
+        "token_concentration": token_concentration(measured),
+        "scopey_token_components": scopey_token_components(sessions),
         "provider_reported_scopey_calls": exact_calls,
         "estimated_scopey_calls": estimated_calls,
         "unmeasured_scopey_jobs": unmeasured_jobs,
+        "call_source_tally": dict(sorted(call_source_tally.items())),
+        "total_analyzer_calls": total_analyzer_calls,
+        "unmeasured_zero_scopey_calls": unmeasured_zero_calls,
         "by_intervention": {
             "intervened": group_metrics(intervened),
             "no_intervention": group_metrics(non_intervened),
             "analyzed_no_intervention": group_metrics(analyzed_non_intervened),
         },
     }
+
+
+def _scopey_composition_line(summary: dict[str, Any]) -> str:
+    comp = summary["scopey_token_components"]
+    total = summary["total_scopey_tokens"]
+    known_pct = (comp["known_composition_tokens"] / total * 100) if total else 0.0
+    line = (
+        f"Scopey-token composition ({known_pct:.1f}% of Scopey tokens have a known cache split, "
+        "mirroring the main-token composition line above): "
+        f"{comp['cached_input_tokens']:,} cached input, "
+        f"{comp['uncached_input_tokens']:,} uncached input, "
+        f"{comp['cache_write_input_tokens']:,} cache-write input, and "
+        f"{comp['output_tokens']:,} output."
+    )
+    if comp["unknown_composition_tokens"]:
+        line += (
+            f" {comp['unknown_composition_tokens']:,} Scopey tokens have no known cache split "
+            "(uncalibrated chars/4-estimated calls)."
+        )
+    return line
+
+
+def _calibration_sample_description(calibration: dict[str, Any]) -> str:
+    counts = set(calibration["sample_calls_per_kind"].values())
+    if len(counts) == 1:
+        return str(next(iter(counts)))
+    return ", ".join(
+        f"{kind}={n}" for kind, n in sorted(calibration["sample_calls_per_kind"].items())
+    )
 
 
 def render_markdown(payload: dict[str, Any]) -> str:
@@ -458,6 +704,7 @@ def render_markdown(payload: dict[str, Any]) -> str:
     judgement_rate = summary["intervention_rate_per_judgement"]
     ratio = summary["overhead_ratio_per_session"]
     grouped = summary["by_intervention"]
+    concentration = summary["token_concentration"]
     pct = lambda value: f"{value * 100:.1f}%"
     lines = [
         "# Scopey real-session analytics",
@@ -473,8 +720,15 @@ def render_markdown(payload: dict[str, Any]) -> str:
         f"- Non-intervention prevalence among all observed sessions: **{pct(non_all_rate['rate'])}** (95% Wilson CI {pct(non_all_rate['ci95_wilson'][0])}–{pct(non_all_rate['ci95_wilson'][1])}).",
         f"- Non-intervention prevalence among analyzed sessions: **{pct(non_analyzed_rate['rate'])}** (95% Wilson CI {pct(non_analyzed_rate['ci95_wilson'][0])}–{pct(non_analyzed_rate['ci95_wilson'][1])}).",
         f"- Correction events per completed judgement: **{summary['intervention_events']}/{summary['judgement_events']} = {pct(judgement_rate['rate'])}** (95% Wilson CI {pct(judgement_rate['ci95_wilson'][0])}–{pct(judgement_rate['ci95_wilson'][1])}).",
-        f"- Scopey overhead / main-session tokens, weighted: **{pct(summary['weighted_overhead_ratio'])}** (sensitivity {pct(summary['weighted_overhead_ratio_low'])}–{pct(summary['weighted_overhead_ratio_high'])}).",
-        f"- Per-session overhead ratio: mean **{pct(ratio['mean'])}**, median **{pct(ratio['median'])}**, SD {pct(ratio['stddev'])}, range {pct(ratio['min'])}–{pct(ratio['max'])}.",
+        "",
+        "### Scopey overhead, three ways",
+        "",
+        "Cached input is billed at a steep discount relative to fresh input, so no single number below is \"the\" cost of Scopey — the weighted ratio and the non-cache-discounted ratio bracket it, and the per-session distribution shows what an individual session should expect:",
+        "",
+        f"- Token-volume weighted (Scopey tokens / all main tokens, cached input included): **{pct(summary['weighted_overhead_ratio'])}** (sensitivity {pct(summary['weighted_overhead_ratio_low'])}–{pct(summary['weighted_overhead_ratio_high'])}).",
+        f"- Per-session distribution: mean **{pct(ratio['mean'])}**, median **{pct(ratio['median'])}**, SD {pct(ratio['stddev'])}, range {pct(ratio['min'])}–{pct(ratio['max'])}.",
+        f"- Against non-cache-discounted main tokens (Scopey tokens / (uncached input + cache-write input + output)): **{pct(summary['full_price_ratio'])}** (sensitivity {pct(summary['full_price_ratio_low'])}–{pct(summary['full_price_ratio_high'])}).",
+        f"- Token-volume concentration: the top {concentration['sessions_for_80pct_of_tokens']} of {concentration['measured_sessions']} sessions supply at least 80% of window main tokens (the single largest session alone: {pct(concentration['top1_session_share'])}), so the weighted ratio above mostly reflects those few large sessions, not a typical session.",
         "",
         "| Sessions | All | Analyzed | Intervened | No intervention | Main usage measurable |",
         "|---|---:|---:|---:|---:|---:|",
@@ -492,6 +746,8 @@ def render_markdown(payload: dict[str, Any]) -> str:
         f"{summary['main_token_components']['cache_write_input_tokens']:,} cache-write input, and "
         f"{summary['main_token_components']['output_tokens']:,} output. The overhead ratio is a token-volume ratio, not a dollar-cost estimate.",
         "",
+        _scopey_composition_line(summary),
+        "",
         "## Intervention versus non-intervention overhead",
         "",
         "| Group | Sessions | Judge calls | Corrections | Main tokens | Scopey tokens | Weighted overhead/main | Median session ratio |",
@@ -506,10 +762,33 @@ def render_markdown(payload: dict[str, Any]) -> str:
         lines.append(
             f"| {label} | {group['sessions']} | {group['judge_calls']} | {group['interventions']} | {group['main_tokens']:,} | {group['scopey_tokens']:,} | {pct(group['weighted_overhead_ratio'])} ({pct(group['weighted_overhead_ratio_low'])}–{pct(group['weighted_overhead_ratio_high'])}) | {pct(group['overhead_ratio_per_session']['median'])} |"
         )
+    tally = summary["call_source_tally"]
+    coverage_parts = [
+        f"{tally.get('provider-reported', 0)} provider-reported",
+        f"{tally.get('calibration-estimated', 0)} calibration-estimated",
+    ]
+    if tally.get("chars-estimated"):
+        coverage_parts.append(f"{tally['chars-estimated']} chars-estimated (uncalibrated model)")
+    coverage_parts.append(f"{tally.get('median-estimated-window', 0)} same-window median-estimated")
+    coverage_parts.append(f"{tally.get('median-estimated-all-history', 0)} all-history median-estimated")
+    unmeasured_zero = summary["unmeasured_zero_scopey_calls"]
+    coverage_parts.append(f"{unmeasured_zero} unmeasured (zero-token)")
+    coverage_lines = [
+        "",
+        f"Analyzer accounting coverage ({summary['total_analyzer_calls']} calls total, all accounted for): "
+        + ", ".join(coverage_parts) + ".",
+        "",
+    ]
+    if unmeasured_zero:
+        coverage_lines.extend([
+            f"{unmeasured_zero} of those calls could not be matched to any Claude analyzer transcript "
+            "with nonzero usage, in this window or anywhere in recorded history, and are counted as "
+            "zero tokens. Scopey token totals — and every overhead ratio above that includes them — "
+            "are therefore lower bounds with respect to those calls.",
+            "",
+        ])
+    lines.extend(coverage_lines)
     lines.extend([
-        "",
-        f"Analyzer accounting coverage: {summary['provider_reported_scopey_calls']} provider-reported calls and {summary['estimated_scopey_calls']} estimated calls; {summary['unmeasured_scopey_jobs']} of the estimates are started Claude jobs with no matchable usage artifact and therefore use the same-window median plus a zero-to-observed-max sensitivity range.",
-        "",
         "## Per-session privacy-safe rows",
         "",
         "| Session | Harness | Main tokens | Summaries | Judges | Interventions | Scopey tokens | Overhead/main | Scopey model(s) |",
@@ -527,8 +806,8 @@ def render_markdown(payload: dict[str, Any]) -> str:
         "- Cohort: non-internal Scopey sessions with activity in the fixed window, an existing Claude/Codex transcript, and a non-test cwd. Test/eval/temp cwd patterns are excluded.",
         "- Main tokens: provider-reported transcript usage inside the same fixed window. Cached input is included and separately retained in JSON.",
         "- Intervention: a persisted Scopey injection with `kind=correction`; reminders are not interventions.",
-        "- Claude Scopey calls: exact provider usage when a print-mode transcript matches the job; unmatched starts use the same-window matched-call median, with zero and observed maximum as sensitivity bounds.",
-        f"- Codex Scopey calls: historical estimate because production used ephemeral calls. Input is calibrated by kind from {CALIBRATION['sample_calls_per_kind']} `{CALIBRATION['model']}` calls per kind in `{CALIBRATION['id']}`; generated tokens use persisted response characters / 4.",
+        "- Claude Scopey calls: exact provider usage when a print-mode transcript matches the job in the fixed window. If none matches, the same-window matched-call median is used. If no calls of that kind matched anywhere in the window either, an all-history matched-call median is used instead. Only if no matching call with nonzero usage exists anywhere in recorded history is the call counted as zero tokens (`unmeasured`) — this is a genuine data gap, not a modeled estimate, and is called out explicitly above whenever it occurs. All three fallback tiers other than `unmeasured` use zero and the relevant observed maximum as sensitivity bounds.",
+        f"- Codex Scopey calls: historical estimate because production used ephemeral calls. Input (and, where the calibration file provides it, its cache split) is calibrated by kind from {_calibration_sample_description(payload['calibration'])} `{payload['calibration']['model']}` calls per kind in `{payload['calibration']['id']}`, loaded at runtime from `{payload['calibration']['source']}`; generated tokens use persisted response characters / 4.",
         "- The JSON artifact includes low/high sensitivity estimates, match coverage, exclusion reasons, calibration constants, and fixed timestamps.",
         "- This is observational telemetry. It measures prevalence and overhead, but cannot establish whether each intervention was correct or how many counterfactual main-session tokens it prevented.",
         "",
@@ -550,7 +829,9 @@ def analyze(args: argparse.Namespace) -> dict[str, Any]:
     scopey_home = args.scopey_home.expanduser().resolve()
     state_root = scopey_home / "work" / "by-id"
     log_root = scopey_home / "logs"
-    claude_calls = claude_analyzer_calls(args.claude_root.expanduser(), since, until)
+    claude_root = args.claude_root.expanduser()
+    calibration = load_calibration(args.calibration.expanduser())
+    claude_calls = claude_analyzer_calls(claude_root, since, until)
     used_claude: set[Path] = set()
     sessions: list[dict[str, Any]] = []
     excluded = Counter()
@@ -605,10 +886,10 @@ def analyze(args: argparse.Namespace) -> dict[str, Any]:
                         calls.append(matched)
                         continue
                     unmeasured_jobs += 1
-                    calls.append(estimate_unmatched_claude_job(claude_calls, kind, model))
+                    calls.append(estimate_unmatched_claude_job(claude_calls, kind, model, claude_root))
                     continue
                 chars = sizes[index] if index < len(sizes) else 0
-                calls.append(estimate_codex_job(kind, chars, model))
+                calls.append(estimate_codex_job(kind, chars, model, calibration))
         verdicts = Counter()
         for event in events:
             if event.get("event") != "job.judge.done" or not in_window(timestamp(event), since, until):
@@ -624,6 +905,13 @@ def analyze(args: argparse.Namespace) -> dict[str, Any]:
         low = sum(call["low_tokens"] for call in calls)
         high = sum(call["high_tokens"] for call in calls)
         models = sorted({call["model"] for call in calls})
+        # A call's `source` is always exactly one of: provider-reported,
+        # calibration-estimated, chars-estimated, median-estimated-window,
+        # median-estimated-all-history, unmeasured. Every call lands in this
+        # tally — nothing is dropped or double counted, unlike the prior
+        # "provider-reported + estimated" split which silently excluded
+        # zero-token unmeasured calls from the headline totals.
+        call_sources = Counter(call["source"] for call in calls)
         session = {
             "session": hash_id(session_id),
             "harness": harness,
@@ -637,8 +925,16 @@ def analyze(args: argparse.Namespace) -> dict[str, Any]:
                 "total_tokens": scopey_total,
                 "low_tokens": low,
                 "high_tokens": high,
-                "provider_reported_calls": sum(call["source"] == "provider-reported" for call in calls),
-                "estimated_calls": sum(call["source"] == "estimated" for call in calls),
+                "call_sources": dict(sorted(call_sources.items())),
+                "provider_reported_calls": call_sources.get("provider-reported", 0),
+                "estimated_calls": sum(
+                    call_sources.get(source, 0)
+                    for source in (
+                        "calibration-estimated", "chars-estimated",
+                        "median-estimated-window", "median-estimated-all-history",
+                    )
+                ),
+                "unmeasured_zero_calls": call_sources.get("unmeasured", 0),
                 "unmeasured_jobs": unmeasured_jobs,
                 "calls": calls,
             },
@@ -657,7 +953,7 @@ def analyze(args: argparse.Namespace) -> dict[str, Any]:
             "exclude_cwd_patterns": list(args.exclude_cwd),
             "excluded": dict(sorted(excluded.items())),
         },
-        "calibration": CALIBRATION,
+        "calibration": calibration,
         "summary": summarize_sessions(sessions),
         "sessions": sessions,
         "unmatched_claude_analyzer_transcripts": len(claude_calls) - len(used_claude),
@@ -673,6 +969,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--since", help="inclusive ISO-8601 UTC/local timestamp")
     parser.add_argument("--until", help="exclusive ISO-8601 UTC/local timestamp")
     parser.add_argument("--exclude-cwd", action="append", default=list(DEFAULT_EXCLUDES))
+    parser.add_argument(
+        "--calibration", type=Path, default=DEFAULT_CALIBRATION_PATH,
+        help="Codex analyzer-call calibration JSON, loaded at runtime (default: %(default)s)",
+    )
     parser.add_argument("--json-out", type=Path)
     parser.add_argument("--markdown-out", type=Path)
     return parser.parse_args()
