@@ -88,6 +88,7 @@ fn write_config(home: &Path, runner: &str, max_global_jobs: u64, health_history:
 model_runner = "{runner}"
 model = "auto"
 model_timeout_secs = 90
+min_job_interval_secs = 0
 max_global_jobs = {max_global_jobs}
 model_health_history = {health_history}
 notify_on_off_track = false
@@ -471,6 +472,138 @@ fn run_concurrency_e2e(runner: &str, sid_prefix: &str) {
     );
 }
 
+/// Fire `scopey hook post-tool` the way a harness would, adding one tool
+/// observation to the session's journal.
+fn fire_post_tool(home: &Path, config: &Path, proj: &Path, sid: &str, command: &str) {
+    let payload = format!(
+        r#"{{"session_id":"{sid}","cwd":"{}","hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{{"command":"{command}"}}}}"#,
+        proj.display()
+    );
+    let mut cmd = Command::new(scopey_bin());
+    cmd.args(["hook", "post-tool"])
+        .current_dir(proj)
+        .env("SCOPEY_HOME", home)
+        .env("SCOPEY_CONFIG", config)
+        .env_remove("SCOPEY_INTERNAL")
+        .env_remove("SCOPEY_HOOKS_DISABLED")
+        .env_remove("CLAUDE_CODE_DISABLE_HOOKS")
+        .env_remove("CLAUDE_CODE_SIMPLE");
+    let out = cmd
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .and_then(|mut c| {
+            use std::io::Write;
+            c.stdin.take().unwrap().write_all(payload.as_bytes())?;
+            c.wait_with_output()
+        })
+        .expect("spawn scopey hook post-tool");
+    assert!(
+        out.status.success(),
+        "post-tool hook failed for {sid}: stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+/// Real end-to-end usage accounting: a genuine summarize (background worker)
+/// and a genuine judge (direct CLI) against the real model CLI must leave
+/// measured per-call analyzer usage in the session store. This pins the
+/// whole chain: JSON output mode -> usage parse -> store record -> state.
+fn run_usage_e2e(runner: &str, sid: &str) {
+    if !cli_available(runner) {
+        eprintln!("SKIP {runner} usage e2e: `{runner}` not on PATH");
+        return;
+    }
+
+    let home = tempfile::tempdir().unwrap();
+    let proj = home.path().join("proj");
+    fs::create_dir_all(&proj).unwrap();
+    let config_path = write_config(home.path(), runner, 2, 50);
+
+    fire_user_prompt(
+        home.path(),
+        &config_path,
+        &proj,
+        sid,
+        "Review src/pager.rs for an off-by-one bug and report what you find.          Analysis only; do not change files.",
+        false,
+    );
+    let session_log = session_log_path(home.path(), sid);
+    assert!(
+        wait_for(WORKER_WAIT, || summarize_transition(&session_log).is_some()),
+        "no summarize within {WORKER_WAIT:?}\n{}",
+        read_or_empty(&session_log)
+    );
+
+    fire_post_tool(
+        home.path(),
+        &config_path,
+        &proj,
+        sid,
+        "rg -n off_by_one src/pager.rs",
+    );
+    fire_post_tool(home.path(), &config_path, &proj, sid, "cat src/pager.rs");
+
+    let judge = Command::new(scopey_bin())
+        .args([
+            "judge",
+            "--session-id",
+            sid,
+            "--cwd",
+            proj.to_str().unwrap(),
+            "--from-count",
+            "0",
+            "--to-count",
+            "2",
+        ])
+        .env("SCOPEY_HOME", home.path())
+        .env("SCOPEY_CONFIG", &config_path)
+        .env_remove("SCOPEY_INTERNAL")
+        .env_remove("SCOPEY_HOOKS_DISABLED")
+        .env_remove("CLAUDE_CODE_SIMPLE")
+        .output()
+        .expect("spawn scopey judge");
+    assert!(
+        judge.status.success(),
+        "judge failed: stderr={}",
+        String::from_utf8_lossy(&judge.stderr)
+    );
+
+    let state_path = home
+        .path()
+        .join("work")
+        .join("by-id")
+        .join(format!("{sid}.json"));
+    let state: serde_json::Value =
+        serde_json::from_str(&read_or_empty(&state_path)).expect("parse session state");
+    let calls = state["analyzer_usage"]
+        .as_array()
+        .unwrap_or_else(|| panic!("no analyzer_usage in state: {state}"));
+    assert!(
+        calls.len() >= 2,
+        "expected summarize+judge usage records, got {calls:?}"
+    );
+    let kinds: Vec<&str> = calls.iter().filter_map(|c| c["kind"].as_str()).collect();
+    assert!(kinds.contains(&"summarize"), "kinds={kinds:?}");
+    assert!(kinds.contains(&"judge"), "kinds={kinds:?}");
+    let mut total = 0u64;
+    for call in calls {
+        assert_eq!(call["runner"].as_str().unwrap(), runner, "{call}");
+        assert!(!call["model"].as_str().unwrap_or("").is_empty(), "{call}");
+        let call_total = call["total_tokens"].as_u64().unwrap_or(0);
+        assert!(call_total > 0, "zero-usage record: {call}");
+        assert!(call["input_tokens"].as_u64().unwrap_or(0) > 0, "{call}");
+        assert!(call["output_tokens"].as_u64().unwrap_or(0) > 0, "{call}");
+        total += call_total;
+    }
+    eprintln!(
+        "OK {runner} usage e2e: {} measured calls, {} tokens recorded ({kinds:?})",
+        calls.len(),
+        total
+    );
+}
+
 #[test]
 #[ignore = "needs local claude OAuth auth; run via make e2e-local"]
 fn claude_oauth_summarize_survives_poisoned_hook_env() {
@@ -487,4 +620,16 @@ fn claude_ten_concurrent_sessions_all_summarize() {
 #[ignore = "needs local codex auth; run via make e2e-local"]
 fn codex_ten_concurrent_sessions_all_summarize() {
     run_concurrency_e2e("codex", "e2e-codex-conc");
+}
+
+#[test]
+#[ignore = "needs local claude OAuth auth; run via make e2e-local"]
+fn claude_analyzer_usage_measured_end_to_end() {
+    run_usage_e2e("claude", "e2e-usage-claude");
+}
+
+#[test]
+#[ignore = "needs local codex auth; run via make e2e-local"]
+fn codex_analyzer_usage_measured_end_to_end() {
+    run_usage_e2e("codex", "e2e-usage-codex");
 }

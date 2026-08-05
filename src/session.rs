@@ -274,6 +274,26 @@ pub struct SessionData {
     /// Judge N-boundary hit while busy — drain when free (latest window wins).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pending_judge: Option<PendingJudgeWindow>,
+    /// Provider-reported usage for each measured analyzer call this session.
+    /// Only calls whose runner exposed usage are recorded, so this is a
+    /// measured floor, never an estimate.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub analyzer_usage: Vec<AnalyzerCall>,
+}
+
+/// One measured analyzer (summarize/judge) call for this session.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnalyzerCall {
+    pub ts: DateTime<Utc>,
+    /// "summarize" or "judge".
+    pub kind: String,
+    pub runner: String,
+    pub model: String,
+    /// Logical input including cached reads.
+    pub input_tokens: u64,
+    pub cached_input_tokens: u64,
+    pub output_tokens: u64,
+    pub total_tokens: u64,
 }
 
 /// Cap retained journal size so long sessions stay small.
@@ -501,6 +521,7 @@ impl SessionStore {
             tool_events: vec![],
             summarize_pending: false,
             pending_judge: None,
+            analyzer_usage: Vec::new(),
         };
         let lock_path = canonical.with_extension("json.lock");
         let lock_file = OpenOptions::new()
@@ -708,6 +729,24 @@ impl SessionStore {
 
     pub fn tool_events_in_window(&self, from: u64, to: u64) -> Vec<ToolEvent> {
         crate::tool_journal::events_in_window(&self.data.tool_events, from, to)
+    }
+
+    /// Record a measured analyzer call. Calls whose runner exposed no usage
+    /// are not recorded — totals stay a measured floor, never an estimate.
+    pub fn record_analyzer_usage(&mut self, kind: &str, completion: &crate::model::Completion) {
+        let Some(usage) = completion.usage else {
+            return;
+        };
+        self.data.analyzer_usage.push(AnalyzerCall {
+            ts: Utc::now(),
+            kind: kind.to_string(),
+            runner: completion.runner.to_string(),
+            model: completion.model.clone(),
+            input_tokens: usage.input_tokens,
+            cached_input_tokens: usage.cached_input_tokens,
+            output_tokens: usage.output_tokens,
+            total_tokens: usage.total_tokens,
+        });
     }
 
     pub fn mark_summarize_pending(&mut self) {
@@ -1026,6 +1065,7 @@ mod tests {
             tool_events: vec![],
             summarize_pending: false,
             pending_judge: None,
+            analyzer_usage: vec![],
         };
         fs::write(&legacy, serde_json::to_string_pretty(&data).unwrap()).unwrap();
         assert!(legacy.exists());

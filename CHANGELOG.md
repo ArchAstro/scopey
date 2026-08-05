@@ -9,6 +9,18 @@ and the project intends to follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Scopey now measures its own cost. Analyzer calls run the model CLIs in
+  usage-reporting modes (Claude `--output-format json`, Codex `--json`) and
+  every measured summarize/judge call is recorded in the session store with
+  its kind, runner, model, and token counts. `scopey insights` reports the
+  result per session ("scopey overhead: N measured across M calls · X% of
+  main volume · Y% of full-price tokens") and in the totals block, with a
+  glossary entry in `--help`. Totals are a measured floor, never an
+  estimate: calls whose runner exposes no usage are not counted. Pinned by
+  real-auth end-to-end tests for both Claude and Codex (`make e2e-local`).
+
+### Added
+
 - `scopey insights` now analyzes drift patterns and token usage, rendered
   readably: a drift-patterns block (archetype taxonomy bars, onset-position
   histogram, drift-by-session-length table, stated/implied-limit split, and

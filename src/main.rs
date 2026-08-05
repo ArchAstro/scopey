@@ -512,6 +512,11 @@ WHAT THE METRICS MEAN
   course corrections Messages Scopey injected after an off-track/warning
                      check. "back on-track next check" = the very next
                      check passed; "drifted again" = it did not.
+  scopey overhead    Measured analyzer tokens Scopey itself spent on the
+                     session (its summarize and judge calls), recorded from
+                     the model CLI's own usage output as the session runs.
+                     A floor, never an estimate: calls whose runner exposes
+                     no usage are not counted.
   tokens             Provider-reported token counters read from each
                      session's transcript. Cache reads are input tokens the
                      provider served from its prompt cache (billed at a deep

@@ -57,6 +57,29 @@ pub struct ModelChoice {
     pub reason: String,
 }
 
+/// Provider-reported token usage for one analyzer call, when the CLI exposes
+/// it. `input_tokens` is logical input including cached reads, matching the
+/// transcript-counter semantics used elsewhere.
+#[derive(Debug, Clone, Copy, Default, serde::Serialize, serde::Deserialize)]
+pub struct ModelUsage {
+    pub input_tokens: u64,
+    pub cached_input_tokens: u64,
+    pub output_tokens: u64,
+    pub total_tokens: u64,
+}
+
+/// One completed analyzer call: the completion text plus the resolved
+/// runner/model and provider-reported usage where the CLI exposes it
+/// (Claude `--output-format json`, Codex `--json`; other runners and
+/// custom `model_command`s report `None`).
+#[derive(Debug, Clone)]
+pub struct Completion {
+    pub text: String,
+    pub runner: &'static str,
+    pub model: String,
+    pub usage: Option<ModelUsage>,
+}
+
 /// Pick the CLI harness that should run the lightweight model job.
 ///
 /// Priority:
@@ -162,8 +185,9 @@ fn which_any(names: &[&str]) -> bool {
     names.iter().any(|n| which_ok(n))
 }
 
-/// Run the configured cheap model with a prompt; return stdout text.
-pub fn complete(cfg: &Config, prompt: &str, session_harness: &str) -> Result<String> {
+/// Run the configured cheap model with a prompt; return the completion text
+/// plus provider-reported usage where the runner exposes it.
+pub fn complete(cfg: &Config, prompt: &str, session_harness: &str) -> Result<Completion> {
     let choice = resolve_choice(cfg, session_harness)?;
     eprintln!("scopey model: {}", choice.reason);
 
@@ -171,6 +195,13 @@ pub fn complete(cfg: &Config, prompt: &str, session_harness: &str) -> Result<Str
     prompt_file.write_all(prompt.as_bytes())?;
     prompt_file.flush()?;
     let prompt_path = prompt_file.path().to_path_buf();
+
+    let done = |text: String, usage: Option<ModelUsage>| Completion {
+        text,
+        runner: choice.runner.as_str(),
+        model: choice.model.clone(),
+        usage,
+    };
 
     if let Some(ref tmpl) = cfg.model_command {
         let cmd_str = tmpl
@@ -198,19 +229,32 @@ pub fn complete(cfg: &Config, prompt: &str, session_harness: &str) -> Result<Str
             };
             bail!("model_command failed: status={} {detail}", output.status);
         }
-        return Ok(String::from_utf8_lossy(&output.stdout).trim().to_string());
+        return Ok(done(
+            String::from_utf8_lossy(&output.stdout).trim().to_string(),
+            None,
+        ));
     }
 
     match choice.runner {
-        Runner::Claude => complete_claude(cfg, prompt, &choice.model),
-        Runner::Codex => complete_codex(cfg, prompt, &choice.model),
-        Runner::Grok => complete_grok(cfg, prompt, &choice.model),
-        Runner::Pi => complete_pi(cfg, prompt, &choice.model),
-        Runner::OpenCode => complete_opencode(cfg, prompt, &choice.model),
+        Runner::Claude => {
+            complete_claude(cfg, prompt, &choice.model).map(|(text, usage)| done(text, usage))
+        }
+        Runner::Codex => {
+            complete_codex(cfg, prompt, &choice.model).map(|(text, usage)| done(text, usage))
+        }
+        Runner::Grok => complete_grok(cfg, prompt, &choice.model).map(|text| done(text, None)),
+        Runner::Pi => complete_pi(cfg, prompt, &choice.model).map(|text| done(text, None)),
+        Runner::OpenCode => {
+            complete_opencode(cfg, prompt, &choice.model).map(|text| done(text, None))
+        }
     }
 }
 
-fn complete_claude(cfg: &Config, prompt: &str, model: &str) -> Result<String> {
+fn complete_claude(
+    cfg: &Config,
+    prompt: &str,
+    model: &str,
+) -> Result<(String, Option<ModelUsage>)> {
     use crate::guard;
 
     // Single OAuth-compatible invocation. A `--bare` (API-key-only) fallback
@@ -218,13 +262,17 @@ fn complete_claude(cfg: &Config, prompt: &str, model: &str) -> Result<String> {
     // "Not logged in" error overwrote the first attempt's real diagnostics
     // (which hid a sustained claude-harness judge outage caused by a stale
     // installed binary), so it is deliberately gone.
+    //
+    // JSON output carries provider-reported usage alongside the result text;
+    // if the CLI ever returns non-JSON, the raw stdout is used as the text
+    // and usage is simply absent.
     let mut cmd = Command::new("claude");
     cmd.arg("-p")
         .arg(prompt)
         .arg("--model")
         .arg(model)
         .arg("--output-format")
-        .arg("text");
+        .arg("json");
     // Do not set CLAUDE_CODE_SIMPLE — it forces API-key-only auth.
     guard::apply_hook_disable_env(&mut cmd);
     cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
@@ -238,8 +286,9 @@ fn complete_claude(cfg: &Config, prompt: &str, model: &str) -> Result<String> {
     // Claude sometimes exits 0 with "Not logged in · Please run /login" on stdout.
     let not_logged_in =
         combined.contains("not logged in") || combined.contains("please run /login");
-    if output.status.success() && !stdout.is_empty() && !not_logged_in {
-        return Ok(stdout);
+    let (text, usage, is_error) = parse_claude_print_json(&stdout);
+    if output.status.success() && !text.is_empty() && !not_logged_in && !is_error {
+        return Ok((text, usage));
     }
     bail!(
         "claude -p --model {model} failed: status={} stdout={:?} stderr={:?} [{}]",
@@ -248,6 +297,44 @@ fn complete_claude(cfg: &Config, prompt: &str, model: &str) -> Result<String> {
         clip_model_error(&stderr),
         claude_env_diagnostics(),
     )
+}
+
+/// Parse `claude -p --output-format json` output: the result text, usage,
+/// and the CLI's own error flag. Non-JSON input degrades to (raw, None,
+/// false) so a CLI format change never breaks completions, only usage.
+fn parse_claude_print_json(stdout: &str) -> (String, Option<ModelUsage>, bool) {
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(stdout) else {
+        return (stdout.trim().to_string(), None, false);
+    };
+    let text = value
+        .get("result")
+        .and_then(|r| r.as_str())
+        .map(str::trim)
+        .unwrap_or("")
+        .to_string();
+    let is_error = value
+        .get("is_error")
+        .and_then(|e| e.as_bool())
+        .unwrap_or(false);
+    let usage = value.get("usage").map(|u| {
+        let field = |name: &str| u.get(name).and_then(|v| v.as_u64()).unwrap_or(0);
+        let uncached = field("input_tokens");
+        let cached = field("cache_read_input_tokens");
+        let cache_write = field("cache_creation_input_tokens");
+        let output = field("output_tokens");
+        let input = uncached + cached + cache_write;
+        ModelUsage {
+            input_tokens: input,
+            cached_input_tokens: cached,
+            output_tokens: output,
+            total_tokens: input + output,
+        }
+    });
+    if text.is_empty() && !is_error {
+        // JSON without a result string: fall back to raw text semantics.
+        return (stdout.trim().to_string(), usage, false);
+    }
+    (text, usage, is_error)
 }
 
 /// Presence-only environment facts that decide Claude CLI auth behavior,
@@ -286,7 +373,7 @@ fn clip_model_error(text: &str) -> String {
     }
 }
 
-fn complete_codex(cfg: &Config, prompt: &str, model: &str) -> Result<String> {
+fn complete_codex(cfg: &Config, prompt: &str, model: &str) -> Result<(String, Option<ModelUsage>)> {
     let out_file = NamedTempFile::new().context("codex out file")?;
     let out_path = out_file.path().to_path_buf();
 
@@ -299,6 +386,7 @@ fn complete_codex(cfg: &Config, prompt: &str, model: &str) -> Result<String> {
     use crate::guard;
     let mut cmd = Command::new("codex");
     cmd.arg("exec")
+        .arg("--json")
         .arg("--ephemeral")
         .arg("--skip-git-repo-check")
         .arg("-m")
@@ -319,6 +407,7 @@ fn complete_codex(cfg: &Config, prompt: &str, model: &str) -> Result<String> {
     } else {
         let mut cmd2 = Command::new("codex");
         cmd2.arg("exec")
+            .arg("--json")
             .arg("--ephemeral")
             .arg("--skip-git-repo-check")
             .arg("-m")
@@ -339,13 +428,68 @@ fn complete_codex(cfg: &Config, prompt: &str, model: &str) -> Result<String> {
         output2.stdout
     };
 
+    let stdout_text = String::from_utf8_lossy(&stdout).to_string();
+    let usage = parse_codex_exec_usage(&stdout_text);
     let from_file = std::fs::read_to_string(&out_path).unwrap_or_default();
     let text = if !from_file.trim().is_empty() {
         from_file
     } else {
-        String::from_utf8_lossy(&stdout).to_string()
+        // Without --output-last-message content, extract the agent message
+        // from the JSONL stream rather than returning raw event JSON.
+        parse_codex_exec_message(&stdout_text).unwrap_or(stdout_text)
     };
-    Ok(text.trim().to_string())
+    Ok((text.trim().to_string(), usage))
+}
+
+/// Cumulative usage from a `codex exec --json` event stream: the last
+/// `turn.completed` event's `usage` object wins.
+fn parse_codex_exec_usage(stdout: &str) -> Option<ModelUsage> {
+    let mut latest = None;
+    for line in stdout.lines() {
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(line) else {
+            continue;
+        };
+        if value.get("type").and_then(|t| t.as_str()) != Some("turn.completed") {
+            continue;
+        }
+        let Some(u) = value.get("usage") else {
+            continue;
+        };
+        let field = |name: &str| u.get(name).and_then(|v| v.as_u64()).unwrap_or(0);
+        let input = field("input_tokens");
+        let output = field("output_tokens");
+        let total = field("total_tokens");
+        latest = Some(ModelUsage {
+            input_tokens: input,
+            cached_input_tokens: field("cached_input_tokens"),
+            output_tokens: output,
+            total_tokens: if total > 0 { total } else { input + output },
+        });
+    }
+    latest
+}
+
+fn parse_codex_exec_message(stdout: &str) -> Option<String> {
+    let mut message = None;
+    for line in stdout.lines() {
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(line) else {
+            continue;
+        };
+        if value.get("type").and_then(|t| t.as_str()) != Some("item.completed") {
+            continue;
+        }
+        let Some(item) = value.get("item") else {
+            continue;
+        };
+        if item.get("type").and_then(|t| t.as_str()) == Some("agent_message") {
+            if let Some(text) = item.get("text").and_then(|t| t.as_str()) {
+                if !text.trim().is_empty() {
+                    message = Some(text.trim().to_string());
+                }
+            }
+        }
+    }
+    message
 }
 
 fn complete_grok(cfg: &Config, prompt: &str, model: &str) -> Result<String> {
@@ -523,7 +667,8 @@ pub fn report_models(cfg: &Config, verify: bool) -> Result<()> {
         );
         let _ = std::io::Write::flush(&mut std::io::stdout());
         match complete(cfg, "Reply with exactly the single word: pong", harness) {
-            Ok(text) => {
+            Ok(completion) => {
+                let text = completion.text;
                 let preview: String = text.chars().take(80).collect();
                 if text.to_ascii_lowercase().contains("pong") {
                     println!("OK ({preview})");
@@ -719,8 +864,47 @@ mod tests {
                 None => std::env::remove_var("CLAUDE_CODE_SIMPLE"),
             }
 
-            assert_eq!(result.unwrap(), "pong");
+            assert_eq!(result.unwrap().text, "pong");
         });
+    }
+
+    #[test]
+    fn claude_print_json_yields_text_and_usage() {
+        let stdout = r#"{"type":"result","subtype":"success","is_error":false,"result":" pong ","session_id":"abc","usage":{"input_tokens":4,"cache_creation_input_tokens":6706,"cache_read_input_tokens":8875,"output_tokens":6}}"#;
+        let (text, usage, is_error) = parse_claude_print_json(stdout);
+        assert_eq!(text, "pong");
+        assert!(!is_error);
+        let usage = usage.unwrap();
+        assert_eq!(usage.input_tokens, 4 + 6706 + 8875);
+        assert_eq!(usage.cached_input_tokens, 8875);
+        assert_eq!(usage.output_tokens, 6);
+        assert_eq!(usage.total_tokens, usage.input_tokens + 6);
+        // Error flag propagates.
+        let (_, _, is_error) =
+            parse_claude_print_json(r#"{"result":"limit reached","is_error":true}"#);
+        assert!(is_error);
+        // Non-JSON degrades to raw text with no usage.
+        let (text, usage, is_error) = parse_claude_print_json("plain text answer");
+        assert_eq!(text, "plain text answer");
+        assert!(usage.is_none());
+        assert!(!is_error);
+    }
+
+    #[test]
+    fn codex_exec_stream_yields_usage_and_message() {
+        let stream = concat!(
+            r#"{"type":"item.completed","item":{"type":"agent_message","text":"verdict text"}}"#,
+            "\n",
+            r#"{"type":"turn.completed","usage":{"input_tokens":12692,"cached_input_tokens":8960,"output_tokens":159}}"#,
+        );
+        let usage = parse_codex_exec_usage(stream).unwrap();
+        assert_eq!(usage.input_tokens, 12692);
+        assert_eq!(usage.cached_input_tokens, 8960);
+        assert_eq!(usage.output_tokens, 159);
+        // total absent in the event -> computed.
+        assert_eq!(usage.total_tokens, 12692 + 159);
+        assert_eq!(parse_codex_exec_message(stream).unwrap(), "verdict text");
+        assert!(parse_codex_exec_usage("not json").is_none());
     }
 
     #[test]

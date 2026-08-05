@@ -126,6 +126,8 @@ pub struct SessionInsight {
     corrections_recovered: usize,
     corrections_repeat: usize,
     tokens: Option<TranscriptTokens>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    scopey_usage: Option<ScopeyMeasured>,
     latest_signal: Option<InsightSignal>,
     signals: Vec<InsightSignal>,
     #[serde(skip)]
@@ -163,6 +165,18 @@ pub struct DriftPatterns {
     corrections_recovered: usize,
 }
 
+/// Measured analyzer usage for one session, summed from the per-call
+/// records Scopey persists as it runs. A floor, never an estimate: calls
+/// whose runner exposed no usage are absent.
+#[derive(Debug, Clone, Copy, Serialize)]
+pub struct ScopeyMeasured {
+    calls: usize,
+    input_tokens: u64,
+    cached_input_tokens: u64,
+    output_tokens: u64,
+    total_tokens: u64,
+}
+
 #[derive(Debug, Default, Serialize)]
 pub struct TokenTotals {
     scope: &'static str,
@@ -171,6 +185,9 @@ pub struct TokenTotals {
     cached: u64,
     output: u64,
     total: u64,
+    scopey_sessions: usize,
+    scopey_calls: usize,
+    scopey_total: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -670,6 +687,11 @@ fn token_totals(sessions: &[SessionInsight], scope: &'static str) -> TokenTotals
         totals.output += tokens.output;
         totals.total += tokens.total;
     }
+    for measured in sessions.iter().filter_map(|s| s.scopey_usage.as_ref()) {
+        totals.scopey_sessions += 1;
+        totals.scopey_calls += measured.calls;
+        totals.scopey_total += measured.total_tokens;
+    }
     totals
 }
 
@@ -766,6 +788,24 @@ fn analyze_sessions(
         let (corrections, corrections_recovered, corrections_repeat) =
             recovery_walk(&ordered_messages);
         let latest_signal = signals.last().cloned();
+        let scopey_usage = if data.analyzer_usage.is_empty() {
+            None
+        } else {
+            let mut measured = ScopeyMeasured {
+                calls: data.analyzer_usage.len(),
+                input_tokens: 0,
+                cached_input_tokens: 0,
+                output_tokens: 0,
+                total_tokens: 0,
+            };
+            for call in &data.analyzer_usage {
+                measured.input_tokens += call.input_tokens;
+                measured.cached_input_tokens += call.cached_input_tokens;
+                measured.output_tokens += call.output_tokens;
+                measured.total_tokens += call.total_tokens;
+            }
+            Some(measured)
+        };
         let mut session = SessionInsight {
             session_id: data.session_id,
             harness: data.harness,
@@ -784,6 +824,7 @@ fn analyze_sessions(
             corrections_recovered,
             corrections_repeat,
             tokens: None,
+            scopey_usage,
             latest_signal,
             signals,
             drift_window_archetypes,
@@ -1229,6 +1270,28 @@ fn print_session_extras(caps: Caps, session: &SessionInsight, width: usize) {
             humanize(tokens.output),
         );
     }
+    if let Some(measured) = &session.scopey_usage {
+        let mut ratios = String::new();
+        if let Some(tokens) = &session.tokens {
+            if tokens.total > 0 {
+                let volume = measured.total_tokens as f64 * 100.0 / tokens.total as f64;
+                ratios.push_str(&format!(" · {volume:.1}% of main volume"));
+                let full_price = tokens.input.saturating_sub(tokens.cached) + tokens.output;
+                if full_price > 0 {
+                    ratios.push_str(&format!(
+                        " · {:.0}% of full-price tokens",
+                        measured.total_tokens as f64 * 100.0 / full_price as f64
+                    ));
+                }
+            }
+        }
+        println!(
+            "  scopey overhead: {} measured across {} calls{}",
+            humanize(measured.total_tokens),
+            measured.calls,
+            ratios,
+        );
+    }
     if !session.drift_onsets_pct.is_empty() {
         let onsets = session
             .drift_onsets_pct
@@ -1604,6 +1667,7 @@ mod tests {
             tool_events: vec![],
             summarize_pending: false,
             pending_judge: None,
+            analyzer_usage: vec![],
         }
     }
 
