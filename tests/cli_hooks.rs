@@ -364,6 +364,17 @@ fn insights_reports_and_filters_off_scope_sessions() {
     )
     .unwrap();
     let now = chrono::Utc::now().to_rfc3339();
+    let transcript = home.path().join("main-transcript.jsonl");
+    fs::write(
+        &transcript,
+        concat!(
+            r#"{"timestamp":"t","payload":{"type":"thread_settings_applied","thread_settings":{"model":"gpt-5.6-terra"}}}"#,
+            "\n",
+            r#"{"payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":120000,"cached_input_tokens":90000,"output_tokens":8000,"total_tokens":128000}}}}"#,
+            "\n",
+        ),
+    )
+    .unwrap();
     let data = serde_json::json!({
         "session_id": "insights-drift",
         "cwd": "/tmp/project",
@@ -371,6 +382,29 @@ fn insights_reports_and_filters_off_scope_sessions() {
         "created_at": now,
         "updated_at": now,
         "tool_call_count": 20,
+        "transcript_path": transcript.to_str().unwrap(),
+        "analyzer_usage": [
+            {
+                "ts": now,
+                "kind": "summarize",
+                "runner": "codex",
+                "model": "gpt-5.6-nano",
+                "input_tokens": 900,
+                "cached_input_tokens": 0,
+                "output_tokens": 50,
+                "total_tokens": 950
+            },
+            {
+                "ts": now,
+                "kind": "judge",
+                "runner": "codex",
+                "model": "gpt-5.6-nano",
+                "input_tokens": 1500,
+                "cached_input_tokens": 0,
+                "output_tokens": 80,
+                "total_tokens": 1580
+            }
+        ],
         "messages": [
             {
                 "type": "scope_requirements",
@@ -448,6 +482,24 @@ fn insights_reports_and_filters_off_scope_sessions() {
     assert!(stdout.contains("50.0%"));
     assert!(stdout.contains("coverage: 1/1 sessions had at least one completed check"));
     assert!(stdout.contains("1 zero-tool session store(s) excluded"));
+    // Main-session and Scopey analyzer spend each name their model, so the
+    // cheap fast lane is distinguishable from the main model.
+    assert!(stdout.contains("model: gpt-5.6-terra"), "stdout={stdout}");
+    assert!(
+        stdout.contains("main session: gpt-5.6-terra 128k"),
+        "stdout={stdout}"
+    );
+    assert!(
+        stdout.contains("fast model: gpt-5.6-nano"),
+        "stdout={stdout}"
+    );
+    assert!(
+        stdout.contains("scopey analyzer (fast model): 2.5k measured across 2 calls"),
+        "stdout={stdout}"
+    );
+    // The totals line word-wraps at terminal width, so assert the pieces.
+    assert!(stdout.contains("gpt-5.6-nano 2.5k"), "stdout={stdout}");
+    assert!(stdout.contains("via codex"), "stdout={stdout}");
 
     let json = Command::new(scopey_bin())
         .args([
@@ -467,6 +519,20 @@ fn insights_reports_and_filters_off_scope_sessions() {
     assert_eq!(report["totals"]["off_track"], 1);
     assert_eq!(report["excluded_empty_sessions"], 0);
     assert_eq!(report["sessions"][0]["session_id"], "insights-drift");
+    let session_models = &report["sessions"][0]["tokens"]["models"];
+    assert_eq!(session_models[0]["model"], "gpt-5.6-terra");
+    assert_eq!(session_models[0]["total"], 128000);
+    let scopey_models = &report["sessions"][0]["scopey_usage"]["models"];
+    assert_eq!(scopey_models[0]["runner"], "codex");
+    assert_eq!(scopey_models[0]["model"], "gpt-5.6-nano");
+    assert_eq!(scopey_models[0]["calls"], 2);
+    assert_eq!(scopey_models[0]["total_tokens"], 2530);
+    let totals = &report["token_totals"];
+    assert_eq!(totals["main_models"][0]["model"], "gpt-5.6-terra");
+    assert_eq!(totals["main_models"][0]["total"], 128000);
+    assert_eq!(totals["scopey_models"][0]["model"], "gpt-5.6-nano");
+    assert_eq!(totals["scopey_models"][0]["total_tokens"], 2530);
+    assert_eq!(totals["scopey_calls"], 2);
 
     let ghost_json = Command::new(scopey_bin())
         .args([
