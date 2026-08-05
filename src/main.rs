@@ -14,8 +14,10 @@ mod model_health;
 mod notify;
 mod pathutil;
 mod session;
+mod term_viz;
 mod tool_journal;
 mod trajectory;
+mod transcript_tokens;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
@@ -247,6 +249,15 @@ enum Commands {
         /// Include every matching judgement and its details
         #[arg(long)]
         details: bool,
+        /// Skip the drift-patterns block (archetypes, onsets, recovery)
+        #[arg(long)]
+        no_patterns: bool,
+        /// Transcript token totals: shown (rendered sessions), all, or off
+        #[arg(long, default_value = "shown", value_name = "shown|all|off")]
+        tokens: String,
+        /// Inline charts: auto (detect kitty/ghostty/WezTerm), kitty, or off
+        #[arg(long, default_value = "auto", value_name = "auto|kitty|off")]
+        graphics: String,
         /// Print machine-readable JSON
         #[arg(long)]
         json: bool,
@@ -470,12 +481,46 @@ Example:
 
 const INSIGHTS_ABOUT: &str = r#"Analyze judgement history across stored sessions.
 
-The summary highlights sessions with off-track or warning windows, reports the
-share of evaluated windows that needed attention, and includes the judge's
-summary plus scope context. Zero-tool stores are excluded by default; use
---include-empty to audit raw history. Date-only values use the local timezone.
+How Scopey works, in one paragraph: while an agent session runs, Scopey
+periodically takes the last stretch of tool calls (a "check") and asks a small
+model whether that work still matches what you asked for. A check comes back
+on-track, warning, or off-track. When a check is flagged (warning/off-track),
+Scopey can send the session a course correction.
 
-Verdicts: on-track, warning, off-track, insufficient-evidence, unknown.
+WHAT THE METRICS MEAN
+
+  checks             Completed judgements. Each covers a window of recent
+                     tool calls, judged against your request's scope.
+  flagged            A check that came back warning or off-track.
+  flag rate          Flagged checks / completed checks. High = Scopey kept
+                     objecting to the session's work.
+  failed to run      Checks whose model call errored ("unknown" verdict).
+                     No opinion was produced; treat as missing, not clean.
+  no tool evidence   "insufficient-evidence": the window held no visible
+                     tool activity, so Scopey refused to judge it.
+  drift patterns     Aggregates over flagged checks only:
+    work involved      What the flagged work was (keyword categories such as
+                       unauthorized tests, vcs/release, out-of-scope files).
+                       One check can match several categories.
+    onset chart        WHEN flags happen inside a session: left edge =
+                       session start, right edge = end. "half of all flags
+                       by tool N" marks the middle of the distribution.
+    stated/implied     Whether the violated scope spelled out a restriction
+                       ("do not edit files") or only implied one.
+    flag rate by       Longer sessions are checked more often; this table
+    session length     shows where flags actually concentrate.
+  course corrections Messages Scopey injected after an off-track/warning
+                     check. "back on-track next check" = the very next
+                     check passed; "drifted again" = it did not.
+  tokens             Provider-reported token counters read from each
+                     session's transcript. Cache reads are input tokens the
+                     provider served from its prompt cache (billed at a deep
+                     discount); fresh input and output are full price.
+                     Token totals count volume, not dollars.
+
+Zero-tool stores are excluded by default; use --include-empty to audit raw
+history. Date-only values use the local timezone. Machine-readable field
+names in --json are stable and may differ from the display labels.
 
 Examples:
   scopey insights
@@ -483,7 +528,7 @@ Examples:
   scopey insights --session 019fb598 --details
   scopey insights --date 2026-07-30 --harness codex
   scopey insights --cwd . --verdict warning --json
-  scopey insights --include-empty
+  scopey insights --tokens all --graphics off
 "#;
 
 const PATH_ABOUT: &str = r#"Path helpers matching Claude's project-directory encoding.
@@ -757,6 +802,9 @@ fn run() -> Result<()> {
             include_empty,
             limit,
             details,
+            no_patterns,
+            tokens,
+            graphics,
             json,
         } => insights::run(
             &cfg,
@@ -772,6 +820,9 @@ fn run() -> Result<()> {
                 include_empty,
                 limit,
                 details,
+                patterns: !no_patterns,
+                tokens,
+                graphics,
                 json,
             },
         ),

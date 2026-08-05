@@ -446,7 +446,7 @@ fn insights_reports_and_filters_off_scope_sessions() {
     assert!(stdout.contains("insights-drift"));
     assert!(stdout.contains("edited an unrelated file"));
     assert!(stdout.contains("50.0%"));
-    assert!(stdout.contains("evaluation coverage: 1/1 sessions"));
+    assert!(stdout.contains("coverage: 1/1 sessions had at least one completed check"));
     assert!(stdout.contains("1 zero-tool session store(s) excluded"));
 
     let json = Command::new(scopey_bin())
