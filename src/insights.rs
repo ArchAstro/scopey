@@ -175,6 +175,10 @@ pub struct ScopeyMeasured {
     cached_input_tokens: u64,
     output_tokens: u64,
     total_tokens: u64,
+    /// Completed model-backed calls from before usage recording existed
+    /// (real scope extractions plus decisive judge verdicts, minus measured
+    /// records). Conservative: free failure paths are excluded.
+    unmeasured_earlier_calls: usize,
 }
 
 #[derive(Debug, Default, Serialize)]
@@ -788,6 +792,36 @@ fn analyze_sessions(
         let (corrections, corrections_recovered, corrections_repeat) =
             recovery_walk(&ordered_messages);
         let latest_signal = signals.last().cloned();
+        // Model-backed calls that predate usage recording: real scope
+        // extractions (fallback scopes never reached a model) plus decisive
+        // judge verdicts (insufficient-evidence may be the free no-tools
+        // path, so it is conservatively excluded).
+        let model_backed_calls = data
+            .messages
+            .iter()
+            .filter(|m| {
+                m.type_ == MessageType::ScopeRequirements
+                    && !m
+                        .content
+                        .as_deref()
+                        .unwrap_or("")
+                        .contains(crate::session::FALLBACK_SCOPE_MARKER)
+            })
+            .count()
+            + data
+                .messages
+                .iter()
+                .filter(|m| {
+                    m.type_ == MessageType::Judgement
+                        && m.status != Some(JudgementStatus::Pending)
+                        && matches!(
+                            m.verdict,
+                            Some(JudgementVerdict::OnTrack)
+                                | Some(JudgementVerdict::Warning)
+                                | Some(JudgementVerdict::OffTrack)
+                        )
+                })
+                .count();
         let scopey_usage = if data.analyzer_usage.is_empty() {
             None
         } else {
@@ -797,6 +831,8 @@ fn analyze_sessions(
                 cached_input_tokens: 0,
                 output_tokens: 0,
                 total_tokens: 0,
+                unmeasured_earlier_calls: model_backed_calls
+                    .saturating_sub(data.analyzer_usage.len()),
             };
             for call in &data.analyzer_usage {
                 measured.input_tokens += call.input_tokens;
@@ -1285,11 +1321,23 @@ fn print_session_extras(caps: Caps, session: &SessionInsight, width: usize) {
                 }
             }
         }
+        let unmeasured = if measured.unmeasured_earlier_calls > 0 {
+            term_viz::dim(
+                caps,
+                &format!(
+                    " · {} earlier call(s) unmeasured",
+                    measured.unmeasured_earlier_calls
+                ),
+            )
+        } else {
+            String::new()
+        };
         println!(
-            "  scopey overhead: {} measured across {} calls{}",
+            "  scopey overhead: {} measured across {} calls{}{}",
             humanize(measured.total_tokens),
             measured.calls,
             ratios,
+            unmeasured,
         );
     }
     if !session.drift_onsets_pct.is_empty() {
@@ -1631,6 +1679,37 @@ mod tests {
         assert_eq!(humanize(51_974), "52k");
         assert_eq!(humanize(142_203_597), "142.2M");
         assert_eq!(humanize(1_414_000_000), "1.41B");
+    }
+
+    #[test]
+    fn measured_overhead_annotates_unmeasured_earlier_calls() {
+        use crate::session::AnalyzerCall;
+        // One real scope + two decisive judgements = 3 model-backed calls;
+        // only one measured record exists, so 2 earlier calls are unmeasured.
+        let mut data = session(
+            "usage-1",
+            &[JudgementVerdict::OnTrack, JudgementVerdict::OffTrack],
+        );
+        data.analyzer_usage = vec![AnalyzerCall {
+            ts: Utc::now(),
+            kind: "judge".into(),
+            runner: "claude".into(),
+            model: "haiku".into(),
+            input_tokens: 17_000,
+            cached_input_tokens: 12_000,
+            output_tokens: 1_400,
+            total_tokens: 18_400,
+        }];
+        let report = analyze_sessions(vec![data], &query(), vec![], 0, true, TokenScope::Off);
+        let measured = report.sessions[0].scopey_usage.as_ref().unwrap();
+        assert_eq!(measured.calls, 1);
+        assert_eq!(measured.total_tokens, 18_400);
+        assert_eq!(measured.unmeasured_earlier_calls, 2);
+        // Fallback scopes and free failure paths never count as model-backed.
+        let mut clean = session("usage-2", &[JudgementVerdict::Unknown]);
+        clean.analyzer_usage = vec![];
+        let report = analyze_sessions(vec![clean], &query(), vec![], 0, true, TokenScope::Off);
+        assert!(report.sessions[0].scopey_usage.is_none());
     }
 
     fn session(id: &str, verdicts: &[JudgementVerdict]) -> SessionData {
