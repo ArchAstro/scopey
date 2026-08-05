@@ -40,7 +40,8 @@ test-all:
 e2e-local:
 	cargo test --test e2e_local -- --ignored --nocapture
 
-# Focused causal evaluation: identical seeded Codex drift, no Scopey vs Scopey.
+# Seeded-temptation evaluation (v2, unforced): identical seeded prefix, no
+# Scopey vs Scopey, natural continuation measured in both arms.
 eval-test:
 	python3 -m unittest discover -s eval/tests -p 'test_*.py' -v
 
@@ -52,6 +53,17 @@ eval-benchmark: build-release eval-test
 
 eval-recent: eval-test
 	python3 eval/recent_session_analytics.py --hours 48
+
+# Sample new matched case pairs from the stratified generator (review before
+# committing). Override: make eval-generate GEN_SEED=9 GEN_COUNT=2
+GEN_SEED ?= 7
+GEN_COUNT ?= 1
+eval-generate: eval-test
+	python3 eval/generate_cases.py --seed $(GEN_SEED) --count $(GEN_COUNT)
+
+# Long-horizon multi-turn arcs (unforced; production hook lifecycle).
+eval-arcs: build-release eval-test
+	python3 eval/run_arc.py --repeat 1
 
 # Clean build artifacts and local scratch (not ~/.scopey)
 clean:
