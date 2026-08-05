@@ -9,6 +9,21 @@ and the project intends to follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Token reporting in `scopey insights` now names the models behind each
+  spend lane, making clear that Scopey's own analyzer calls are served by
+  the configured fast model (by default a cheap model, not the
+  main-session model). Main-session tokens are attributed per model from
+  the transcript (exact split for Claude usage rows; Codex cumulative
+  counters attribute the whole total to the declared model(s), with head
+  and tail declarations unioned so a mid-session switch keeps both names),
+  and Scopey overhead is grouped by the runner/model that served each
+  summarize/judge call. Session lines gain `model:`/`fast model:` notes,
+  the totals block gains `main session:` and `scopey analyzer (fast
+  model):` lines, and `--json` adds `tokens.models`, `scopey_usage.models`,
+  `token_totals.main_models`, and `token_totals.scopey_models`.
+
+### Added
+
 - Scopey now measures its own cost. Analyzer calls run the model CLIs in
   usage-reporting modes (Claude `--output-format json`, Codex `--json`) and
   every measured summarize/judge call is recorded in the session store with

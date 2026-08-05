@@ -159,8 +159,19 @@ coverage, judge failure rate, and contaminated scope records. Historical or
 new warning/off-track results that explicitly say the transcript or tool
 evidence is missing are counted as `insufficient-evidence`, not agent drift.
 
+Token reporting names the models involved so the two spend lanes never
+blur: main-session tokens are attributed to the model(s) the transcript
+declares (exact per-model split for Claude transcripts; Codex counters are
+cumulative, so the whole total is attributed to the declared model), while
+Scopey's own overhead is grouped by the fast model that served each
+summarize/judge call. Volume percentages compare token counts, not cost —
+Scopey's tokens are billed at the configured fast model's rate, by default
+a much cheaper model than the main session's.
+
 `--json` exposes the same totals, data-quality counts, per-session scope
-quality, summaries, details, tool windows, and timestamps for scripts.
+quality, summaries, details, tool windows, timestamps, and the per-model
+token breakdowns (`tokens.models`, `scopey_usage.models`,
+`token_totals.main_models`, `token_totals.scopey_models`) for scripts.
 
 ## Session logs
 

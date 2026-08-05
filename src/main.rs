@@ -516,12 +516,18 @@ WHAT THE METRICS MEAN
                      session (its summarize and judge calls), recorded from
                      the model CLI's own usage output as the session runs.
                      A floor, never an estimate: calls whose runner exposes
-                     no usage are not counted.
+                     no usage are not counted. These calls go to the
+                     configured fast model (by default a cheap model such
+                     as haiku, not the main-session model), and the report
+                     names that model next to the spend.
   tokens             Provider-reported token counters read from each
-                     session's transcript. Cache reads are input tokens the
+                     session's transcript, attributed to the main-session
+                     model(s) by name. Cache reads are input tokens the
                      provider served from its prompt cache (billed at a deep
                      discount); fresh input and output are full price.
-                     Token totals count volume, not dollars.
+                     Token totals count volume, not dollars — so comparing
+                     main-model volume against Scopey's fast-model overhead
+                     overstates Scopey's relative cost in dollars.
 
 Zero-tool stores are excluded by default; use --include-empty to audit raw
 history. Date-only values use the local timezone. Machine-readable field

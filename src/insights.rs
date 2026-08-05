@@ -4,7 +4,7 @@ use crate::session::{
     SessionMessageWire, SessionStore,
 };
 use crate::term_viz::{self, Caps, Graphics};
-use crate::transcript_tokens::{self, TranscriptTokens};
+use crate::transcript_tokens::{self, ModelTokens, TranscriptTokens};
 use anyhow::{bail, Context, Result};
 use chrono::{DateTime, Days, Local, NaiveDate, TimeZone, Utc};
 use serde::Serialize;
@@ -168,17 +168,32 @@ pub struct DriftPatterns {
 /// Measured analyzer usage for one session, summed from the per-call
 /// records Scopey persists as it runs. A floor, never an estimate: calls
 /// whose runner exposed no usage are absent.
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ScopeyMeasured {
     calls: usize,
     input_tokens: u64,
     cached_input_tokens: u64,
     output_tokens: u64,
     total_tokens: u64,
+    /// Analyzer spend grouped by the fast model that served it, so the
+    /// cheap-model lane is distinguishable from the main session's model.
+    models: Vec<ScopeyModelUsage>,
     /// Completed model-backed calls from before usage recording existed
     /// (real scope extractions plus decisive judge verdicts, minus measured
     /// records). Conservative: free failure paths are excluded.
     unmeasured_earlier_calls: usize,
+}
+
+/// Analyzer usage attributed to one runner/model pair.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct ScopeyModelUsage {
+    runner: String,
+    model: String,
+    calls: usize,
+    input_tokens: u64,
+    cached_input_tokens: u64,
+    output_tokens: u64,
+    total_tokens: u64,
 }
 
 #[derive(Debug, Default, Serialize)]
@@ -189,9 +204,15 @@ pub struct TokenTotals {
     cached: u64,
     output: u64,
     total: u64,
+    /// Main-session spend per model, aggregated across transcripts.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    main_models: Vec<ModelTokens>,
     scopey_sessions: usize,
     scopey_calls: usize,
     scopey_total: u64,
+    /// Scopey analyzer spend per fast model, aggregated across sessions.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    scopey_models: Vec<ScopeyModelUsage>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -690,12 +711,62 @@ fn token_totals(sessions: &[SessionInsight], scope: &'static str) -> TokenTotals
         totals.cached += tokens.cached;
         totals.output += tokens.output;
         totals.total += tokens.total;
+        for share in &tokens.models {
+            let row = match totals
+                .main_models
+                .iter_mut()
+                .find(|row| row.model == share.model)
+            {
+                Some(row) => row,
+                None => {
+                    totals.main_models.push(ModelTokens {
+                        model: share.model.clone(),
+                        ..ModelTokens::default()
+                    });
+                    totals.main_models.last_mut().expect("just pushed")
+                }
+            };
+            row.input += share.input;
+            row.cached += share.cached;
+            row.output += share.output;
+            row.total += share.total;
+        }
     }
     for measured in sessions.iter().filter_map(|s| s.scopey_usage.as_ref()) {
         totals.scopey_sessions += 1;
         totals.scopey_calls += measured.calls;
         totals.scopey_total += measured.total_tokens;
+        for share in &measured.models {
+            let row = match totals
+                .scopey_models
+                .iter_mut()
+                .find(|row| row.runner == share.runner && row.model == share.model)
+            {
+                Some(row) => row,
+                None => {
+                    totals.scopey_models.push(ScopeyModelUsage {
+                        runner: share.runner.clone(),
+                        model: share.model.clone(),
+                        ..ScopeyModelUsage::default()
+                    });
+                    totals.scopey_models.last_mut().expect("just pushed")
+                }
+            };
+            row.calls += share.calls;
+            row.input_tokens += share.input_tokens;
+            row.cached_input_tokens += share.cached_input_tokens;
+            row.output_tokens += share.output_tokens;
+            row.total_tokens += share.total_tokens;
+        }
     }
+    totals
+        .main_models
+        .sort_by(|a, b| b.total.cmp(&a.total).then_with(|| a.model.cmp(&b.model)));
+    totals.scopey_models.sort_by(|a, b| {
+        b.total_tokens
+            .cmp(&a.total_tokens)
+            .then_with(|| a.model.cmp(&b.model))
+    });
     totals
 }
 
@@ -831,6 +902,7 @@ fn analyze_sessions(
                 cached_input_tokens: 0,
                 output_tokens: 0,
                 total_tokens: 0,
+                models: Vec::new(),
                 unmeasured_earlier_calls: model_backed_calls
                     .saturating_sub(data.analyzer_usage.len()),
             };
@@ -839,7 +911,32 @@ fn analyze_sessions(
                 measured.cached_input_tokens += call.cached_input_tokens;
                 measured.output_tokens += call.output_tokens;
                 measured.total_tokens += call.total_tokens;
+                let row = match measured
+                    .models
+                    .iter_mut()
+                    .find(|row| row.runner == call.runner && row.model == call.model)
+                {
+                    Some(row) => row,
+                    None => {
+                        measured.models.push(ScopeyModelUsage {
+                            runner: call.runner.clone(),
+                            model: call.model.clone(),
+                            ..ScopeyModelUsage::default()
+                        });
+                        measured.models.last_mut().expect("just pushed")
+                    }
+                };
+                row.calls += 1;
+                row.input_tokens += call.input_tokens;
+                row.cached_input_tokens += call.cached_input_tokens;
+                row.output_tokens += call.output_tokens;
+                row.total_tokens += call.total_tokens;
             }
+            measured.models.sort_by(|a, b| {
+                b.total_tokens
+                    .cmp(&a.total_tokens)
+                    .then_with(|| a.model.cmp(&b.model))
+            });
             Some(measured)
         };
         let mut session = SessionInsight {
@@ -1294,19 +1391,86 @@ fn print_token_totals(caps: Caps, totals: &TokenTotals, width: usize) {
         ));
     }
     println!("  {bar}  {}", legend.join(&term_viz::dim(caps, " · ")));
+    if !totals.main_models.is_empty() {
+        let list = totals
+            .main_models
+            .iter()
+            .map(|row| format!("{} {}", row.model, humanize(row.total)))
+            .collect::<Vec<_>>()
+            .join(" · ");
+        println!(
+            "{}",
+            term_viz::wrap_indent(&format!("main session: {list}"), width, "  ", "      ")
+        );
+    }
+    if totals.scopey_calls > 0 {
+        let mut line = format!(
+            "scopey analyzer (fast model): {} measured across {} calls in {} session(s)",
+            humanize(totals.scopey_total),
+            totals.scopey_calls,
+            totals.scopey_sessions,
+        );
+        if !totals.scopey_models.is_empty() {
+            let list = totals
+                .scopey_models
+                .iter()
+                .map(|row| {
+                    format!(
+                        "{} {} via {}",
+                        row.model,
+                        humanize(row.total_tokens),
+                        row.runner
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(" · ");
+            line.push_str(&format!(" — {list}"));
+        }
+        if totals.total > 0 {
+            line.push_str(&format!(
+                " · {:.1}% of main volume",
+                totals.scopey_total as f64 * 100.0 / totals.total as f64
+            ));
+        }
+        println!("{}", term_viz::wrap_indent(&line, width, "  ", "      "));
+    }
 }
 
 fn print_session_extras(caps: Caps, session: &SessionInsight, width: usize) {
     if let Some(tokens) = &session.tokens {
-        println!(
-            "  tokens: {} ({} cache reads · {} fresh input · {} output)",
+        let model_note = match tokens.models.as_slice() {
+            [] => String::new(),
+            [only] => format!(" · model: {}", only.model),
+            many => format!(
+                " · models: {}",
+                many.iter()
+                    .map(|row| format!("{} {}", row.model, humanize(row.total)))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+        };
+        let line = format!(
+            "tokens: {} ({} cache reads · {} fresh input · {} output){}",
             humanize(tokens.total),
             humanize(tokens.cached),
             humanize(tokens.input.saturating_sub(tokens.cached)),
             humanize(tokens.output),
+            model_note,
         );
+        println!("{}", term_viz::wrap_indent(&line, width, "  ", "      "));
     }
     if let Some(measured) = &session.scopey_usage {
+        let model_note = match measured.models.as_slice() {
+            [] => String::new(),
+            [only] => format!(" · fast model: {}", only.model),
+            many => format!(
+                " · fast models: {}",
+                many.iter()
+                    .map(|row| format!("{} {}", row.model, humanize(row.total_tokens)))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+        };
         let mut ratios = String::new();
         if let Some(tokens) = &session.tokens {
             if tokens.total > 0 {
@@ -1321,24 +1485,25 @@ fn print_session_extras(caps: Caps, session: &SessionInsight, width: usize) {
                 }
             }
         }
+        // Plain text: wrap_indent measures raw chars, so ANSI-styled words
+        // would skew its wrap points.
         let unmeasured = if measured.unmeasured_earlier_calls > 0 {
-            term_viz::dim(
-                caps,
-                &format!(
-                    " · {} earlier call(s) unmeasured",
-                    measured.unmeasured_earlier_calls
-                ),
+            format!(
+                " · {} earlier call(s) unmeasured",
+                measured.unmeasured_earlier_calls
             )
         } else {
             String::new()
         };
-        println!(
-            "  scopey overhead: {} measured across {} calls{}{}",
+        let line = format!(
+            "scopey overhead: {} measured across {} calls{}{}{}",
             humanize(measured.total_tokens),
             measured.calls,
+            model_note,
             ratios,
             unmeasured,
         );
+        println!("{}", term_viz::wrap_indent(&line, width, "  ", "      "));
     }
     if !session.drift_onsets_pct.is_empty() {
         let onsets = session
