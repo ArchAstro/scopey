@@ -931,7 +931,7 @@ pub fn build_correction_injection(
     let mut out = format!(
         r#"[scopey COURSE CORRECTION — verdict: {verdict:?}]
 The recent trajectory was judged against the session scope and found issues.
-You must re-align immediately.
+Pause before taking another action related to the flagged work.
 
 SCOPE REQUIREMENTS:
 {scope}
@@ -942,8 +942,16 @@ JUDGEMENT SUMMARY:
 DETAILS / REQUIRED CORRECTIONS:
 {details}
 
-Continue only with work that advances the scope requirements. Drop or reverse
-out-of-scope changes when safe. State a one-line re-plan before the next edit."#
+Do not undo, discard, or overwrite work already completed solely because of this
+correction. Before the next tool call or edit, tell the user:
+1. What you were doing that was judged out of scope.
+2. Why it was judged out of scope.
+3. The current state, including changes already made.
+4. The exact next step you would take.
+
+Ask for permission to take that next step, then stop and wait for the user's
+answer. Continue the flagged work only if the user approves it. If permission is
+denied, leave existing work intact unless the user explicitly asks you to revert it."#
     );
     if ascii_scopey {
         out.push_str("\n\nPost the below:\n```\n");
@@ -1106,6 +1114,13 @@ mod tests {
         assert!(c.contains("stay scoped"));
         assert!(c.contains("went sideways"));
         assert!(c.contains("revert foo"));
+        assert!(c.contains("Do not undo, discard, or overwrite work already completed"));
+        assert!(c.contains("What you were doing that was judged out of scope"));
+        assert!(c.contains("The current state, including changes already made"));
+        assert!(c.contains("The exact next step you would take"));
+        assert!(c.contains("Ask for permission to take that next step"));
+        assert!(c.contains("stop and wait for the user's"));
+        assert!(!c.contains("Drop or reverse"));
         assert!(c.contains("You got scoped!"));
         assert!(c.contains("Post the below:"));
 
