@@ -9,6 +9,13 @@ and the project intends to follow [Semantic Versioning](https://semver.org/).
 
 ## [0.2.1] - 2026-08-11
 
+### Fixed
+
+- Course corrections now preserve completed work instead of directing the
+  coding agent to undo it. The agent summarizes the flagged out-of-scope work,
+  explains its current state and proposed next step, then waits for explicit
+  permission before continuing or reverting anything.
+
 ## [0.2.0] - 2026-08-05
 
 ### Added
