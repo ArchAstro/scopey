@@ -7,6 +7,12 @@ and the project intends to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `scopey disable` and `scopey enable` persist an `enabled` config flag so
+  Scopey can be paused without uninstalling hooks or deleting session data.
+  Disabled hooks return immediately without recording events or spawning work.
+
 ## [0.2.1] - 2026-08-11
 
 ### Fixed

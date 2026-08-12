@@ -205,6 +205,17 @@ background jobs, while `scopey setup --force` refreshes installed hooks.
 `scopey uninstall` removes hooks but keeps local data; add `--purge-data` to
 remove Scopey's config, sessions, logs, and locks as well.
 
+Temporarily pause Scopey without removing hooks or data:
+
+```bash
+scopey disable
+scopey enable
+```
+
+These commands persist `enabled = false|true` in the effective config file.
+While disabled, installed hooks still run but immediately return as no-ops:
+they do not read events, record tools, spawn model jobs, or inject messages.
+
 ## Herdr awareness
 
 [Herdr](https://herdr.dev) is an agent multiplexer with its own notification + state API.
@@ -296,6 +307,7 @@ legacy files at `work/<escaped-cwd>/<session_id>.json` are migrated into
 
 | Key | Default | Meaning |
 |-----|---------|---------|
+| `enabled` | `true` | Master switch; `false` makes installed hooks no-op |
 | `n_tool_calls` | 10 | Journal + start background judge every N tools |
 | `m_reminder` | 20 | Inject scope reminder every M tools |
 | `model_runner` | `auto` | Session harness, or pin any supported runner |
