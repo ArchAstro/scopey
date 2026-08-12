@@ -1,6 +1,6 @@
 [package]
 name = "scopey"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 description = "Keep coding-agent sessions on scope with requirement summaries, trajectory judging, course corrections, and drift insights."
 license = "MIT"

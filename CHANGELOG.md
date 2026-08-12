@@ -7,6 +7,8 @@ and the project intends to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-08-12
+
 ### Added
 
 - `scopey disable` and `scopey enable` persist an `enabled` config flag so
