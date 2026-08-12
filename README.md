@@ -282,9 +282,9 @@ newer scope. If the summarizer model is unavailable, the fallback preserves
 only the latest request instead of replaying the full prompt history.
 
 Course corrections are advisory: they surface the judged evidence and preserve
-completed work, but they do not block the user's latest request nor require
-permission before the agent continues. The agent should pause for approval only
-when the user explicitly asks for it.
+completed work, but they do not override the user's latest request or create an
+approval gate. Independent clarification, authorization, and safety requirements
+still apply.
 
 ### Development checks
 
