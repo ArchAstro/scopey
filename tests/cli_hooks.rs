@@ -96,6 +96,81 @@ fn internal_env_makes_hooks_noop() {
 }
 
 #[test]
+fn disable_and_enable_persist_config_and_gate_hooks() {
+    let home = tempfile::tempdir().unwrap();
+    let cwd = home.path().join("proj");
+    fs::create_dir_all(&cwd).unwrap();
+    let config = home.path().join("config.toml");
+    fs::write(
+        &config,
+        format!(
+            "# retained\nwork_root = \"{}\"\nn_tool_calls = 15\n",
+            home.path().join("work").display()
+        ),
+    )
+    .unwrap();
+
+    let disable = Command::new(scopey_bin())
+        .arg("disable")
+        .env("SCOPEY_HOME", home.path())
+        .env("SCOPEY_CONFIG", &config)
+        .output()
+        .unwrap();
+    assert!(
+        disable.status.success(),
+        "stderr={}",
+        String::from_utf8_lossy(&disable.stderr)
+    );
+    assert!(String::from_utf8_lossy(&disable.stdout).contains("scopey disabled"));
+    let disabled_config = fs::read_to_string(&config).unwrap();
+    assert!(disabled_config.contains("enabled = false"));
+    assert!(disabled_config.contains("# retained"));
+
+    let sid = "disabled-hook";
+    let payload = format!(
+        r#"{{"session_id":"{sid}","cwd":"{}","prompt":"hello","hook_event_name":"UserPromptSubmit"}}"#,
+        cwd.display()
+    );
+    let disabled_hook = run_hook_with_config(home.path(), Some(&config), "user-prompt", &payload);
+    assert!(disabled_hook.status.success());
+    assert!(disabled_hook.stdout.is_empty());
+    assert!(!home
+        .path()
+        .join("logs")
+        .join(format!("{sid}.jsonl"))
+        .exists());
+    assert!(!home
+        .path()
+        .join("work/by-id")
+        .join(format!("{sid}.json"))
+        .exists());
+
+    let enable = Command::new(scopey_bin())
+        .arg("enable")
+        .env("SCOPEY_HOME", home.path())
+        .env("SCOPEY_CONFIG", &config)
+        .output()
+        .unwrap();
+    assert!(
+        enable.status.success(),
+        "stderr={}",
+        String::from_utf8_lossy(&enable.stderr)
+    );
+    assert!(String::from_utf8_lossy(&enable.stdout).contains("scopey enabled"));
+    assert!(fs::read_to_string(&config)
+        .unwrap()
+        .contains("enabled = true"));
+
+    let enabled_hook = run_hook_with_config(home.path(), Some(&config), "user-prompt", &payload);
+    assert!(enabled_hook.status.success());
+    assert!(home
+        .path()
+        .join("logs")
+        .join(format!("{sid}.jsonl"))
+        .exists());
+}
+
+#[test]
 fn user_prompt_writes_jsonl_and_logs_command() {
     let home = tempfile::tempdir().unwrap();
     let cwd = home.path().join("proj");

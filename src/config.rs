@@ -6,6 +6,9 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
+    /// Master switch for hook processing. Disabled hooks stay installed but
+    /// return immediately without reading events or writing session state.
+    pub enabled: bool,
     /// Every N tool calls: journal trajectory + start background judge.
     pub n_tool_calls: u64,
     /// Every M tool calls: inject a scope-requirements reminder (if no stronger injection).
@@ -114,6 +117,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            enabled: true,
             n_tool_calls: 15,
             m_reminder: 30,
             model_runner: "auto".into(),
@@ -266,9 +270,53 @@ impl Config {
         Ok(path)
     }
 
+    /// Persist the master hook switch in the effective config file while
+    /// preserving all other settings and comments.
+    pub fn write_enabled(&self, enabled: bool) -> Result<PathBuf> {
+        let path = &self.loaded_from;
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
+        let original = if path.exists() {
+            fs::read_to_string(path).with_context(|| format!("read config {}", path.display()))?
+        } else {
+            default_config_toml()
+        };
+        let replacement = format!("enabled = {enabled}");
+        let mut found = false;
+        let mut lines = original
+            .lines()
+            .map(|line| {
+                let is_enabled = line
+                    .split_once('=')
+                    .is_some_and(|(key, _)| key.trim() == "enabled");
+                if is_enabled {
+                    found = true;
+                    replacement.clone()
+                } else {
+                    line.to_string()
+                }
+            })
+            .collect::<Vec<_>>();
+        if !found {
+            let insert_at = lines
+                .iter()
+                .position(|line| !line.trim_start().starts_with('#') && !line.trim().is_empty())
+                .unwrap_or(lines.len());
+            lines.insert(insert_at, replacement);
+            lines.insert(insert_at + 1, String::new());
+        }
+        let mut updated = lines.join("\n");
+        updated.push('\n');
+        fs::write(path, updated).with_context(|| format!("write config {}", path.display()))?;
+        Ok(path.clone())
+    }
+
     pub fn display_human(&self) -> String {
         format!(
             "loaded_from = {}\n\
+             enabled = {}              # master hook-processing switch\n\
              n_tool_calls = {}          # journal + background judge every N tools\n\
              m_reminder = {}            # inject scope reminder every M tools\n\
              model_runner = {:?}     # auto → use any supported session harness\n\
@@ -316,6 +364,7 @@ impl Config {
              Model selection: same product as the agent session when model_runner=auto.\n\
              Fast defaults are runner-specific; empty Pi/OpenCode values use provider defaults.\n",
             self.loaded_from.display(),
+            self.enabled,
             self.n_tool_calls,
             self.m_reminder,
             self.model_runner,
@@ -366,6 +415,10 @@ pub fn default_config_toml() -> String {
     format!(
         r#"# scopey configuration
 # Docs: scopey --help | scopey config --help
+
+# Master switch. When false, installed hooks remain registered but immediately
+# return without reading events, writing session state, or spawning jobs.
+enabled = true
 
 # Every N tool-call events: write a trajectory mark and start a background
 # judgement of that window against scope requirements.
@@ -477,6 +530,7 @@ mod tests {
     #[test]
     fn default_values_sane() {
         let c = Config::default();
+        assert!(c.enabled);
         assert!(c.n_tool_calls >= 1);
         assert!(c.m_reminder >= c.n_tool_calls);
         assert_eq!(c.model_runner, "auto");
@@ -490,6 +544,7 @@ mod tests {
     fn parse_toml_defaults() {
         let t = default_config_toml();
         let c: Config = toml::from_str(&t).expect("default toml parses");
+        assert!(c.enabled);
         assert!(c.n_tool_calls > 0);
         assert_eq!(c.min_job_interval_secs, 60);
     }
@@ -536,6 +591,7 @@ model = "haiku"
     #[test]
     fn display_human_mentions_keys() {
         let d = Config::default().display_human();
+        assert!(d.contains("enabled"));
         assert!(d.contains("n_tool_calls"));
         assert!(d.contains("model_runner"));
         assert!(d.contains("min_job_interval"));
@@ -546,5 +602,47 @@ model = "haiku"
         Config::with_temp_scopey_home(|dir| {
             assert_eq!(Config::scopey_home(), dir);
         });
+    }
+
+    #[test]
+    fn write_enabled_preserves_existing_config() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        fs::write(
+            &path,
+            "# keep this comment\nn_tool_calls = 42\nmodel = \"custom\"\n",
+        )
+        .unwrap();
+        let cfg = Config::load(Some(&path)).unwrap();
+
+        cfg.write_enabled(false).unwrap();
+        let disabled = fs::read_to_string(&path).unwrap();
+        assert!(disabled.contains("enabled = false"));
+        assert!(disabled.contains("# keep this comment"));
+        assert!(disabled.contains("n_tool_calls = 42"));
+        assert!(disabled.contains("model = \"custom\""));
+        assert!(!Config::load(Some(&path)).unwrap().enabled);
+
+        Config::load(Some(&path))
+            .unwrap()
+            .write_enabled(true)
+            .unwrap();
+        let enabled = fs::read_to_string(&path).unwrap();
+        assert_eq!(enabled.matches("enabled = true").count(), 1);
+        assert!(Config::load(Some(&path)).unwrap().enabled);
+    }
+
+    #[test]
+    fn write_enabled_creates_missing_config() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("nested/config.toml");
+        let cfg = Config::load(Some(&path)).unwrap();
+
+        cfg.write_enabled(false).unwrap();
+
+        let saved = fs::read_to_string(&path).unwrap();
+        assert!(saved.contains("enabled = false"));
+        assert!(saved.contains("n_tool_calls = 15"));
+        assert!(!Config::load(Some(&path)).unwrap().enabled);
     }
 }

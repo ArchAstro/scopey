@@ -14,8 +14,11 @@ use serde_json::json;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
-/// Absolute first line of defense: headless/internal children never re-enter hooks.
-fn hooks_disabled() -> bool {
+/// Absolute first line of defense: disabled installs and internal children no-op.
+fn hooks_disabled(cfg: &Config) -> bool {
+    if !cfg.enabled {
+        return true;
+    }
     if guard::is_internal() {
         // Do not log per-call when internal — would re-amplify during storms.
         eprintln!("scopey hook: no-op (SCOPEY_INTERNAL / hooks disabled)");
@@ -416,7 +419,7 @@ fn clip(s: &str, n: usize) -> String {
 }
 
 pub fn user_prompt(cfg: &Config) -> Result<()> {
-    if hooks_disabled() {
+    if hooks_disabled(cfg) {
         return Ok(());
     }
     let ev = read_event(cfg, "user-prompt")?;
@@ -521,7 +524,7 @@ pub fn user_prompt(cfg: &Config) -> Result<()> {
 }
 
 pub fn session_start(cfg: &Config) -> Result<()> {
-    if hooks_disabled() {
+    if hooks_disabled(cfg) {
         return Ok(());
     }
     let ev = read_event(cfg, "session-start")?;
@@ -580,7 +583,7 @@ pub fn session_start(cfg: &Config) -> Result<()> {
 }
 
 pub fn post_tool(cfg: &Config) -> Result<()> {
-    if hooks_disabled() {
+    if hooks_disabled(cfg) {
         return Ok(());
     }
     let ev = read_event(cfg, "post-tool")?;
@@ -812,7 +815,7 @@ pub fn post_tool(cfg: &Config) -> Result<()> {
 }
 
 pub fn stop(cfg: &Config) -> Result<()> {
-    if hooks_disabled() {
+    if hooks_disabled(cfg) {
         return Ok(());
     }
     let ev = read_event(cfg, "stop")?;
