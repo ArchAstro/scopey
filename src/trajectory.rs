@@ -959,7 +959,9 @@ and safety requirements still apply. Leave existing work intact unless the user
 explicitly asks you to revert it."#
     );
     if ascii_scopey {
-        out.push_str("\n\nPost the below:\n```\n");
+        out.push_str(
+            "\n\nIf compatible with the latest user request, you may include the optional mascot below:\n```\n",
+        );
         out.push_str(ASCII_SCOPEY_SCOPED.trim_start_matches('\n'));
         out.push_str("```\n");
     }
@@ -1133,7 +1135,9 @@ mod tests {
         assert!(!c.contains("REQUIRED CORRECTIONS"));
         assert!(!c.contains("Drop or reverse"));
         assert!(c.contains("You got scoped!"));
-        assert!(c.contains("Post the below:"));
+        assert!(c.contains("If compatible with the latest user request"));
+        assert!(c.contains("optional mascot"));
+        assert!(!c.contains("Post the below:"));
 
         let c_off = build_correction_injection(
             "- stay scoped",
@@ -1144,6 +1148,7 @@ mod tests {
         );
         assert!(c_off.contains("COURSE CORRECTION"));
         assert!(!c_off.contains("You got scoped!"));
+        assert!(!c_off.contains("optional mascot"));
         assert!(!c_off.contains("Post the below:"));
 
         let r = build_reminder_injection("- rule one");
