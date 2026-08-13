@@ -7,6 +7,11 @@ and the project intends to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Course-correction injections are advisory, no longer override the user's
+  latest request, and do not create their own approval gate.
+
 ## [0.2.2] - 2026-08-12
 
 ### Added

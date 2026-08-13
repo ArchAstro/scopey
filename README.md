@@ -281,6 +281,11 @@ verdicts and restarts the tool window so old work is never judged against a
 newer scope. If the summarizer model is unavailable, the fallback preserves
 only the latest request instead of replaying the full prompt history.
 
+Course corrections are advisory: they surface the judged evidence and preserve
+completed work, but they do not override the user's latest request or create an
+approval gate. Independent clarification, authorization, and safety requirements
+still apply.
+
 ### Development checks
 
 Contributors should run `make install-pre-commit` once after installing
