@@ -7,6 +7,11 @@ and the project intends to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Course-correction ASCII Scopey now uses a denser block-character rendering of
+  the mascot (still saying "You got scoped!").
+
 ## [0.2.2] - 2026-08-12
 
 ### Added
