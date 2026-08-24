@@ -572,23 +572,10 @@ Respond with EXACTLY this JSON object (no markdown fences):
                 json!({ "verdict": format!("{:?}", verdict) }),
             );
         }
-    } else if cfg.herdr_report_state {
-        // Herdr overlay is independent of desktop notify toggles. When we
-        // skip notify_judgement, still set/clear metadata for the same
-        // verdict classes notify_judgement would have handled.
-        match verdict {
-            JudgementVerdict::OffTrack => {
-                notify::report_herdr_attention(cfg, "off_track", &summary);
-            }
-            JudgementVerdict::Warning => {
-                notify::report_herdr_attention(cfg, "warning", &summary);
-            }
-            JudgementVerdict::OnTrack
-            | JudgementVerdict::InsufficientEvidence
-            | JudgementVerdict::Unknown => {
-                notify::clear_herdr_attention(cfg);
-            }
-        }
+    } else {
+        // Desktop notify skipped — still sync Herdr overlay via the same
+        // owning helper notify_judgement uses, so verdict policy cannot drift.
+        notify::sync_herdr_attention(cfg, &verdict, &summary);
     }
 
     Ok(())
