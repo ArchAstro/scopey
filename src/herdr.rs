@@ -256,20 +256,21 @@ pub fn resolve_agent_label(pane_id: Option<&str>) -> Option<String> {
                     .and_then(|x| x.as_array())
                 {
                     for p in procs {
-                        if let Some(name) = p
-                            .get("name")
+                        // Prefer argv0 (stable "grok") over process name
+                        // ("grok-0.2.118-ma") so lifecycle --agent matches Herdr.
+                        let raw = p
+                            .get("argv0")
                             .and_then(|x| x.as_str())
                             .map(str::trim)
                             .filter(|s| !s.is_empty())
-                        {
-                            // Normalize common binary names to herdr agent labels.
-                            let label = match name {
-                                "claude" | "codex" | "grok" | "pi" | "opencode" | "cursor" => {
-                                    name.to_string()
-                                }
-                                other => other.to_ascii_lowercase(),
-                            };
-                            if !label.eq_ignore_ascii_case("scopey") {
+                            .or_else(|| {
+                                p.get("name")
+                                    .and_then(|x| x.as_str())
+                                    .map(str::trim)
+                                    .filter(|s| !s.is_empty())
+                            });
+                        if let Some(raw) = raw {
+                            if let Some(label) = normalize_process_agent_label(raw) {
                                 return Some(label);
                             }
                         }
@@ -280,6 +281,36 @@ pub fn resolve_agent_label(pane_id: Option<&str>) -> Option<String> {
     }
 
     None
+}
+
+/// Map a foreground process name/argv0 to a Herdr agent label.
+///
+/// Returns None for empty / "scopey". Recognizes versioned binaries such as
+/// `grok-0.2.118-ma` → `grok`.
+pub fn normalize_process_agent_label(raw: &str) -> Option<String> {
+    let base = std::path::Path::new(raw)
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or(raw)
+        .trim();
+    if base.is_empty() {
+        return None;
+    }
+    let lower = base.to_ascii_lowercase();
+    if lower == "scopey" {
+        return None;
+    }
+    // Longer prefixes first so "opencode" wins over "open".
+    const KNOWN: &[&str] = &[
+        "opencode", "claude", "codex", "cursor", "hermes", "grok", "kimi", "kilo", "omp", "pi",
+    ];
+    for known in KNOWN {
+        // Exact or `name-…` (versioned builds). Avoid bare prefix so "pineapple" ≠ "pi".
+        if lower == *known || lower.starts_with(&format!("{known}-")) {
+            return Some((*known).to_string());
+        }
+    }
+    Some(lower)
 }
 
 /// Mark scope attention on the current pane via **display-only** metadata.
@@ -433,7 +464,7 @@ pub fn release_agent(source: &str, agent_label: &str) -> Result<()> {
 }
 
 /// Best-effort recovery after scope attention: clear metadata, and if lifecycle
-/// was used, re-report working (or release) so the icon does not stick.
+/// was used, **release** authority so Herdr screen detection can resume.
 pub fn clear_scope_attention_full(
     source: &str,
     lifecycle: bool,
@@ -451,15 +482,10 @@ pub fn clear_scope_attention_full(
         .map(|s| s.to_string())
         .or_else(|| resolve_agent_label(None));
     if let Some(agent) = label {
-        // Prefer working over idle: under lifecycle authority, idle often maps to "done".
-        match report_agent_state("working", "scopey recovered", source, &agent) {
-            Ok(()) => {}
-            Err(e) => {
-                eprintln!("scopey herdr: report working failed ({e:#}); trying release-agent");
-                if let Err(e2) = release_agent(source, &agent) {
-                    eprintln!("scopey herdr: release-agent failed: {e2:#}");
-                }
-            }
+        // Release, don't just re-report working: working leaves scopey holding
+        // lifecycle authority and keeps screen detection suppressed.
+        if let Err(e) = release_agent(source, &agent) {
+            eprintln!("scopey herdr: release-agent failed: {e:#}");
         }
     }
     Ok(())
@@ -505,6 +531,27 @@ mod tests {
         assert!(
             empty.to_string().contains("non-empty"),
             "unexpected err: {empty:#}"
+        );
+    }
+
+    #[test]
+    fn normalize_process_agent_label_handles_versioned_binaries() {
+        assert_eq!(
+            normalize_process_agent_label("grok-0.2.118-ma").as_deref(),
+            Some("grok")
+        );
+        assert_eq!(
+            normalize_process_agent_label("grok").as_deref(),
+            Some("grok")
+        );
+        assert_eq!(
+            normalize_process_agent_label("/opt/homebrew/bin/codex").as_deref(),
+            Some("codex")
+        );
+        assert_eq!(normalize_process_agent_label("scopey"), None);
+        assert_eq!(
+            normalize_process_agent_label("pineapple").as_deref(),
+            Some("pineapple")
         );
     }
 }
