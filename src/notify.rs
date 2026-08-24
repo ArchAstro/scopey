@@ -53,21 +53,25 @@ pub fn notify_judgement(cfg: &Config, ctx: &NotifyContext<'_>) -> Result<()> {
     let body = ctx.expand(&cfg.notify_body);
     let sound = cfg.notify_sound.as_deref().filter(|s| !s.is_empty());
 
-    // Optional: annotate the Herdr pane (display-only by default).
-    if cfg.herdr_report_state {
-        match ctx.verdict {
-            JudgementVerdict::OffTrack | JudgementVerdict::Warning => {
-                report_herdr_attention(cfg, ctx.verdict_label(), &ctx.summary);
-            }
-            JudgementVerdict::OnTrack
-            | JudgementVerdict::InsufficientEvidence
-            | JudgementVerdict::Unknown => {
-                clear_herdr_attention(cfg);
-            }
-        }
-    }
-
+    sync_herdr_attention(cfg, ctx.verdict, ctx.summary);
     deliver(cfg, &title, &body, sound, ctx)
+}
+
+/// Single owner for judgement → Herdr overlay set/clear policy.
+///
+/// Called from notify and from the judge path when desktop notify is skipped,
+/// so the verdict arms cannot drift apart.
+pub fn sync_herdr_attention(cfg: &Config, verdict: &JudgementVerdict, summary: &str) {
+    if !cfg.herdr_report_state {
+        return;
+    }
+    match verdict {
+        JudgementVerdict::OffTrack => report_herdr_attention(cfg, "off_track", summary),
+        JudgementVerdict::Warning => report_herdr_attention(cfg, "warning", summary),
+        JudgementVerdict::OnTrack
+        | JudgementVerdict::InsufficientEvidence
+        | JudgementVerdict::Unknown => clear_herdr_attention(cfg),
+    }
 }
 
 /// Display-only metadata overlay (+ optional lifecycle report with real agent).

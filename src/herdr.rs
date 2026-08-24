@@ -487,6 +487,8 @@ pub fn clear_scope_attention_full(
         if let Err(e) = release_agent(source, &agent) {
             eprintln!("scopey herdr: release-agent failed: {e:#}");
         }
+    } else {
+        eprintln!("scopey herdr: lifecycle release skipped (could not resolve real agent label)");
     }
     Ok(())
 }
