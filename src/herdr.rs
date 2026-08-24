@@ -1,4 +1,4 @@
-//! Herdr awareness: detection, in-app notifications, optional pane state reports.
+//! Herdr awareness: detection, in-app notifications, optional pane annotations.
 //!
 //! Herdr is an agent multiplexer with a socket API. When a process runs inside a
 //! Herdr pane it typically has:
@@ -14,8 +14,14 @@
 //! Toast delivery is configured in Herdr itself under `[ui.toast] delivery`:
 //!   off | herdr | terminal | system
 //!
-//! State reporting (affects sidebar rollups / waits / Herdr-native alerts):
-//!   `herdr pane report-agent <pane_id> --source scopey --agent scopey`
+//! Display-only overlay (default — does not rename the real agent or take
+//! lifecycle authority):
+//!   `herdr pane report-metadata <pane_id> --source scopey`
+//!     --state-label blocked=scope --token scopey=off_track [--ttl-ms N]
+//!
+//! Lifecycle reporting (opt-in only; must use the real agent label, never
+//! hardcode "scopey" as --agent):
+//!   `herdr pane report-agent <pane_id> --source scopey --agent <codex|…>`
 //!     --state idle|working|blocked|unknown [--message TEXT]
 
 use anyhow::{bail, Context, Result};
@@ -23,6 +29,15 @@ use serde_json::Value;
 use std::env;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
+
+/// Token name written via `report-metadata` for scopey attention.
+pub const METADATA_TOKEN: &str = "scopey";
+/// `state_labels` key used when scopey wants a blocked annotation.
+pub const METADATA_BLOCKED_LABEL_KEY: &str = "blocked";
+/// Default value for the blocked state label (short sidebar text).
+pub const METADATA_BLOCKED_LABEL_VALUE: &str = "scope";
+/// Default metadata TTL: 5 minutes (Herdr auto-expires overlay).
+pub const DEFAULT_METADATA_TTL_MS: u64 = 300_000;
 
 /// Runtime view of whether we're inside / can talk to Herdr.
 #[derive(Debug, Clone)]
@@ -108,6 +123,14 @@ fn default_socket_path() -> Option<PathBuf> {
     }
 }
 
+fn herdr_bin() -> Result<PathBuf> {
+    which::which("herdr").context("herdr not on PATH")
+}
+
+fn current_pane_id() -> Option<String> {
+    HerdrContext::detect().pane_id
+}
+
 /// Map scopey config sound / verdict to Herdr's sound enum: none|done|request.
 ///
 /// Off-track / warning default to **request** (needs-attention). Unknown OS
@@ -140,7 +163,7 @@ pub fn notification_show(
     sound: &str,
     position: Option<&str>,
 ) -> Result<bool> {
-    let bin = which::which("herdr").context("herdr not on PATH")?;
+    let bin = herdr_bin()?;
     let mut cmd = Command::new(bin);
     cmd.arg("notification")
         .arg("show")
@@ -192,24 +215,173 @@ pub fn notification_show(
     Ok(true)
 }
 
-/// Mark the current Herdr pane's agent state (blocked/working/idle).
+/// Resolve the real agent label for the current (or given) pane.
 ///
-/// No-op (Ok) when not inside a pane. Failures are returned for the caller to log.
+/// Prefers `pane get` → `agent`, then foreground process name. Never invents
+/// "scopey" — that would hijack the sidebar identity.
+pub fn resolve_agent_label(pane_id: Option<&str>) -> Option<String> {
+    let pane = pane_id.map(|s| s.to_string()).or_else(current_pane_id)?;
+    let bin = herdr_bin().ok()?;
+
+    if let Ok(output) = Command::new(&bin)
+        .args(["pane", "get", &pane])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .output()
+    {
+        if output.status.success() {
+            if let Ok(v) = serde_json::from_str::<Value>(&String::from_utf8_lossy(&output.stdout)) {
+                if let Some(agent) = v
+                    .pointer("/result/pane/agent")
+                    .and_then(|x| x.as_str())
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty() && !s.eq_ignore_ascii_case("scopey"))
+                {
+                    return Some(agent.to_string());
+                }
+            }
+        }
+    }
+
+    if let Ok(output) = Command::new(&bin)
+        .args(["pane", "process-info", "--pane", &pane])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .output()
+    {
+        if output.status.success() {
+            if let Ok(v) = serde_json::from_str::<Value>(&String::from_utf8_lossy(&output.stdout)) {
+                if let Some(procs) = v
+                    .pointer("/result/process_info/foreground_processes")
+                    .and_then(|x| x.as_array())
+                {
+                    for p in procs {
+                        if let Some(name) = p
+                            .get("name")
+                            .and_then(|x| x.as_str())
+                            .map(str::trim)
+                            .filter(|s| !s.is_empty())
+                        {
+                            // Normalize common binary names to herdr agent labels.
+                            let label = match name {
+                                "claude" | "codex" | "grok" | "pi" | "opencode" | "cursor" => {
+                                    name.to_string()
+                                }
+                                other => other.to_ascii_lowercase(),
+                            };
+                            if !label.eq_ignore_ascii_case("scopey") {
+                                return Some(label);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Mark scope attention on the current pane via **display-only** metadata.
+///
+/// Does not take lifecycle authority or rename the real agent (codex/claude/…).
+/// Herdr designed `report-metadata` for user hooks / overlays exactly like this.
+pub fn report_scope_attention(source: &str, verdict: &str, ttl_ms: u64) -> Result<()> {
+    let pane_id = match current_pane_id() {
+        Some(p) => p,
+        None => {
+            eprintln!("scopey herdr: no HERDR_PANE_ID; skip report-metadata");
+            return Ok(());
+        }
+    };
+    let bin = herdr_bin()?;
+    let token_value = if verdict.is_empty() {
+        "attention".to_string()
+    } else {
+        verdict.to_string()
+    };
+    let mut cmd = Command::new(bin);
+    cmd.arg("pane")
+        .arg("report-metadata")
+        .arg(&pane_id)
+        .arg("--source")
+        .arg(source)
+        .arg("--state-label")
+        .arg(format!(
+            "{METADATA_BLOCKED_LABEL_KEY}={METADATA_BLOCKED_LABEL_VALUE}"
+        ))
+        .arg("--token")
+        .arg(format!("{METADATA_TOKEN}={token_value}"));
+    if ttl_ms > 0 {
+        cmd.arg("--ttl-ms").arg(ttl_ms.to_string());
+    }
+    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let output = cmd.output().context("spawn herdr pane report-metadata")?;
+    if !output.status.success() {
+        bail!(
+            "herdr pane report-metadata failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    Ok(())
+}
+
+/// Clear scopey's display-only metadata on the current pane (recovery).
+pub fn clear_scope_attention(source: &str) -> Result<()> {
+    let pane_id = match current_pane_id() {
+        Some(p) => p,
+        None => return Ok(()),
+    };
+    let bin = herdr_bin()?;
+    let mut cmd = Command::new(bin);
+    cmd.arg("pane")
+        .arg("report-metadata")
+        .arg(&pane_id)
+        .arg("--source")
+        .arg(source)
+        .arg("--clear-state-labels")
+        .arg("--clear-token")
+        .arg(METADATA_TOKEN);
+    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let output = cmd
+        .output()
+        .context("spawn herdr pane report-metadata clear")?;
+    if !output.status.success() {
+        bail!(
+            "herdr pane report-metadata clear failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    Ok(())
+}
+
+/// Opt-in lifecycle report. Caller must pass the **real** agent label (codex/…).
+///
+/// Prefer `report_scope_attention` for normal use. Lifecycle authority
+/// suppresses screen detection until released or re-reported.
 pub fn report_agent_state(
     state: &str,
     message: &str,
     source: &str,
     agent_label: &str,
 ) -> Result<()> {
-    let ctx = HerdrContext::detect();
-    let pane_id = match ctx.pane_id {
-        Some(ref p) => p.clone(),
+    if agent_label.trim().is_empty() {
+        bail!("report-agent requires a non-empty agent label (use resolve_agent_label)");
+    }
+    if agent_label.eq_ignore_ascii_case("scopey") {
+        bail!(
+            "refusing to report-agent with --agent scopey (hijacks pane identity); \
+             pass the real harness label"
+        );
+    }
+    let pane_id = match current_pane_id() {
+        Some(p) => p,
         None => {
             eprintln!("scopey herdr: no HERDR_PANE_ID; skip report-agent");
             return Ok(());
         }
     };
-    let bin = which::which("herdr").context("herdr not on PATH")?;
+    let bin = herdr_bin()?;
     let mut cmd = Command::new(bin);
     cmd.arg("pane")
         .arg("report-agent")
@@ -230,6 +402,65 @@ pub fn report_agent_state(
             "herdr pane report-agent failed: {}",
             String::from_utf8_lossy(&output.stderr)
         );
+    }
+    Ok(())
+}
+
+/// Release lifecycle authority previously taken by `report_agent_state`.
+pub fn release_agent(source: &str, agent_label: &str) -> Result<()> {
+    let pane_id = match current_pane_id() {
+        Some(p) => p,
+        None => return Ok(()),
+    };
+    let bin = herdr_bin()?;
+    let mut cmd = Command::new(bin);
+    cmd.arg("pane")
+        .arg("release-agent")
+        .arg(&pane_id)
+        .arg("--source")
+        .arg(source)
+        .arg("--agent")
+        .arg(agent_label);
+    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let output = cmd.output().context("spawn herdr pane release-agent")?;
+    if !output.status.success() {
+        bail!(
+            "herdr pane release-agent failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    Ok(())
+}
+
+/// Best-effort recovery after scope attention: clear metadata, and if lifecycle
+/// was used, re-report working (or release) so the icon does not stick.
+pub fn clear_scope_attention_full(
+    source: &str,
+    lifecycle: bool,
+    agent_label_override: Option<&str>,
+) -> Result<()> {
+    if let Err(e) = clear_scope_attention(source) {
+        eprintln!("scopey herdr: clear metadata failed: {e:#}");
+    }
+    if !lifecycle {
+        return Ok(());
+    }
+    let label = agent_label_override
+        .map(str::trim)
+        .filter(|s| !s.is_empty() && !s.eq_ignore_ascii_case("scopey"))
+        .map(|s| s.to_string())
+        .or_else(|| resolve_agent_label(None));
+    if let Some(agent) = label {
+        // Prefer working over idle: under lifecycle authority, idle often maps to "done".
+        match report_agent_state("working", "scopey recovered", source, &agent) {
+            Ok(()) => {}
+            Err(e) => {
+                eprintln!("scopey herdr: report working failed ({e:#}); trying release-agent");
+                if let Err(e2) = release_agent(source, &agent) {
+                    eprintln!("scopey herdr: release-agent failed: {e2:#}");
+                }
+            }
+        }
     }
     Ok(())
 }
@@ -259,5 +490,21 @@ mod tests {
         let _ = h.summary_line();
         let _ = h.can_notify();
         let _ = h.inside_pane();
+    }
+
+    #[test]
+    fn refuse_scopey_as_lifecycle_agent() {
+        let err = report_agent_state("blocked", "x", "scopey", "scopey")
+            .expect_err("must refuse --agent scopey");
+        assert!(
+            err.to_string().contains("hijacks pane identity"),
+            "unexpected err: {err:#}"
+        );
+        let empty = report_agent_state("blocked", "x", "scopey", "  ")
+            .expect_err("must refuse empty agent");
+        assert!(
+            empty.to_string().contains("non-empty"),
+            "unexpected err: {empty:#}"
+        );
     }
 }

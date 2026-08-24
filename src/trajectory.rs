@@ -572,6 +572,10 @@ Respond with EXACTLY this JSON object (no markdown fences):
                 json!({ "verdict": format!("{:?}", verdict) }),
             );
         }
+    } else if cfg.herdr_report_state && matches!(verdict, JudgementVerdict::OnTrack) {
+        // On-track does not notify, but still clear a prior Herdr overlay so
+        // the pane does not stay marked after the agent recovers.
+        notify::clear_herdr_attention(cfg);
     }
 
     Ok(())

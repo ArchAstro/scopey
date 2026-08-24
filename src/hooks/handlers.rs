@@ -475,6 +475,12 @@ pub fn user_prompt(cfg: &Config) -> Result<()> {
         }),
     );
 
+    // User continued → clear any stuck Herdr scope-attention overlay from a
+    // prior off-track judgement so the sidebar icon recovers.
+    if cfg.herdr_report_state {
+        crate::notify::clear_herdr_attention(cfg);
+    }
+
     // Single-flight + throttle: defer summarize when busy (drain later).
     if !SessionJobGuard::can_spawn(cfg, &sid)? {
         store.mark_summarize_pending();
