@@ -53,22 +53,78 @@ pub fn notify_judgement(cfg: &Config, ctx: &NotifyContext<'_>) -> Result<()> {
     let body = ctx.expand(&cfg.notify_body);
     let sound = cfg.notify_sound.as_deref().filter(|s| !s.is_empty());
 
-    // Optional: tell Herdr this pane is blocked / needs attention.
+    // Optional: annotate the Herdr pane (display-only by default).
     if cfg.herdr_report_state {
-        let state = match ctx.verdict {
-            JudgementVerdict::OffTrack | JudgementVerdict::Warning => "blocked",
-            JudgementVerdict::OnTrack => "working",
-            JudgementVerdict::InsufficientEvidence | JudgementVerdict::Unknown => "unknown",
-        };
-        let msg = format!("{}: {}", ctx.verdict_label(), ctx.summary);
-        if let Err(e) =
-            herdr::report_agent_state(state, &msg, &cfg.herdr_source, &cfg.herdr_agent_label)
-        {
-            eprintln!("scopey herdr: report-agent failed: {e:#}");
+        match ctx.verdict {
+            JudgementVerdict::OffTrack | JudgementVerdict::Warning => {
+                report_herdr_attention(cfg, ctx.verdict_label(), &ctx.summary);
+            }
+            JudgementVerdict::OnTrack
+            | JudgementVerdict::InsufficientEvidence
+            | JudgementVerdict::Unknown => {
+                clear_herdr_attention(cfg);
+            }
         }
     }
 
     deliver(cfg, &title, &body, sound, ctx)
+}
+
+/// Display-only metadata overlay (+ optional lifecycle report with real agent).
+pub fn report_herdr_attention(cfg: &Config, verdict: &str, summary: &str) {
+    if let Err(e) =
+        herdr::report_scope_attention(&cfg.herdr_source, verdict, cfg.herdr_metadata_ttl_ms)
+    {
+        eprintln!("scopey herdr: report-metadata failed: {e:#}");
+    }
+    if !cfg.herdr_report_lifecycle {
+        return;
+    }
+    let agent = resolve_lifecycle_agent(cfg);
+    let Some(agent) = agent else {
+        eprintln!("scopey herdr: lifecycle report skipped (could not resolve real agent label)");
+        return;
+    };
+    let msg = if summary.is_empty() {
+        format!("scopey: {verdict}")
+    } else {
+        format!("scopey {verdict}: {summary}")
+    };
+    if let Err(e) = herdr::report_agent_state("blocked", &msg, &cfg.herdr_source, &agent) {
+        eprintln!("scopey herdr: report-agent failed: {e:#}");
+    }
+}
+
+/// Clear scopey Herdr annotations (user continued / on-track / recovery).
+pub fn clear_herdr_attention(cfg: &Config) {
+    let override_label = cfg.herdr_agent_label.trim();
+    let override_label = if override_label.is_empty() {
+        None
+    } else {
+        Some(override_label)
+    };
+    if let Err(e) = herdr::clear_scope_attention_full(
+        &cfg.herdr_source,
+        cfg.herdr_report_lifecycle,
+        override_label,
+    ) {
+        eprintln!("scopey herdr: clear attention failed: {e:#}");
+    }
+}
+
+fn resolve_lifecycle_agent(cfg: &Config) -> Option<String> {
+    let configured = cfg.herdr_agent_label.trim();
+    if !configured.is_empty() {
+        if configured.eq_ignore_ascii_case("scopey") {
+            eprintln!(
+                "scopey herdr: herdr_agent_label=\"scopey\" is refused (hijacks sidebar names); \
+                 auto-detecting instead"
+            );
+        } else {
+            return Some(configured.to_string());
+        }
+    }
+    herdr::resolve_agent_label(None)
 }
 
 fn deliver(

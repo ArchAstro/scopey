@@ -224,12 +224,17 @@ When Claude/Codex run **inside a Herdr pane**, scopey can:
 
 1. **Notify via Herdr** — `herdr notification show … --sound request`  
    (Herdr routes to in-app toast, outer terminal, or OS depending on `[ui.toast] delivery`)
-2. **Report pane state** — `herdr pane report-agent … --state blocked` so the sidebar shows needs-attention
+2. **Annotate the pane** — `herdr pane report-metadata …` (display-only overlay with a
+   short `blocked=scope` label and a `scopey=<verdict>` token). This does **not** rename
+   the real agent (codex/claude/…) or take lifecycle authority, so the sidebar icon
+   recovers when you send a new prompt, an on-track judgement lands, or the TTL expires.
 
 | scopey config | Default | Meaning |
 |---|---|---|
 | `notify_backend` | `auto` | `auto` → Herdr if available, else OS; or pin `herdr` / `os` / `command` |
-| `herdr_report_state` | `true` | Also mark the pane blocked on off-track/warning |
+| `herdr_report_state` | `true` | Display-only metadata overlay on off-track/warning |
+| `herdr_report_lifecycle` | `false` | Opt-in `report-agent` using the **real** agent label (auto-detected) |
+| `herdr_metadata_ttl_ms` | `300000` | Auto-expire metadata overlay (5 minutes; `0` = no TTL) |
 | `herdr_notify_sound` | (auto) | `none` \| `done` \| `request` |
 | `notify_fallback_os_if_herdr_disabled` | `true` | If Herdr returns `shown=false`, use OS notify |
 

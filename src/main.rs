@@ -687,14 +687,18 @@ Herdr pane they export HERDR_ENV / HERDR_SOCKET_PATH / HERDR_PANE_ID.
 
 scopey uses:
   herdr notification show <title> --body … --sound request|done|none
-  herdr pane report-agent <pane> --source scopey --state blocked …
+  herdr pane report-metadata <pane> --source scopey
+    --state-label blocked=scope --token scopey=<verdict> [--ttl-ms …]
+  (display-only: does not rename the agent or take lifecycle authority)
 
 Toast delivery is controlled by Herdr config `[ui.toast] delivery`:
   off | herdr | terminal | system
 
 scopey config:
   notify_backend = "auto"   # auto|herdr|os|command
-  herdr_report_state = true
+  herdr_report_state = true          # metadata overlay on off-track/warning
+  herdr_report_lifecycle = false     # opt-in report-agent with real agent label
+  herdr_metadata_ttl_ms = 300000     # auto-expire overlay (5 min)
   notify_fallback_os_if_herdr_disabled = true
 
 Examples:
@@ -973,11 +977,18 @@ fn cmd_herdr(cfg: &Config, probe: bool) -> Result<()> {
     println!("  {}", h.summary_line());
     println!("  notify_backend = {:?}", cfg.notify_backend);
     println!("  herdr_report_state = {}", cfg.herdr_report_state);
+    println!("  herdr_report_lifecycle = {}", cfg.herdr_report_lifecycle);
+    println!("  herdr_source = {:?}", cfg.herdr_source);
+    println!("  herdr_agent_label = {:?}", cfg.herdr_agent_label);
+    println!("  herdr_metadata_ttl_ms = {}", cfg.herdr_metadata_ttl_ms);
     println!("  herdr_notify_sound = {:?}", cfg.herdr_notify_sound);
     println!(
         "  notify_fallback_os_if_herdr_disabled = {}",
         cfg.notify_fallback_os_if_herdr_disabled
     );
+    if let Some(agent) = herdr::resolve_agent_label(None) {
+        println!("  resolved_agent_label = {agent}");
+    }
     println!();
     println!("Herdr toast delivery is configured in ~/.config/herdr/config.toml under [ui.toast].");
     println!("  delivery = \"herdr\" | \"terminal\" | \"system\" | \"off\"");

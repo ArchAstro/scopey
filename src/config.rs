@@ -68,12 +68,27 @@ pub struct Config {
     pub herdr_notify_sound: Option<String>,
     /// If Herdr accepts the call but `shown=false` (toasts disabled), fall back to OS.
     pub notify_fallback_os_if_herdr_disabled: bool,
-    /// When true and inside a Herdr pane, also `pane report-agent --state blocked`.
+    /// When true and inside a Herdr pane, annotate the pane via display-only
+    /// `pane report-metadata` (state label + token) on off-track/warning.
+    /// Does not rename the real agent or take lifecycle authority.
     pub herdr_report_state: bool,
-    /// `--source` for herdr pane report-agent.
+    /// `--source` id for Herdr pane metadata / optional lifecycle reports.
     pub herdr_source: String,
-    /// `--agent` label for herdr pane report-agent.
+    /// Opt-in: also call `pane report-agent` so Herdr sidebar waits treat the
+    /// pane as lifecycle-blocked. Uses the real agent label (auto-detected
+    /// unless `herdr_agent_label` is set). Default false — lifecycle authority
+    /// hijacks screen detection and sticks if never recovered.
+    #[serde(default)]
+    pub herdr_report_lifecycle: bool,
+    /// Optional override for lifecycle `--agent` (codex/claude/grok/…).
+    /// Empty (default) means auto-detect from the Herdr pane. Never set this
+    /// to "scopey" — that renames every pane in the sidebar.
+    #[serde(default)]
     pub herdr_agent_label: String,
+    /// TTL for display-only metadata overlays (milliseconds). 0 = no TTL.
+    /// Default 300_000 (5 minutes) so a stuck annotation self-expires.
+    #[serde(default = "default_herdr_metadata_ttl_ms")]
+    pub herdr_metadata_ttl_ms: u64,
     /// Root for session JSON files.
     pub work_root: PathBuf,
     /// Max characters of transcript excerpt sent to the judge model.
@@ -143,7 +158,9 @@ impl Default for Config {
             notify_fallback_os_if_herdr_disabled: true,
             herdr_report_state: true,
             herdr_source: "scopey".into(),
-            herdr_agent_label: "scopey".into(),
+            herdr_report_lifecycle: false,
+            herdr_agent_label: String::new(),
+            herdr_metadata_ttl_ms: default_herdr_metadata_ttl_ms(),
             work_root: default_work_root(),
             judge_transcript_chars: 24_000,
             summarize_prompt_chars: 32_000,
@@ -340,9 +357,11 @@ impl Config {
              herdr_notify_position = {:?}\n\
              herdr_notify_sound = {:?}\n\
              notify_fallback_os_if_herdr_disabled = {}\n\
-             herdr_report_state = {}\n\
+             herdr_report_state = {}     # display-only report-metadata overlay\n\
              herdr_source = {:?}\n\
-             herdr_agent_label = {:?}\n\
+             herdr_report_lifecycle = {} # opt-in report-agent (real agent label)\n\
+             herdr_agent_label = {:?}  # empty = auto-detect; never \"scopey\"\n\
+             herdr_metadata_ttl_ms = {}  # 0 = no TTL; default 5 min\n\
              work_root = {}\n\
              judge_transcript_chars = {}\n\
              summarize_prompt_chars = {}\n\
@@ -390,7 +409,9 @@ impl Config {
             self.notify_fallback_os_if_herdr_disabled,
             self.herdr_report_state,
             self.herdr_source,
+            self.herdr_report_lifecycle,
             self.herdr_agent_label,
+            self.herdr_metadata_ttl_ms,
             self.work_root.display(),
             self.judge_transcript_chars,
             self.summarize_prompt_chars,
@@ -405,6 +426,10 @@ impl Config {
             self.log_raw_events,
         )
     }
+}
+
+fn default_herdr_metadata_ttl_ms() -> u64 {
+    crate::herdr::DEFAULT_METADATA_TTL_MS
 }
 
 fn default_work_root() -> PathBuf {
@@ -483,10 +508,13 @@ notify_backend = "auto"
 # herdr_notify_sound = "request"   # none|done|request
 notify_fallback_os_if_herdr_disabled = true
 
-# When inside a Herdr pane, also report blocked state for sidebar / waits
+# When inside a Herdr pane, annotate via display-only report-metadata
+# (does not rename the agent or take lifecycle authority).
 herdr_report_state = true
 herdr_source = "scopey"
-herdr_agent_label = "scopey"
+# herdr_report_lifecycle = false  # opt-in report-agent with real agent label
+# herdr_agent_label = ""          # empty = auto-detect; never set to "scopey"
+herdr_metadata_ttl_ms = 300000    # 5 min auto-expire for metadata overlay
 
 work_root = "{work}"
 
@@ -538,6 +566,13 @@ mod tests {
         assert_eq!(c.claude_fast_model, "haiku");
         assert!(!c.codex_fast_model.is_empty());
         assert_eq!(c.notify_backend, "auto");
+        assert!(c.herdr_report_state);
+        assert!(!c.herdr_report_lifecycle);
+        assert!(c.herdr_agent_label.is_empty());
+        assert_eq!(
+            c.herdr_metadata_ttl_ms,
+            crate::herdr::DEFAULT_METADATA_TTL_MS
+        );
     }
 
     #[test]
