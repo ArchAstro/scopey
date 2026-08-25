@@ -127,8 +127,12 @@ fn herdr_bin() -> Result<PathBuf> {
     which::which("herdr").context("herdr not on PATH")
 }
 
+/// Pane id for report/clear calls. Reads `HERDR_PANE_ID` only — never runs
+/// `herdr status` / full detect. Hook hot paths (user-prompt clear) call this
+/// on every prompt; probing a stuck Herdr CLI outside a pane would hang the
+/// harness.
 fn current_pane_id() -> Option<String> {
-    HerdrContext::detect().pane_id
+    env::var("HERDR_PANE_ID").ok().filter(|s| !s.is_empty())
 }
 
 /// Map scopey config sound / verdict to Herdr's sound enum: none|done|request.
