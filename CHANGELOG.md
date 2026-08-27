@@ -7,6 +7,8 @@ and the project intends to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-08-27
+
 ### Changed
 
 - Course-correction ASCII Scopey now uses a denser block-character rendering of
