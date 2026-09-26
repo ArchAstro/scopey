@@ -47,6 +47,8 @@ fn env_truthy(key: &str) -> bool {
 pub fn apply_hook_disable_env(cmd: &mut std::process::Command) {
     cmd.env(ENV_INTERNAL, "1");
     cmd.env(ENV_HOOKS_DISABLED, "1");
+    // Internal workers and model runners are helpers, not independently tracked agents.
+    cmd.env("ARCHDEV_PRESENCE_DISABLED", "1");
     // A parent Scopey worker may itself have inherited SIMPLE. Merely avoiding
     // setting it again is not enough: Claude Code treats any inherited value
     // as API-key-only mode and skips OAuth/keychain credentials.
@@ -444,6 +446,12 @@ mod tests {
         let mut cmd2 = std::process::Command::new("true");
         apply_hook_disable_env(&mut cmd2);
         let oauth_env = cmd2.get_envs().collect::<std::collections::HashMap<_, _>>();
+        for child_env in [&internal_env, &oauth_env] {
+            assert_eq!(
+                child_env.get(std::ffi::OsStr::new("ARCHDEV_PRESENCE_DISABLED")),
+                Some(&Some(std::ffi::OsStr::new("1")))
+            );
+        }
         assert_eq!(
             oauth_env.get(std::ffi::OsStr::new(ENV_INTERNAL)),
             Some(&Some(std::ffi::OsStr::new("1")))
