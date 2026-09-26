@@ -109,6 +109,16 @@ spelling), a transcript path under a `subagents/` folder, or
 `SCOPEY_SUBAGENT=1` in the hook environment. Set `ignore_subagents = false`
 to restore the old behavior.
 
+### ArchDev presence
+
+Scopey's background summarize/judge workers and model subprocesses set
+`ARCHDEV_PRESENCE_DISABLED=1` in their child environment, including custom
+`model_command` invocations. ArchDev 0.46.9+ honors this opt-out, so these internal
+helpers do not publish presence. The top-level coding session keeps reporting
+normally. No shell-wide export or hook reconfiguration is needed; upgrade older
+ArchDev installs before relying on suppression. Room logging remains available,
+and any existing helper presence rows expire normally.
+
 ## Model selection
 
 Summarize/judge use a **cheap/fast** model on the **same harness as the agent session** when possible.
