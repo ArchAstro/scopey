@@ -7,6 +7,11 @@ and the project intends to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Release archives now include `THIRD_PARTY_NOTICES.md` with the license texts of
+  the crates compiled into the binary. CI checks that it matches `Cargo.lock`.
+
 ## [0.2.4] - 2026-09-26
 
 ## [0.2.3] - 2026-08-27
