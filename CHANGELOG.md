@@ -7,6 +7,8 @@ and the project intends to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-11-25
+
 ### Added
 
 - Release archives now include `THIRD_PARTY_NOTICES.md` with the license texts of
