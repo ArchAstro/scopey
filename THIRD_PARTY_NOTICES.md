@@ -53,7 +53,7 @@ crate offers a choice.
 | proc-macro2 | 1.0.107 | MIT OR Apache-2.0 | https://github.com/dtolnay/proc-macro2 |
 | quote | 1.0.47 | MIT OR Apache-2.0 | https://github.com/dtolnay/quote |
 | rustix | 1.1.4 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | https://github.com/bytecodealliance/rustix |
-| scopey | 0.2.4 | MIT | https://github.com/ArchAstro/scopey |
+| scopey | 0.2.5 | MIT | https://github.com/ArchAstro/scopey |
 | serde | 1.0.229 | MIT OR Apache-2.0 | https://github.com/serde-rs/serde |
 | serde_core | 1.0.229 | MIT OR Apache-2.0 | https://github.com/serde-rs/serde |
 | serde_derive | 1.0.229 | MIT OR Apache-2.0 | https://github.com/serde-rs/serde |
@@ -2210,7 +2210,7 @@ THE SOFTWARE.
 
 Used by:
 
-- scopey 0.2.4
+- scopey 0.2.5
 
 ```text
 MIT License
