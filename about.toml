@@ -1,0 +1,21 @@
+# cargo-about config for THIRD_PARTY_NOTICES.md: the crates linked into the released binary
+# on its release targets. Regenerate with scripts/third-party-notices.sh.
+accepted = [
+    "Apache-2.0",
+    "MIT",
+    "Unicode-3.0",
+]
+# The release targets in .github/workflows/release.yml.
+targets = [
+    "aarch64-apple-darwin",
+    "x86_64-apple-darwin",
+    "x86_64-unknown-linux-gnu",
+    "aarch64-unknown-linux-gnu",
+]
+ignore-dev-dependencies = true
+ignore-build-dependencies = true
+
+# MPL-2.0 is file-level copyleft. option-ext is linked unmodified (via dirs); the
+# obligations are the license text and the source location, both in the notices.
+[option-ext]
+accepted = ["MPL-2.0"]
